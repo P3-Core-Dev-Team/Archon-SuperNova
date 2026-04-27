@@ -1,15 +1,16 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { JobService } from '../../services/job.service';
+import { CommonModule } from '@angular/common';
+import { JobService, ConnectionTestResult } from '../../services/job.service';
 
 @Component({
   selector: 'app-job-submit',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule],
   template: `
     <h2>Submit a new discovery run</h2>
-    <p class="muted">Fill in the source database connection details. The job runs in the background — this form will clear, the new job appears in the Jobs list.</p>
+    <p class="muted">Fill in the source database connection details, then <strong>Test connection</strong>. The Run button enables once the test succeeds.</p>
 
     <form [formGroup]="form" (ngSubmit)="onSubmit()" class="card">
       <div class="row">
@@ -53,9 +54,28 @@ import { JobService } from '../../services/job.service';
         <div class="error">{{ error() }}</div>
       }
 
+      @if (testResult(); as t) {
+        @if (t.ok) {
+          <div class="success">
+            ✓ Connected — server: {{ t.server_version }} · user: <code>{{ t.current_user }}</code>
+            · schema <code>{{ t.schema }}</code> has <strong>{{ t.table_count }}</strong> tables.
+          </div>
+        } @else {
+          <div class="error">
+            ✗ Connection failed: {{ t.error }}
+          </div>
+        }
+      }
+
       <div class="actions">
+        <button type="button" class="secondary"
+                [disabled]="!canTest() || testing()"
+                (click)="onTest()">
+          {{ testing() ? 'Testing…' : 'Test connection' }}
+        </button>
         <button type="submit" class="primary"
-                [disabled]="form.invalid || submitting()">
+                [disabled]="!canRun()"
+                [title]="canRun() ? '' : 'Test the connection successfully before running'">
           {{ submitting() ? 'Submitting…' : 'Run discovery' }}
         </button>
         <button type="button" (click)="reset()">Reset</button>
@@ -85,6 +105,26 @@ import { JobService } from '../../services/job.service';
       border-radius: 6px;
       margin-bottom: 12px;
     }
+    .success {
+      background: #0e2e1d;
+      border: 1px solid #2ea043;
+      color: #aaf0c1;
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+    }
+    button.secondary {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+    }
+    button.secondary:hover:not(:disabled) {
+      background: #30363d;
+    }
+    button.primary:disabled, button.secondary:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
   `],
 })
 export class JobSubmitComponent {
@@ -93,7 +133,9 @@ export class JobSubmitComponent {
   private router = inject(Router);
 
   submitting = signal(false);
+  testing = signal(false);
   error = signal<string | null>(null);
+  testResult = signal<ConnectionTestResult | null>(null);
 
   form = this.fb.nonNullable.group({
     label: ['', Validators.required],
@@ -105,9 +147,74 @@ export class JobSubmitComponent {
     password: ['', Validators.required],
   });
 
+  // Connection-bearing fields. Any edit invalidates a prior test result so
+  // the user has to re-test before Run is re-enabled.
+  private readonly connFields = [
+    'host', 'port', 'database', 'user', 'password', 'schema',
+  ] as const;
+
+  // Snapshot of the connection-field values that produced the last successful
+  // test. If the user edits any of those fields, the test result is invalidated.
+  private testedFingerprint: string | null = null;
+
+  constructor() {
+    this.form.valueChanges.subscribe(() => {
+      if (this.testResult() && this.connFingerprint() !== this.testedFingerprint) {
+        this.testResult.set(null);
+        this.testedFingerprint = null;
+      }
+    });
+  }
+
+  private connFingerprint(): string {
+    const v = this.form.getRawValue();
+    return [v.host, v.port, v.database, v.user, v.password, v.schema].join('|');
+  }
+
+  // Test enabled iff every connection field is filled and valid.
+  canTest(): boolean {
+    return this.connFields.every(n => {
+      const c = this.form.controls[n];
+      return c.valid && c.value !== null && c.value !== '';
+    });
+  }
+
+  // Run enabled iff (a) the form is fully valid (incl. label) AND (b) the
+  // most recent connection test succeeded for the current field values.
+  canRun(): boolean {
+    return this.form.valid && !this.submitting() &&
+           !!this.testResult() && this.testResult()!.ok;
+  }
+
+  onTest(): void {
+    if (!this.canTest()) return;
+    this.testing.set(true);
+    this.error.set(null);
+    this.testResult.set(null);
+    const v = this.form.getRawValue();
+    this.jobs.testConnection({
+      host: v.host, port: v.port,
+      database: v.database, user: v.user, password: v.password,
+      schema: v.schema,
+    }).subscribe({
+      next: r => {
+        this.testing.set(false);
+        this.testResult.set(r);
+        this.testedFingerprint = this.connFingerprint();
+      },
+      error: err => {
+        this.testing.set(false);
+        this.testResult.set({
+          ok: false,
+          host: v.host, port: v.port, database: v.database, schema: v.schema,
+          error: err?.error?.detail ?? err?.message ?? 'request failed',
+        });
+      },
+    });
+  }
+
   onSubmit(): void {
-    if (this.form.invalid) {
-      // Surface validation issues even if the user mashed Enter without focusing.
+    if (!this.canRun()) {
       this.form.markAllAsTouched();
       return;
     }
@@ -122,7 +229,7 @@ export class JobSubmitComponent {
           host: 'localhost', port: 5432,
           database: '', user: '', password: '',
         });
-        // Spec: navigate straight to the new job's detail page.
+        this.testResult.set(null);
         this.router.navigate(['/jobs', job.job_id]);
       },
       error: err => {
@@ -141,5 +248,6 @@ export class JobSubmitComponent {
       database: '', user: '', password: '',
     });
     this.error.set(null);
+    this.testResult.set(null);
   }
 }

@@ -30,6 +30,28 @@ export interface RunLogEntry {
   sub_failed?: number;
 }
 
+export interface ConnectionTestRequest {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+  schema: string;
+}
+
+export interface ConnectionTestResult {
+  ok: boolean;
+  host: string;
+  port: number;
+  database: string;
+  schema: string;
+  server_version?: string;
+  current_user?: string;
+  table_count?: number;
+  error?: string;
+  error_kind?: 'connect' | 'schema_missing' | 'probe';
+}
+
 @Injectable({ providedIn: 'root' })
 export class JobService {
   private http = inject(HttpClient);
@@ -46,6 +68,15 @@ export class JobService {
       'X-Discovery-Token': DISCOVERY_API_TOKEN,
     });
     return this.http.post<Job>(`${this.base}/jobs`, req, { headers });
+  }
+
+  testConnection(req: ConnectionTestRequest): Observable<ConnectionTestResult> {
+    const headers = new HttpHeaders({
+      'X-Discovery-Token': DISCOVERY_API_TOKEN,
+    });
+    return this.http.post<ConnectionTestResult>(
+      `${this.base}/test_connection`, req, { headers },
+    );
   }
 
   list(): Observable<Job[]> {

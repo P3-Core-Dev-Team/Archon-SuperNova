@@ -130,6 +130,18 @@ class JobRequest(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class ConnectionTestRequest(BaseModel):
+    """Submitted by the UI's "Test connection" button before job submit."""
+    host: str
+    port: int = 5432
+    database: str
+    user: str
+    password: str
+    schema_name: str = Field(..., alias="schema")
+
+    model_config = {"populate_by_name": True}
+
+
 class JobStatus(BaseModel):
     job_id: str
     label: str
@@ -471,6 +483,80 @@ def _job_stats_from_db(schema_name: str) -> dict[str, int]:
 
 
 # ----------------------------------------------------------- HTTP routes
+
+
+@app.post(
+    "/api/test_connection",
+    dependencies=[Depends(_require_secret)],
+)
+def test_connection(req: ConnectionTestRequest) -> dict[str, Any]:
+    """Probe the source DB before the user submits a discovery job.
+
+    Returns ``{ok: True, ...}`` when a basic connect + ``SELECT 1`` plus a
+    schema-existence check succeed, otherwise ``{ok: False, error: <msg>}``
+    with a 200 status (the UI distinguishes failure by the ``ok`` field
+    rather than HTTP status, so it can show the error inline next to the
+    Test-connection button).
+    """
+    info: dict[str, Any] = {
+        "ok": False,
+        "host": req.host,
+        "port": req.port,
+        "database": req.database,
+        "schema": req.schema_name,
+    }
+    try:
+        conn = psycopg2.connect(
+            host=req.host,
+            port=req.port,
+            dbname=req.database,
+            user=req.user,
+            password=req.password,
+            connect_timeout=5,
+        )
+    except psycopg2.OperationalError as exc:
+        info["error"] = f"connect failed: {exc.args[0].strip() if exc.args else exc}"
+        info["error_kind"] = "connect"
+        return info
+    except Exception as exc:
+        info["error"] = f"connect failed: {type(exc).__name__}: {exc}"
+        info["error_kind"] = "connect"
+        return info
+
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT version(), current_database(), current_user")
+        version, dbname, current_user = cur.fetchone()
+        info["server_version"] = version.split(",")[0]
+        info["current_user"] = current_user
+
+        cur.execute(
+            "SELECT 1 FROM information_schema.schemata WHERE schema_name = %s",
+            (req.schema_name,),
+        )
+        if cur.fetchone() is None:
+            info["error"] = f'schema "{req.schema_name}" not found in database "{dbname}"'
+            info["error_kind"] = "schema_missing"
+            return info
+
+        cur.execute(
+            """
+            SELECT count(*) FROM information_schema.tables
+            WHERE table_schema = %s AND table_type = 'BASE TABLE'
+            """,
+            (req.schema_name,),
+        )
+        info["table_count"] = int(cur.fetchone()[0])
+    except Exception as exc:
+        info["error"] = f"probe failed: {type(exc).__name__}: {exc}"
+        info["error_kind"] = "probe"
+        return info
+    finally:
+        conn.close()
+
+    info["ok"] = True
+    return info
+
 
 @app.post(
     "/api/jobs",
