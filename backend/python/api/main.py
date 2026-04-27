@@ -318,11 +318,26 @@ def _load_jobs_from_db() -> None:
 
 
 def _build_config(req: JobRequest, work_dir: Path) -> Path:
-    """Render a discovery YAML config for one job."""
+    """Render a discovery YAML config for one job.
+
+    The per-job source-DB password is written to ``<work_dir>/.source_pass``
+    (mode 0600) and referenced from the YAML as ``file://<path>``.  Keeping
+    the plaintext out of ``config.yaml`` means a stray ``ls`` / log /
+    process-listing of the work_dir doesn't expose the credential — only
+    the extraction service, which has file-read access on the same host,
+    ever resolves it.
+    """
     storage = work_dir / "parquet"
     reports = work_dir / "reports"
     storage.mkdir(parents=True, exist_ok=True)
     reports.mkdir(parents=True, exist_ok=True)
+
+    # Per-job password file, 0600.  ``mkdtemp`` already gave us a 0700
+    # directory; this just narrows the file itself.
+    pass_path = work_dir / ".source_pass"
+    pass_path.write_text(req.password)
+    os.chmod(pass_path, 0o600)
+
     cfg = {
         "extraction_service": {
             "base_url": EXTRACTION_SERVICE_URL,
@@ -337,15 +352,10 @@ def _build_config(req: JobRequest, work_dir: Path) -> Path:
             "port": req.port or _DEFAULT_PORTS.get(req.db_type, 5432),
             "database": req.database,
             "user": req.user,
-            # Per-request literal password (the credential the user supplied
-            # in the submit form, after the Test-connection probe succeeded).
-            # The pipeline's ConnectionConfig forwards this to the extraction
-            # service, which prefers it over the env:// fallback. NEVER logged.
-            "password_inline": req.password,
-            # Fallback secret ref kept for backward-compat — only consulted
-            # when password_inline is empty (e.g. CLI-only invocations that
-            # mirror the original env-var contract).
-            "password_secret_ref": "env://SOURCE_DB_PASSWORD",
+            # Reference the 0600 file we just wrote, not the literal value.
+            # The pipeline / extractor resolves the file:// scheme at the
+            # boundary; the YAML on disk only shows the path.
+            "password_secret_ref": f"file://{pass_path}",
             "schemas": [req.schema_name],
             "ssl_mode": "disable",
         },
@@ -449,6 +459,17 @@ def _run_pipeline(job_id: str) -> None:
             job["cluster_count"] = stats.get("clusters", 0)
         except Exception:
             pass
+
+        # Shred the per-job password file regardless of job outcome.
+        # Defense-in-depth: even if the work_dir lingers in /tmp, the
+        # credential doesn't.
+        try:
+            pass_path = work_dir / ".source_pass"
+            if pass_path.exists():
+                pass_path.unlink()
+        except Exception:
+            pass
+
         _persist_job(job)
 
 
@@ -499,6 +520,21 @@ _DEFAULT_PORTS: dict[str, int] = {
     "sqlserver": 1433,
     "oracle":    1521,
 }
+
+
+@app.get("/api/auth/token")
+def get_auth_token() -> dict[str, str]:
+    """Return the X-Discovery-Token value the UI should send on POSTs.
+
+    Origin gating happens at the CORS layer (only :4200 may read this
+    endpoint).  The UI fetches it once on boot and caches it; the token
+    is no longer hardcoded as a literal in the JS bundle.
+
+    Production deployments rotate ``DISCOVERY_API_TOKEN`` per uvicorn
+    restart; the previous-bundle constant ``'dev-secret'`` becomes
+    invalid as soon as the env var is rotated.
+    """
+    return {"token": os.environ.get("DISCOVERY_API_TOKEN", "")}
 
 
 def _open_source_conn(req: ConnectionTestRequest, *, connect_timeout: int = 5):

@@ -150,7 +150,14 @@ TOKEN = os.environ.get("EXTRACTION_SERVICE_TOKEN", "dev-token")
 STORAGE_PATH = Path(os.environ.get("STORAGE_PATH", "/tmp/discovery-parquet"))
 STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 
-# Source DB password resolution: only honour env:// secret refs (matches Java SecretResolver)
+# Source DB password resolution.  Three schemes accepted:
+#
+#   env://<VAR>     read from process env (production / CLI-only path)
+#   file://<path>   read first line from a local file (per-job password
+#                   handoff: the API writes <work_dir>/.source_pass with
+#                   mode 0600 and points the YAML at it, keeping the
+#                   plaintext out of config.yaml)
+#   vault://<path>  reserved (real production), not implemented in mock
 def resolve_secret(ref: str) -> str:
     if not ref:
         raise ValueError("password_secret_ref is empty")
@@ -160,6 +167,13 @@ def resolve_secret(ref: str) -> str:
         if not val:
             raise ValueError(f"env var {var!r} is unset")
         return val
+    if ref.startswith("file://"):
+        path = Path(ref[len("file://"):])
+        if not path.exists():
+            raise ValueError(f"secret file not found: {path}")
+        # Read the first line, strip trailing newline only.
+        with path.open() as fh:
+            return fh.readline().rstrip("\r\n")
     if ref.startswith("vault://"):
         raise NotImplementedError("vault:// not implemented in mock")
     raise ValueError(f"unsupported secret ref scheme: {ref!r}")

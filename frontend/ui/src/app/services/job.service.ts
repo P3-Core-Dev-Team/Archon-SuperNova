@@ -14,10 +14,12 @@ import {
   SourceDbType,
 } from '../models/job.model';
 
-// MVP-only shared secret for POST /api/jobs. This is NOT a real auth secret --
-// the backend uses it solely to keep random web-origin pages from triggering
-// subprocess pipeline runs. Shipping it as a constant in client code is fine.
-const DISCOVERY_API_TOKEN = 'dev-secret';
+// The X-Discovery-Token used to authorise POSTs is fetched at runtime from
+// /api/auth/token (a CORS-gated GET) on app boot, so the literal value is no
+// longer baked into the JS bundle.  Until the fetch resolves we fall back to
+// an empty string and any POST will get a 401 — that's the desired posture
+// when the token can't be retrieved (network failure, server misconfig).
+let DISCOVERY_API_TOKEN = '';
 
 // Re-export so components can import SourceDbType from this service barrel.
 export type { SourceDbType } from '../models/job.model';
@@ -69,19 +71,29 @@ export class JobService {
   // also writes here, so the panel works even if B1 hasn't wired the click yet.
   selectedTable = signal<string | null>(null);
 
-  submit(req: JobRequest): Observable<Job> {
-    const headers = new HttpHeaders({
-      'X-Discovery-Token': DISCOVERY_API_TOKEN,
+  // Fetch the API token from /api/auth/token on first construction.  The
+  // service is providedIn: 'root' so this runs exactly once at app boot.
+  // Subsequent POSTs read the cached value via _authHeaders().
+  constructor() {
+    this.http.get<{ token: string }>(`${this.base}/auth/token`).subscribe({
+      next: r => { DISCOVERY_API_TOKEN = r.token || ''; },
+      error: () => { /* leave empty; POSTs will 401 until next reload */ },
     });
-    return this.http.post<Job>(`${this.base}/jobs`, req, { headers });
+  }
+
+  private _authHeaders(): HttpHeaders {
+    return new HttpHeaders({ 'X-Discovery-Token': DISCOVERY_API_TOKEN });
+  }
+
+  submit(req: JobRequest): Observable<Job> {
+    return this.http.post<Job>(`${this.base}/jobs`, req, {
+      headers: this._authHeaders(),
+    });
   }
 
   testConnection(req: ConnectionTestRequest): Observable<ConnectionTestResult> {
-    const headers = new HttpHeaders({
-      'X-Discovery-Token': DISCOVERY_API_TOKEN,
-    });
     return this.http.post<ConnectionTestResult>(
-      `${this.base}/test_connection`, req, { headers },
+      `${this.base}/test_connection`, req, { headers: this._authHeaders() },
     );
   }
 

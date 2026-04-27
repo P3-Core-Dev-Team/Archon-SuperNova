@@ -1,7 +1,8 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { Subscription, interval, switchMap } from 'rxjs';
+import { Subscription, combineLatest, interval, of, switchMap } from 'rxjs';
+import { catchError, filter } from 'rxjs/operators';
 import { Job } from '../../models/job.model';
 import { JobService, RunLogEntry } from '../../services/job.service';
 import { RelationshipGraphComponent } from '../relationship-graph/relationship-graph.component';
@@ -261,20 +262,26 @@ export class JobDetailComponent implements OnInit, OnDestroy {
         error: () => {},
       });
 
-    // Log polling — only fetches when the log tab is open.  Pulls both the
-    // raw stdout/stderr (/log) and the structured per-phase audit (/run_log).
-    this.logSub = interval(2000).subscribe(() => {
-      if (this.tab() === 'log') {
-        this.jobsSvc.log(id, 200).subscribe({
-          next: r => this.logText.set(r.log),
-          error: () => {},
-        });
-        this.jobsSvc.runLog(id).subscribe({
-          next: r => this.runLog.set(r.entries),
-          error: () => {},
-        });
-      }
-    });
+    // Log polling — only fetches when the log tab is open.  switchMap
+    // cancels in-flight HTTP requests when the next tick fires, preventing
+    // out-of-order responses on slow networks from clobbering newer state.
+    // catchError keeps the outer stream alive if a single tick fails.
+    this.logSub = interval(2000)
+      .pipe(
+        filter(() => this.tab() === 'log'),
+        switchMap(() => combineLatest([
+          this.jobsSvc.log(id, 200).pipe(
+            catchError(() => of({ log: this.logText() })),
+          ),
+          this.jobsSvc.runLog(id).pipe(
+            catchError(() => of({ entries: this.runLog() })),
+          ),
+        ])),
+      )
+      .subscribe(([logResp, runLogResp]) => {
+        this.logText.set(logResp.log);
+        this.runLog.set(runLogResp.entries);
+      });
   }
 
   ngOnDestroy(): void {
