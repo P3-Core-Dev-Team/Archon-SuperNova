@@ -85,7 +85,7 @@ Key modules under `backend/python/pipeline/src/discovery/`:
 | `polymorphic_fk.py` | Phase 4c — Rails/Django `entity_type`+`entity_id` pattern detector |
 | `jsonb_fk.py` | Phase 4d — extract leaf paths from `jsonb` columns and test containment |
 | `inheritance.py` | Post-Phase-5 evidence annotator for IS-A patterns |
-| `clustering.py` | Junction-collapse, node typology (FACT/DIM/LOOKUP/JUNCTION/AUDIT), weighted Louvain on the FK graph, cluster auto-naming |
+| `clustering.py` | Junction-collapse, node typology (FACT / DIMENSION / LOOKUP / JUNCTION / AUDIT / EMPTY), weighted Louvain on the FK graph, cluster auto-naming. Zero-record tables are pulled out of Louvain and grouped under a single `<schema>_empty_tables` cluster |
 | `results_db.py` | SQLAlchemy Core schema for the `discovery_results.discovery` Postgres tables + DAO objects (one DAO per result type) |
 | `run_log.py` | Per-phase audit log with `start/succeed/fail` + `is_complete` resume guard |
 | `report.py` | Phase 7 — emits `csv`/`xlsx` artifacts under `reports/<schema>/` |
@@ -94,6 +94,31 @@ Key modules under `backend/python/pipeline/src/discovery/`:
 
 DDL in `backend/python/pipeline/sql/results_schema.sql` — this is the single
 source of truth for the result-DB shape; `discovery init` runs it.
+
+#### Recent precision improvements
+
+These are baked into the modules above; calling them out here so the
+architecture map matches what the code actually does today.
+
+- **Structural-key FK eligibility (`inventory.py`).** A column declared
+  `PRIMARY KEY` / `UNIQUE`, or whose name is `id` / `<x>_id`, keeps
+  `is_fk_eligible=true` even when its `TypeClass` is `STRING_LONG` (the
+  default exclusion for long-text columns). Critical for UUID/text-keyed
+  schemas — without it, every FK out of a UUID PK is invisible to
+  candidate generation.
+- **Suffix-id-match candidate gate (`scoring.py` + `candidates.py`).**
+  Generic `<x>_id → <table>.id` rule with token-overlap matching plus
+  singularisation. Recovers FKs whose lexical similarity is below 0.85
+  but whose name conforms to the universal SQL convention.
+- **PII pointer suppression (`pii_priors.py` + `pii_scan.py`).**
+  Findings on pointer-named columns (`id` / `*_id` / `*_uuid` / `*_pk`
+  / `*_fk` / `*_ref`) are dropped unless the column name has a positive
+  prior for the matched type. UUID values triggering `API_KEY` /
+  `PHONE_US` regex hits no longer pollute the findings table.
+- **Empty-table cluster (`clustering.py`).** Tables with
+  `row_count_estimate = 0` are pulled out of the Louvain input and
+  emitted as one labelled cluster `<schema>_empty_tables`, archetype
+  `EMPTY`. Replaces the long tail of meaningless singleton clusters.
 
 ### 2. API — `backend/python/api/main.py`
 
@@ -108,7 +133,18 @@ Responsibilities:
   subprocess; status updates persisted on every transition
 - Defensive crash-recovery: jobs left as `running` at boot are surfaced as
   `failed` with reason "API restarted while job was in flight"
-- Auth: `POST /api/jobs` requires `X-Discovery-Token`; GET endpoints open
+- Source-DB credential pipelined per-request: the form password becomes
+  `password_inline` on the `ConnectionConfig` sent to the extractor. The
+  process-wide `SOURCE_DB_PASSWORD` env var is now only a CLI fallback
+- Pre-submit connection probe: `POST /api/test_connection` runs
+  `psycopg2.connect → SELECT version() → schema-existence check → BASE
+  TABLE count`. The UI's **Run discovery** button is disabled until this
+  succeeds for the current field values
+- Structured run-log: `GET /api/jobs/{id}/run_log` returns a per-phase
+  rollup of `discovery.run_log`; `/log` strips ANSI before returning
+  the raw subprocess output
+- Auth: `POST /api/jobs` and `POST /api/test_connection` require
+  `X-Discovery-Token`; GET endpoints open
 - CORS: `localhost:4200` and `127.0.0.1:4200` only
 
 ### 3. UI — `frontend/ui/`

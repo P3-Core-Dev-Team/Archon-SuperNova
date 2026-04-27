@@ -8,6 +8,7 @@ FastAPI app served by uvicorn at `http://127.0.0.1:8000`. All routes under
 | Endpoint | Auth |
 |---|---|
 | `POST /api/jobs` | **Required** — header `X-Discovery-Token: <DISCOVERY_API_TOKEN>` |
+| `POST /api/test_connection` | **Required** — same header |
 | Every other route | Open (GET-only, MVP convention so the dashboard polls without token glue) |
 
 CORS allowlist: `http://localhost:4200`, `http://127.0.0.1:4200`.
@@ -15,6 +16,16 @@ CORS allowlist: `http://localhost:4200`, `http://127.0.0.1:4200`.
 
 Required env at boot (uvicorn refuses to start otherwise):
 `SOURCE_DB_PASSWORD`, `RESULTS_DB_PASSWORD`, `DISCOVERY_API_TOKEN`.
+
+## Source-DB credentials
+
+The form supplies the source-DB password per request. The API plumbs it
+through to the extraction service as `password_inline` on each
+`/api/v1/extract` call (see `ConnectionConfig.password_inline`). The
+process-wide `SOURCE_DB_PASSWORD` env var is now only a fallback for
+CLI-only invocations that don't set the inline channel — UI-driven jobs
+ignore it. The credential is never logged: `extraction_client._safe_conn_repr`
+redacts both `password_secret_ref` and `password_inline`.
 
 ## Endpoint reference
 
@@ -46,6 +57,63 @@ connect to). Used by the Dashboard to populate the per-schema cards.
   "total": 3
 }
 ```
+
+---
+
+### `POST /api/test_connection`
+
+Probe the source DB before submitting a job. Auth-gated. The Submit form
+in the UI calls this from the **Test connection** button and gates the
+**Run discovery** button on a successful result.
+
+**Headers**: `Content-Type: application/json`, `X-Discovery-Token: <token>`
+
+**Body** (`ConnectionTestRequest`):
+```json
+{
+  "host":     "localhost",
+  "port":     5432,
+  "database": "ads",
+  "user":     "adsuser",
+  "password": "Ads@3421",
+  "schema":   "public"
+}
+```
+
+**Probe sequence** (5-second connect timeout):
+1. `psycopg2.connect(...)`
+2. `SELECT version(), current_database(), current_user`
+3. Verify `schema_name` exists in `information_schema.schemata`
+4. Count `BASE TABLE` entries in that schema
+
+**200 — success**:
+```json
+{
+  "ok": true,
+  "host": "localhost", "port": 5432,
+  "database": "ads", "schema": "public",
+  "server_version": "PostgreSQL 14.2 on x86_64-pc-linux-gnu",
+  "current_user": "adsuser",
+  "table_count": 218
+}
+```
+
+**200 — failure** (note: HTTP 200 always; failure is in the body so the
+UI can render the error inline rather than treating it as transport):
+```json
+{
+  "ok": false,
+  "host": "localhost", "port": 5432,
+  "database": "ads", "schema": "nope",
+  "error": "schema \"nope\" not found in database \"ads\"",
+  "error_kind": "schema_missing"
+}
+```
+
+`error_kind` ∈ `{"connect", "schema_missing", "probe"}`.
+
+**Errors**:
+- `401` if token missing/wrong.
 
 ---
 
@@ -119,7 +187,10 @@ Status for one job.
 
 ### `GET /api/jobs/{job_id}/log?tail=200`
 
-Returns the tail of the pipeline log file at `<work_dir>/run.log`.
+Returns the tail of the pipeline log file at `<work_dir>/run.log`. The
+pipeline emits coloured output via structlog/rich; the API strips ANSI
+escape sequences server-side before returning so the UI's `<pre>` block
+displays plain text.
 
 **Query params**:
 - `tail` (int, default `200`): number of trailing lines to return.
@@ -128,6 +199,46 @@ Returns the tail of the pipeline log file at `<work_dir>/run.log`.
 ```json
 { "log": "..." }
 ```
+
+---
+
+### `GET /api/jobs/{job_id}/run_log?detail=rollup`
+
+Returns the structured per-phase audit from the `discovery.run_log`
+table. The Run-log tab in the UI renders this above the raw `/log`
+output.
+
+**Query params**:
+- `detail` ∈ `{"rollup", "full"}`, default `"rollup"`:
+  - `rollup`: one summary entry per phase (~14 rows) plus every failed
+    sub-scope row (so failures still surface). What the UI consumes.
+  - `full`: every `run_log` row — typically thousands (one per column
+    for fingerprint / pii_scan / validate). Used by deep debug.
+
+**200**:
+```json
+{
+  "entries": [
+    {
+      "phase": "extract",
+      "scope_type": "global",
+      "scope_id": 0,
+      "status": "succeeded",
+      "started_at": "2026-04-27T15:05:48.826299+05:30",
+      "ended_at":   "2026-04-27T15:05:50.556585+05:30",
+      "error_message": null,
+      "sub_total": 214,
+      "sub_failed": 0
+    }
+  ]
+}
+```
+
+`sub_total` / `sub_failed` are present only on phases that recorded
+per-table or per-column scopes (extract, fingerprint, pii_scan,
+validate). They show how many sub-scopes ran and how many failed.
+
+**404** if `job_id` not in the in-memory registry.
 
 ---
 

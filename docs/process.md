@@ -69,8 +69,23 @@ The user opens `http://localhost:4200/submit` and fills a form:
 | user | (empty) | required |
 | password | (empty) | required |
 
-On submit, `JobService.submit(payload)` POSTs to `/api/jobs` with header
-`X-Discovery-Token: dev-secret`.
+The form has **two action buttons**: *Test connection* (always enabled
+when every field is filled) and *Run discovery* (disabled until the
+test for the *current* field values succeeds). Any edit to any
+connection field invalidates the prior test result and re-disables
+*Run*.
+
+**Test connection** path:
+- POST `/api/test_connection` (auth-gated, header `X-Discovery-Token`).
+- API connects with a 5-second timeout, runs `SELECT version()`,
+  verifies the named schema exists, counts `BASE TABLE` entries.
+- Returns HTTP 200 always; the `ok` field carries success/failure so
+  the UI can render the message inline. Success surfaces server
+  version + table count; failure surfaces the underlying error
+  (connect refused, schema missing, etc.).
+
+**Run discovery** path: only fires after the test passed. POSTs to
+`/api/jobs` with header `X-Discovery-Token`.
 
 ### Step 1 — API accepts the job
 
@@ -80,11 +95,14 @@ On submit, `JobService.submit(payload)` POSTs to `/api/jobs` with header
    Fails fast with 401 on missing/wrong token.
 2. **Build per-job config**. Creates `tempfile.mkdtemp(prefix=f"disc-{job_id}-")`,
    renders a YAML config under it pointing to the per-job `parquet/` dir,
-   the results-DB DSN, and a single-schema scope.
-3. **Scrub the password**. `req.model_copy(update={"password": ""})` —
-   we never persist the source-DB password. The pipeline reads it from
-   the mock extraction service's environment via `password_secret_ref:
-   env://SOURCE_DB_PASSWORD`.
+   the results-DB DSN, and a single-schema scope. The form-supplied
+   password lands in the YAML as `source_db.password_inline` so the
+   extractor uses the credential the user actually typed (not a
+   process-wide env var).
+3. **In-memory scrub**. `req.model_copy(update={"password": ""})` clears
+   the password from the in-memory `_jobs` registry. The plaintext
+   only lives in the per-job `<work_dir>/config.yaml` (mode 0700) for
+   the duration of the run.
 4. **Persist initial state**. `_persist_job(job)` UPSERTs into
    `discovery.jobs` immediately so the row exists even if a crash hits
    before the runner starts. UI list renders it as `queued`.
@@ -120,11 +138,11 @@ exits non-zero, the API thread sets `job["status"] = "failed"`.
 
 | Phase | Module | What it does |
 |---|---|---|
-| 1. **inventory** | `inventory.py` | Connects to source DB, lists tables in `schema`, persists rows in `tbl_inventory` + `col_inventory`. Captures declared PK / unique-index metadata. |
+| 1. **inventory** | `inventory.py` | Connects to source DB, lists tables in `schema`, persists rows in `tbl_inventory` + `col_inventory`. Captures declared PK / unique-index metadata. **Structural-key promotion**: a column declared PK / UNIQUE, or named `id` / `<x>_id`, is marked `is_fk_eligible=true` even when its `TypeClass` is `STRING_LONG` — required for UUID / text-keyed schemas where the FK keys are stored as VARCHAR. |
 | 2. **extract** | `extraction.py` + `extraction_client.py` | For each table: posts a `COPY (SELECT ...)` request to the extraction service. Service streams CSV, writes a single Parquet file under `<work_dir>/parquet/<schema>__<table>.parquet`. Idempotent (skips tables already present + checksum-matching). |
 | 3a. **fingerprint** | `fingerprint.py` | One worker per CPU. Each worker reads its assigned column from Parquet, computes a HyperMinHash sketch (1024 buckets × 8 bits) + HLL cardinality + numeric min/max + null %. Adaptive early-stop after 3 row-groups when HLL stabilizes. Pickled sketch goes into `col_inventory.sketch_blob`. |
-| 3b. **pii_scan** | `pii_scan.py` | Per column: regex pass + Luhn / stdnum validators + name-prior boost + (default-on) spaCy NER on `STRING_LONG` columns. Multi-hit-per-cell capped at 1. Writes `pii_findings`. Adds `IDENTITY_BUNDLE` table-level rows when ≥2 of {first_name, last_name, email, phone, ssn, address} are present. |
-| 4. **candidate_gen** | `candidates.py` | SQL pre-filter (cardinality + type + PK signal + name match) + FAISS LSH search on the sketches → 100s-1000s of candidate (child_col, parent_col) pairs. Post-filters: `dedup_bidirectional_candidates` (keeps the canonical direction via PK > inheritance > row-count-vs-distinct identifier > canonical `id` > alphabetical), `filter_bridge_collisions` (drops ambiguous parents when one wins on name-sim + row-distance, exempting self-refs and declared-PK parents), `apply_range_overlap_penalty` (demotes child<<parent + weak name to advisory tier). Persists to `fk_candidates` with `tier ∈ {primary, advisory_lowconf}`. |
+| 3b. **pii_scan** | `pii_scan.py` | Per column: regex pass + Luhn / stdnum validators + name-prior boost + (default-on) spaCy NER on `STRING_LONG` columns. Multi-hit-per-cell capped at 1. Writes `pii_findings`. Adds `IDENTITY_BUNDLE` table-level rows when ≥2 of {first_name, last_name, email, phone, ssn, address} are present. **Structural-pointer suppression**: findings on columns named `id` / `*_id` / `*_uuid` / `*_pk` / `*_fk` / `*_ref` are dropped unless the column name has a positive name-prior for the matched PII type (so a UUID PK won't surface as `API_KEY`, a dense-int FK won't surface as `PHONE_US`). `*_key` / `*_hash` are intentionally not in the suppression set — `api_key` and `password_hash` legitimately hold credential material. |
+| 4. **candidate_gen** | `candidates.py` | SQL pre-filter (cardinality + type + PK signal + name match) + FAISS LSH search on the sketches → 100s-1000s of candidate (child_col, parent_col) pairs. Three role-bypasses re-admit candidates the lexical gate would otherwise reject: `self_ref_role` (manager_id → id), `cross_role_fk` (posted_by → employees.id), and `suffix_id_match` (generic `<x>_id → <table>.id` token-overlap rule, with singularisation; recovers `storage_policy_id → ads_st_config_policy.id`-style hits). Post-filters: `dedup_bidirectional_candidates` (canonical-direction picker), `filter_bridge_collisions` (drops ambiguous parents), `apply_range_overlap_penalty` (demotes child<<parent + weak name to advisory tier). PII-flagged columns whose name is a structural key keep FK-eligibility. Persists to `fk_candidates` with `tier ∈ {primary, advisory_lowconf}`. |
 | 5. **validate** | `validate.py` | DuckDB queries each Parquet file. For each `fk_candidates.tier='primary'` pair: `SELECT count of orphans = SELECT count(distinct child) - count(distinct child WHERE EXISTS in parent)`. `containment_full = 1 - orphans/child_distinct`. Survivors with `containment ≥ 0.95` land in `relationships` with the exact `confidence` and `cardinality` (1:1 / 1:N / N:1 / N:M). |
 | 4b. **composite_fk** | `composite_fk.py` | Multi-column FK detection — finds (col1, col2) pairs whose tuple values are contained in a parent's (PK1, PK2). Persists to `composite_relationships`. |
 | 4c. **polymorphic_fk** | `polymorphic_fk.py` | Detects Rails/Django shape: `entity_type` (low-cardinality string matching parent table names) + `entity_id` (high-cardinality int). Partitions child rows by discriminator value and runs DuckDB containment per partition. Writes `polymorphic_relationships`. |
@@ -132,7 +150,7 @@ exits non-zero, the API thread sets `job["status"] = "failed"`.
 | **inheritance** | `inheritance.py` | Post-Phase-5 annotator. Tags `relationships.evidence.is_a_inheritance = true` for pairs where both sides are PK + containment = 1.0 + name_sim ≥ 0.95. Catches `vendor.business_entity_id ↔ business_entity.business_entity_id`. |
 | **pii_propagation** | `pii_propagation.py` | Reverse-BFS over `relationships` (confidence ≥ 0.8). Roots = tables with a column-level PII finding in the direct-identifier class set (EMAIL, SSN_*, IBAN, CC_NUMBER, IDENTITY_BUNDLE, ...) at score ≥ 0.85. Tags every reachable table on `tbl_inventory.subject_kinds JSONB` with the union of subject types and `subject_link_distance`. No distance decay (under GDPR, depth-5 still counts). |
 | **pii_leak** | `pii_leak.py` | Cross-cluster value-set overlap detector. Compares HyperMinHash sketches between every PII direct-identifier column and every NON-PII column from a different table; emits a `pii_leaks` row when containment ≥ 0.5. Reuses sketches already on disk — no re-sampling. |
-| **clustering** | `clustering.py` | (1) Junction-collapse: degree-2 PK→PK junction tables become synthetic M:M edges between their two parents. (2) Node typology: tag each table FACT/DIMENSION/LOOKUP/JUNCTION/AUDIT. (3) Weighted Louvain (NetworkX) with `weight = confidence × cardinality_factor + schema_bonus(0.15) + pii_bonus(0.10)`. (4) Auto-name: anchor table → lexical prefix → `cluster_<id>`. Persists `clusters` rows + back-fills `tbl_inventory.cluster_id`. |
+| **clustering** | `clustering.py` | (0) **Empty-table partition**: tables with `row_count_estimate == 0` are pulled out of the graph and emitted as a single dedicated cluster `<schema>_empty_tables` with archetype `EMPTY` — replaces the long tail of meaningless singleton clusters. (1) Junction-collapse: degree-2 PK→PK junction tables become synthetic M:M edges between their two parents. (2) Node typology: tag each table FACT / DIMENSION / LOOKUP / JUNCTION / AUDIT (or EMPTY for the partitioned set). (3) Weighted Louvain (NetworkX) with `weight = confidence × cardinality_factor + schema_bonus(0.15) + pii_bonus(0.10)`. (4) Auto-name: anchor table → lexical prefix → `cluster_<id>`. Persists `clusters` rows + back-fills `tbl_inventory.cluster_id`. |
 | 7. **report** | `report.py` | Emits CSV + Excel artifacts under `<work_dir>/reports/`. |
 
 ### Step 3 — API records terminal state
