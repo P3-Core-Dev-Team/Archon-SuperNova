@@ -526,9 +526,12 @@ _DEFAULT_PORTS: dict[str, int] = {
 def get_auth_token() -> dict[str, str]:
     """Return the X-Discovery-Token value the UI should send on POSTs.
 
-    Origin gating happens at the CORS layer (only :4200 may read this
-    endpoint).  The UI fetches it once on boot and caches it; the token
-    is no longer hardcoded as a literal in the JS bundle.
+    This endpoint is intentionally unauthenticated.  CORS headers limit
+    cross-origin *browser* requests to :4200, but server-side tools
+    (curl, scripts) can read it freely regardless of CORS.  Its purpose
+    is to avoid hardcoding the token as a literal in the Angular bundle;
+    it is NOT an access-control boundary.  For stricter environments,
+    gate this endpoint behind its own auth or deliver the token out-of-band.
 
     Production deployments rotate ``DISCOVERY_API_TOKEN`` per uvicorn
     restart; the previous-bundle constant ``'dev-secret'`` becomes
@@ -765,24 +768,38 @@ def submit_job(req: JobRequest) -> JobStatus:
         "relationships_count": None,
         "pii_count": None,
     }
-    with _jobs_lock:
-        _jobs[job_id] = job
+    try:
+        with _jobs_lock:
+            _jobs[job_id] = job
 
-    # Persist immediately on submit so a crash before the runner starts
-    # still leaves a queued row visible in the UI.
-    _persist_job(job)
+        # Persist immediately on submit so a crash before the runner starts
+        # still leaves a queued row visible in the UI.
+        _persist_job(job)
 
-    # Clear stale orchestration state so the new job actually runs.  The
-    # pipeline's run_log is scoped (phase, "global", None); without this
-    # reset, a previous job's "succeeded" row makes _run_phase short-circuit
-    # with `phase_already_complete_skipping` and the new job produces 0
-    # results.  Also delete the prior analysis rows for THIS source schema
-    # so tbl_inventory/col_inventory/etc. don't show duplicates after
-    # re-extraction.  The persistent `jobs` table is intentionally NOT
-    # touched here.
-    _reset_pipeline_state_for_schema(req.schema_name)
+        # Clear stale orchestration state so the new job actually runs.  The
+        # pipeline's run_log is scoped (phase, "global", None); without this
+        # reset, a previous job's "succeeded" row makes _run_phase short-circuit
+        # with `phase_already_complete_skipping` and the new job produces 0
+        # results.  Also delete the prior analysis rows for THIS source schema
+        # so tbl_inventory/col_inventory/etc. don't show duplicates after
+        # re-extraction.  The persistent `jobs` table is intentionally NOT
+        # touched here.
+        _reset_pipeline_state_for_schema(req.schema_name)
 
-    threading.Thread(target=_run_pipeline, args=(job_id,), daemon=True).start()
+        threading.Thread(target=_run_pipeline, args=(job_id,), daemon=True).start()
+    except Exception as exc:
+        # If anything between _build_config and thread start raises, shred
+        # the per-job password file so it doesn't linger in work_dir.
+        pass_path = work_dir / ".source_pass"
+        try:
+            if pass_path.exists():
+                pass_path.unlink()
+        except Exception:
+            pass
+        with _jobs_lock:
+            _jobs.pop(job_id, None)
+        shutil.rmtree(work_dir, ignore_errors=True)
+        raise HTTPException(500, f"job setup failed: {exc}")
     return _job_status(job)
 
 
