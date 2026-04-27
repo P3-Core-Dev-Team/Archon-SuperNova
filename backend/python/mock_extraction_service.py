@@ -114,7 +114,13 @@ def extract_to_parquet(conn_cfg: dict, query: str, output_path: Path,
     decode CSV, and write a Parquet file. Returns manifest entry dict."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
-    password = resolve_secret(conn_cfg["password_secret_ref"])
+    # Prefer a per-request literal password (dev / API-supplied) when present;
+    # otherwise resolve the env://VAR / vault://path reference.
+    inline = conn_cfg.get("password_inline")
+    if inline:
+        password = inline
+    else:
+        password = resolve_secret(conn_cfg["password_secret_ref"])
 
     conn = psycopg2.connect(
         host=conn_cfg["host"], port=conn_cfg.get("port", 5432),
@@ -275,7 +281,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if self.path == "/api/v1/connections/test":
                 cfg = body
-                password = resolve_secret(cfg["password_secret_ref"])
+                inline = cfg.get("password_inline")
+                password = inline if inline else resolve_secret(cfg["password_secret_ref"])
                 conn = psycopg2.connect(host=cfg["host"], port=cfg.get("port", 5432),
                                         dbname=cfg["database"], user=cfg["user"],
                                         password=password, connect_timeout=10)

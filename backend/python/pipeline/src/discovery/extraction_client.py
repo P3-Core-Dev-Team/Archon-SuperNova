@@ -73,7 +73,8 @@ def _log_retry(retry_state: RetryCallState) -> None:
 
 
 def _safe_conn_repr(conn: ConnectionConfig) -> dict[str, Any]:
-    """Return a loggable dict from ConnectionConfig with the secret ref redacted."""
+    """Return a loggable dict from ConnectionConfig with both credential
+    channels redacted (secret ref AND any literal inline password)."""
     return {
         "type": conn.type,
         "host": conn.host,
@@ -81,6 +82,7 @@ def _safe_conn_repr(conn: ConnectionConfig) -> dict[str, Any]:
         "database": conn.database,
         "user": conn.user,
         "password_secret_ref": "***redacted***",
+        "password_inline": "***redacted***" if conn.password_inline else None,
         "ssl_mode": conn.ssl_mode,
     }
 

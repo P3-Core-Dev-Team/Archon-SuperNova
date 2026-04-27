@@ -11,7 +11,7 @@ secret (env://VAR or vault://path), NEVER the resolved password value.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,8 +25,14 @@ class ConnectionConfig(BaseModel):
     """
     Connection descriptor sent to the extraction service.
 
-    The service resolves password_secret_ref at runtime; Python never sees the
-    actual credential value.
+    Two channels for the source-DB credential:
+      * ``password_secret_ref`` — production path (env:// or vault://). The
+        extraction service resolves the reference; Python never sees the
+        actual value.
+      * ``password_inline`` — dev / per-job path. The API may set this when
+        the user supplies the credential through the submit form so the
+        password is delivered with the request rather than depending on a
+        process-wide env var on the extraction service. NEVER logged.
     """
 
     type: Literal["postgres"]
@@ -36,6 +42,14 @@ class ConnectionConfig(BaseModel):
     user: str
     password_secret_ref: str = Field(
         description="Secret reference: env://VAR_NAME or vault://path/to/secret"
+    )
+    password_inline: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional literal password (dev / per-job override). When set, "
+            "the extraction service uses this value directly and ignores "
+            "password_secret_ref. NEVER logged."
+        ),
     )
     ssl_mode: Literal["disable", "require", "verify-ca", "verify-full"] = "require"
     application_name: str = "discovery-extractor"

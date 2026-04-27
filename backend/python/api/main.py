@@ -332,11 +332,14 @@ def _build_config(req: JobRequest, work_dir: Path) -> Path:
             "port": req.port,
             "database": req.database,
             "user": req.user,
-            # The mock extraction service is a long-running peer process and
-            # only resolves env:// refs from its own environment (it was started
-            # with SOURCE_DB_PASSWORD set). Per-job env vars set on the pipeline
-            # subprocess are invisible to the mock service. Real production
-            # secret managers (vault://) would not have this restriction.
+            # Per-request literal password (the credential the user supplied
+            # in the submit form, after the Test-connection probe succeeded).
+            # The pipeline's ConnectionConfig forwards this to the extraction
+            # service, which prefers it over the env:// fallback. NEVER logged.
+            "password_inline": req.password,
+            # Fallback secret ref kept for backward-compat — only consulted
+            # when password_inline is empty (e.g. CLI-only invocations that
+            # mirror the original env-var contract).
             "password_secret_ref": "env://SOURCE_DB_PASSWORD",
             "schemas": [req.schema_name],
             "ssl_mode": "disable",

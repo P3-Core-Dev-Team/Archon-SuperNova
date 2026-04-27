@@ -20,7 +20,7 @@ from __future__ import annotations
 import os
 import re
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
@@ -105,6 +105,10 @@ class SourceDbConfig(BaseModel):
     password_secret_ref: str = Field(
         description="Secret ref: env://VAR or vault://path.  NEVER the actual password."
     )
+    # Optional dev / per-job override.  When set, the extraction service uses
+    # this value directly and ignores ``password_secret_ref``.  The API writes
+    # this when the user supplies a credential via the submit form.
+    password_inline: Optional[str] = None
     schemas: list[str] = Field(default_factory=lambda: ["public"])
     ssl_mode: Literal["disable", "require", "verify-ca", "verify-full"] = "require"
     application_name: str = "discovery-extractor"
@@ -121,6 +125,7 @@ class SourceDbConfig(BaseModel):
             database=self.database,
             user=self.user,
             password_secret_ref=self.password_secret_ref,
+            password_inline=self.password_inline,
             ssl_mode=self.ssl_mode,
             application_name=self.application_name,
         )
