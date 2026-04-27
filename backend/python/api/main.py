@@ -542,86 +542,86 @@ def _probe_source(conn, db_type: str, schema_name: str) -> dict[str, Any]:
     ``RuntimeError("schema_missing")`` when the schema doesn't exist.
     """
     cur = conn.cursor()
+    try:
+        if db_type == "postgres":
+            cur.execute("SELECT version(), current_database(), current_user")
+            version, _dbname, current_user = cur.fetchone()
+            cur.execute(
+                "SELECT 1 FROM information_schema.schemata WHERE schema_name = %s",
+                (schema_name,),
+            )
+            if cur.fetchone() is None:
+                raise RuntimeError("schema_missing")
+            cur.execute(
+                "SELECT count(*) FROM information_schema.tables "
+                "WHERE table_schema = %s AND table_type = 'BASE TABLE'",
+                (schema_name,),
+            )
+            table_count = int(cur.fetchone()[0])
 
-    if db_type == "postgres":
-        cur.execute("SELECT version(), current_database(), current_user")
-        version, _dbname, current_user = cur.fetchone()
-        cur.execute(
-            "SELECT 1 FROM information_schema.schemata WHERE schema_name = %s",
-            (schema_name,),
-        )
-        if cur.fetchone() is None:
-            raise RuntimeError("schema_missing")
-        cur.execute(
-            "SELECT count(*) FROM information_schema.tables "
-            "WHERE table_schema = %s AND table_type = 'BASE TABLE'",
-            (schema_name,),
-        )
-        table_count = int(cur.fetchone()[0])
+        elif db_type == "mysql":
+            cur.execute("SELECT version(), database(), current_user()")
+            version, _dbname, current_user = cur.fetchone()
+            # In MySQL, "schema" is synonymous with "database"; treat the request's
+            # schema_name as the target database name.
+            cur.execute(
+                "SELECT 1 FROM information_schema.schemata WHERE schema_name = %s",
+                (schema_name,),
+            )
+            if cur.fetchone() is None:
+                raise RuntimeError("schema_missing")
+            cur.execute(
+                "SELECT count(*) FROM information_schema.tables "
+                "WHERE table_schema = %s AND table_type = 'BASE TABLE'",
+                (schema_name,),
+            )
+            table_count = int(cur.fetchone()[0])
 
-    elif db_type == "mysql":
-        cur.execute("SELECT version(), database(), current_user()")
-        version, _dbname, current_user = cur.fetchone()
-        # In MySQL, "schema" is synonymous with "database"; treat the request's
-        # schema_name as the target database name.
-        cur.execute(
-            "SELECT 1 FROM information_schema.schemata WHERE schema_name = %s",
-            (schema_name,),
-        )
-        if cur.fetchone() is None:
-            raise RuntimeError("schema_missing")
-        cur.execute(
-            "SELECT count(*) FROM information_schema.tables "
-            "WHERE table_schema = %s AND table_type = 'BASE TABLE'",
-            (schema_name,),
-        )
-        table_count = int(cur.fetchone()[0])
+        elif db_type == "sqlserver":
+            cur.execute("SELECT @@VERSION, DB_NAME(), SUSER_NAME()")
+            version, _dbname, current_user = cur.fetchone()
+            cur.execute(
+                "SELECT 1 FROM sys.schemas WHERE name = %s",
+                (schema_name,),
+            )
+            if cur.fetchone() is None:
+                raise RuntimeError("schema_missing")
+            cur.execute(
+                "SELECT count(*) FROM information_schema.tables "
+                "WHERE table_schema = %s AND table_type = 'BASE TABLE'",
+                (schema_name,),
+            )
+            table_count = int(cur.fetchone()[0])
 
-    elif db_type == "sqlserver":
-        cur.execute("SELECT @@VERSION, DB_NAME(), SUSER_NAME()")
-        version, _dbname, current_user = cur.fetchone()
-        cur.execute(
-            "SELECT 1 FROM sys.schemas WHERE name = %s",
-            (schema_name,),
-        )
-        if cur.fetchone() is None:
-            raise RuntimeError("schema_missing")
-        cur.execute(
-            "SELECT count(*) FROM information_schema.tables "
-            "WHERE table_schema = %s AND table_type = 'BASE TABLE'",
-            (schema_name,),
-        )
-        table_count = int(cur.fetchone()[0])
+        elif db_type == "oracle":
+            # Oracle: schema_name maps to the owner / username.  The "database"
+            # in the connection request is the service name; row counts come
+            # from ALL_TABLES filtered by owner.
+            cur.execute(
+                "SELECT BANNER FROM v$version WHERE BANNER LIKE 'Oracle%' "
+                "FETCH FIRST 1 ROWS ONLY"
+            )
+            version_row = cur.fetchone()
+            version = version_row[0] if version_row else "Oracle (version unknown)"
+            cur.execute("SELECT user FROM dual")
+            current_user = cur.fetchone()[0]
+            # Schema (= owner) existence: any row in ALL_USERS.
+            cur.execute(
+                "SELECT 1 FROM all_users WHERE username = :s",
+                {"s": schema_name.upper()},
+            )
+            if cur.fetchone() is None:
+                raise RuntimeError("schema_missing")
+            cur.execute(
+                "SELECT count(*) FROM all_tables WHERE owner = :s",
+                {"s": schema_name.upper()},
+            )
+            table_count = int(cur.fetchone()[0])
 
-    elif db_type == "oracle":
-        # Oracle: schema_name maps to the owner / username.  The "database"
-        # in the connection request is the service name; row counts come
-        # from ALL_TABLES filtered by owner.
-        cur.execute(
-            "SELECT BANNER FROM v$version WHERE BANNER LIKE 'Oracle%' "
-            "FETCH FIRST 1 ROWS ONLY"
-        )
-        version_row = cur.fetchone()
-        version = version_row[0] if version_row else "Oracle (version unknown)"
-        cur.execute("SELECT user FROM dual")
-        current_user = cur.fetchone()[0]
-        # Schema (= owner) existence: any row in ALL_USERS.
-        cur.execute(
-            "SELECT 1 FROM all_users WHERE username = :s",
-            {"s": schema_name.upper()},
-        )
-        if cur.fetchone() is None:
-            raise RuntimeError("schema_missing")
-        cur.execute(
-            "SELECT count(*) FROM all_tables WHERE owner = :s",
-            {"s": schema_name.upper()},
-        )
-        table_count = int(cur.fetchone()[0])
-
-    else:
-        raise ValueError(f"unsupported db_type: {db_type}")
-
-    cur.close()
+        else:
+            raise ValueError(f"unsupported db_type: {db_type}")
+    finally:
+        cur.close()
     return {
         "server_version": str(version).split("\n")[0].split(",")[0].strip(),
         "current_user": str(current_user),
