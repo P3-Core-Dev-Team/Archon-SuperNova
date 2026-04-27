@@ -99,7 +99,7 @@ class ClusteredTable:
     table_name: str
     schema_name: str
     cluster_id: int
-    archetype: str  # FACT | DIMENSION | LOOKUP | JUNCTION | AUDIT
+    archetype: str  # FACT | DIMENSION | LOOKUP | JUNCTION | AUDIT | EMPTY
 
 
 @dataclass(frozen=True)
@@ -639,7 +639,20 @@ def cluster_schema(
         Frozen dataclass that CL-2 turns into DB rows.
     """
     # ----- 0. Filter input rows to *this* schema --------------------
-    schema_tables = [t for t in tables if t.get("schema_name") == schema_name]
+    schema_tables_all = [t for t in tables if t.get("schema_name") == schema_name]
+
+    # Pull out zero-record tables into a dedicated "empty" cluster.  These
+    # tables can't participate in containment-based FK validation (no values
+    # to test), so they otherwise become a long tail of meaningless
+    # singletons — grouping them under one labelled cluster keeps the
+    # cluster graph readable and signals "this group needs other evidence
+    # (DDL parsing, new data, ...) before it can be analysed".
+    empty_table_ids: set[int] = {
+        int(t["table_id"]) for t in schema_tables_all if _row_count(t) == 0
+    }
+    schema_tables = [
+        t for t in schema_tables_all if int(t["table_id"]) not in empty_table_ids
+    ]
     schema_table_ids: set[int] = {int(t["table_id"]) for t in schema_tables}
 
     # column->table map; we keep the full map (cross-schema) so that an edge
@@ -649,10 +662,25 @@ def cluster_schema(
     cols_by_table = _columns_by_table(columns)
     table_pii = _table_pii_types(pii_findings, col_to_table)
 
-    if not schema_tables:
+    if not schema_tables_all:
         return ClusteringResult(
             clusters=tuple(),
             table_assignments=tuple(),
+            junction_collapsed=tuple(),
+            modularity_score=0.0,
+            edge_count_post_collapse=0,
+        )
+
+    # Schema has only empty tables: short-circuit to the empty cluster only.
+    if not schema_tables:
+        empty_cluster, empty_assignments = _build_empty_cluster(
+            cluster_id=0,
+            schema_name=schema_name,
+            empty_tables=schema_tables_all,
+        )
+        return ClusteringResult(
+            clusters=(empty_cluster,) if empty_cluster else tuple(),
+            table_assignments=tuple(empty_assignments),
             junction_collapsed=tuple(),
             modularity_score=0.0,
             edge_count_post_collapse=0,
@@ -922,6 +950,21 @@ def cluster_schema(
             )
         )
 
+    # ----- 12. Append the "empty tables" cluster (if any) --------
+    if empty_table_ids:
+        empty_rows = [
+            t for t in schema_tables_all
+            if int(t["table_id"]) in empty_table_ids
+        ]
+        empty_cluster, empty_assignments = _build_empty_cluster(
+            cluster_id=len(final_clusters),
+            schema_name=schema_name,
+            empty_tables=empty_rows,
+        )
+        if empty_cluster is not None:
+            final_clusters.append(empty_cluster)
+            assignments.extend(empty_assignments)
+
     return ClusteringResult(
         clusters=tuple(final_clusters),
         table_assignments=tuple(assignments),
@@ -929,3 +972,43 @@ def cluster_schema(
         modularity_score=float(modularity_score),
         edge_count_post_collapse=int(edge_count_post_collapse),
     )
+
+
+def _build_empty_cluster(
+    *,
+    cluster_id: int,
+    schema_name: str,
+    empty_tables: list[dict],
+) -> tuple[Cluster | None, list[ClusteredTable]]:
+    """Build the "<schema>_empty_tables" cluster + its per-table assignments.
+
+    Returns ``(None, [])`` when the input list is empty.  Otherwise returns
+    a single Cluster containing all the empty tables tagged with archetype
+    ``EMPTY``.  No edges are computed (these tables can't participate in
+    containment-validated FKs by definition), so intra/inter counts and
+    modularity contribution are all zero.
+    """
+    if not empty_tables:
+        return None, []
+    member_tids = sorted(int(t["table_id"]) for t in empty_tables)
+    cluster = Cluster(
+        cluster_id=cluster_id,
+        name=f"{schema_name}_empty_tables",
+        schema_name=schema_name,
+        table_ids=tuple(member_tids),
+        archetype_distribution={"EMPTY": len(member_tids)},
+        intra_edge_count=0,
+        inter_edge_count=0,
+        modularity_contribution=0.0,
+    )
+    assignments = [
+        ClusteredTable(
+            table_id=int(t["table_id"]),
+            table_name=str(t["table_name"]),
+            schema_name=str(t["schema_name"]),
+            cluster_id=cluster_id,
+            archetype="EMPTY",
+        )
+        for t in sorted(empty_tables, key=lambda r: int(r["table_id"]))
+    ]
+    return cluster, assignments
