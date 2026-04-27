@@ -1,8 +1,9 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { Subscription, combineLatest, interval, of, switchMap } from 'rxjs';
-import { catchError, filter } from 'rxjs/operators';
+import { EMPTY, Subscription, combineLatest, interval, of, switchMap, timer } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { Job } from '../../models/job.model';
 import { JobService, RunLogEntry } from '../../services/job.service';
 import { RelationshipGraphComponent } from '../relationship-graph/relationship-graph.component';
@@ -262,13 +263,17 @@ export class JobDetailComponent implements OnInit, OnDestroy {
         error: () => {},
       });
 
-    // Log polling — only fetches when the log tab is open.  switchMap
-    // cancels in-flight HTTP requests when the next tick fires, preventing
-    // out-of-order responses on slow networks from clobbering newer state.
-    // catchError keeps the outer stream alive if a single tick fails.
-    this.logSub = interval(2000)
+    // Log polling — only fetches while the log tab is open.  Driven by tab
+    // changes so switching TO the log tab triggers an immediate fetch (t=0)
+    // followed by a 2s poll; switching AWAY cancels both the in-flight
+    // request and the pending timer via the outer switchMap.
+    // combineLatest waits for both single-emit HttpClient observables to
+    // complete before emitting — that's fine; they always complete.
+    // catchError on each inner observable returns stale state so a transient
+    // network hiccup doesn't wipe the display.
+    this.logSub = toObservable(this.tab)
       .pipe(
-        filter(() => this.tab() === 'log'),
+        switchMap(t => t === 'log' ? timer(0, 2000) : EMPTY),
         switchMap(() => combineLatest([
           this.jobsSvc.log(id, 200).pipe(
             catchError(() => of({ log: this.logText() })),

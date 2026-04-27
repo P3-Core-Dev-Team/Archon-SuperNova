@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { catchError, shareReplay, switchMap } from 'rxjs/operators';
 import {
   ClusterDetail,
   ClusterList,
@@ -13,13 +14,6 @@ import {
   SchemaList,
   SourceDbType,
 } from '../models/job.model';
-
-// The X-Discovery-Token used to authorise POSTs is fetched at runtime from
-// /api/auth/token (a CORS-gated GET) on app boot, so the literal value is no
-// longer baked into the JS bundle.  Until the fetch resolves we fall back to
-// an empty string and any POST will get a 401 — that's the desired posture
-// when the token can't be retrieved (network failure, server misconfig).
-let DISCOVERY_API_TOKEN = '';
 
 // Re-export so components can import SourceDbType from this service barrel.
 export type { SourceDbType } from '../models/job.model';
@@ -71,29 +65,37 @@ export class JobService {
   // also writes here, so the panel works even if B1 hasn't wired the click yet.
   selectedTable = signal<string | null>(null);
 
-  // Fetch the API token from /api/auth/token on first construction.  The
-  // service is providedIn: 'root' so this runs exactly once at app boot.
-  // Subsequent POSTs read the cached value via _authHeaders().
-  constructor() {
-    this.http.get<{ token: string }>(`${this.base}/auth/token`).subscribe({
-      next: r => { DISCOVERY_API_TOKEN = r.token || ''; },
-      error: () => { /* leave empty; POSTs will 401 until next reload */ },
-    });
-  }
+  // Fetch the API token from /api/auth/token exactly once at construction.
+  // shareReplay(1) means any number of callers subscribing BEFORE or AFTER
+  // the request completes will each receive the resolved value, so Submit /
+  // Test-connection clicks that arrive while the token is still in-flight are
+  // transparently queued and retried once the token is known rather than
+  // sending an empty-token POST that would 401.
+  private readonly tokenReady$ = this.http
+    .get<{ token: string }>(`${this.base}/auth/token`)
+    .pipe(
+      catchError(err => {
+        console.error('[JobService] Failed to fetch auth token:', err);
+        return of({ token: '' });
+      }),
+      shareReplay(1),
+    );
 
-  private _authHeaders(): HttpHeaders {
-    return new HttpHeaders({ 'X-Discovery-Token': DISCOVERY_API_TOKEN });
+  private withAuth<T>(req$: (headers: HttpHeaders) => Observable<T>): Observable<T> {
+    return this.tokenReady$.pipe(
+      switchMap(r => req$(new HttpHeaders({ 'X-Discovery-Token': r.token }))),
+    );
   }
 
   submit(req: JobRequest): Observable<Job> {
-    return this.http.post<Job>(`${this.base}/jobs`, req, {
-      headers: this._authHeaders(),
-    });
+    return this.withAuth(headers =>
+      this.http.post<Job>(`${this.base}/jobs`, req, { headers }),
+    );
   }
 
   testConnection(req: ConnectionTestRequest): Observable<ConnectionTestResult> {
-    return this.http.post<ConnectionTestResult>(
-      `${this.base}/test_connection`, req, { headers: this._authHeaders() },
+    return this.withAuth(headers =>
+      this.http.post<ConnectionTestResult>(`${this.base}/test_connection`, req, { headers }),
     );
   }
 
