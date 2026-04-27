@@ -177,6 +177,75 @@ def negative_prior_match(column_name: str, pii_type: str) -> bool:
     return False
 
 
+# ---------------------------------------------------------------------------
+# Structural-key name suppression
+# ---------------------------------------------------------------------------
+#
+# Surrogate-key columns (``id``, ``foo_id``, ``user_uuid``, ``order_pk``, …)
+# carry opaque values — UUIDs, hashes, dense integers — that frequently
+# match high-entropy PII patterns (``API_KEY``, ``PHONE_US`` digit-shape,
+# ``PESEL_PL``, ``SWIFT_BIC``) by accident.  When the only evidence is an
+# unvalidated regex hit on such a column and the column name doesn't actually
+# imply the matched PII type, the finding is almost always a false positive.
+#
+# The PII scanner consults :func:`is_structural_key_name` to drop those
+# findings; the heuristic is name-shape only, so it never silences a
+# validator-confirmed match (Luhn / checksum / NER) or a positive
+# name-prior signal.
+
+# Pointer-typed names: pure surrogate-key references (FK / PK pointers).
+# A column with one of these shapes is structurally guaranteed to hold an
+# opaque identifier — never a real API key, phone number, etc.  Findings
+# without an explicit positive name-prior are suppressed.
+_STRUCTURAL_POINTER_NAME_RE = re.compile(
+    r"^(id|uuid|guid|oid|pk|fk|sid|gid)$|"
+    r"_(id|uuid|guid|oid|pk|fk|sid|gid|ref)$",
+    re.IGNORECASE,
+)
+
+# Broader "key-like" names: includes ``_key`` and ``_hash`` suffixes.  These
+# are ambiguous — ``api_key``, ``password_hash``, and ``access_token_hash``
+# legitimately hold credential material — so we don't suppress findings on
+# them by default.  Reserved for future use.
+_STRUCTURAL_KEY_NAME_RE = re.compile(
+    r"^(id|uuid|guid|oid|pk|fk|sid|gid|hash|key)$|"
+    r"_(id|uuid|guid|oid|pk|fk|sid|gid|ref|hash|key)$",
+    re.IGNORECASE,
+)
+
+
+def is_structural_pointer_name(column_name: str) -> bool:
+    """Return True for **pure surrogate-key pointer** column names —
+    ``id``, ``foo_id``, ``user_uuid``, ``order_pk``, ``parent_fk``,
+    ``vendor_ref``, ``record_oid``, …
+
+    These columns are structurally guaranteed to carry opaque identifiers
+    (UUIDs, hashes, dense integers).  A regex hit on an ``API_KEY``,
+    ``PHONE_US``, ``CC_NUMBER`` etc. pattern on such a column is a false
+    positive virtually 100% of the time — even when the pattern's
+    "validator" (entropy / Luhn / checksum) reports a pass.
+
+    Note: ``_key`` and ``_hash`` are *not* covered here — those names
+    legitimately hold credential or hash material in many schemas
+    (``api_key``, ``password_hash``).  Use :func:`is_structural_key_name`
+    for the broader form when you specifically want to include them.
+    """
+    if not column_name:
+        return False
+    return bool(_STRUCTURAL_POINTER_NAME_RE.search(column_name.strip().lower()))
+
+
+def is_structural_key_name(column_name: str) -> bool:
+    """Broader form of :func:`is_structural_pointer_name` that also matches
+    ``_key`` and ``_hash`` suffixes.  Kept for callers that want to flag
+    every key-shaped column; PII suppression uses the *pointer* variant
+    so genuinely-credential-bearing ``api_key`` / ``password_hash``
+    columns still surface their findings."""
+    if not column_name:
+        return False
+    return bool(_STRUCTURAL_KEY_NAME_RE.search(column_name.strip().lower()))
+
+
 def name_prior_strength(column_name: str, pii_type: str) -> float:
     """Return the Bayesian π_name component for (column_name, pii_type).
 

@@ -54,7 +54,11 @@ from discovery.pii_patterns import (  # noqa: F401  (re-exports)
     SPECIFICITY,
     get_pattern,
 )
-from discovery.pii_priors import name_prior, name_prior_strength
+from discovery.pii_priors import (
+    is_structural_pointer_name,
+    name_prior,
+    name_prior_strength,
+)
 from discovery.pii_score import Match as _ScoreMatch
 from discovery.pii_score import column_pii_confidence, resolve_overlaps
 
@@ -645,14 +649,31 @@ def scan_column(
         name_prior_strength(column, prior_type) if prior_type else 0.0
     )
 
+    # Structural-pointer suppression: when the column name is an ``id`` /
+    # ``_id`` / ``_uuid`` / ``_pk`` / ``_fk`` / ``_ref`` shape, the column
+    # holds an opaque surrogate-key value.  Generic regex patterns
+    # (``API_KEY``, ``PHONE_US``, ``CC_NUMBER``, etc.) frequently match
+    # those values by accident, and the patterns' "validators" (entropy /
+    # Luhn / checksum) are not strict enough to reject UUIDs / hashes.
+    # Suppress every finding on a pointer-named column unless the column
+    # name itself implies the specific PII type (positive name prior).
+    # ``_key`` / ``_hash`` columns are NOT included in this check —
+    # ``api_key`` and ``password_hash`` legitimately hold credentials.
+    is_struct_pointer = is_structural_pointer_name(column)
+
     seen_types: set[str] = set()
 
     # Regex / Hyperscan findings
     for pii_type, match_count in regex_match_counts.items():
         validated = validated_counts.get(pii_type, 0)
+        np_strength = name_prior_strength(column, pii_type)
+        # Drop false positives on structural-pointer columns.  Validator
+        # passes do NOT override: the API_KEY entropy validator passes on
+        # any UUID, the Luhn check passes on plenty of dense-integer ids.
+        if is_struct_pointer and np_strength == 0.0:
+            continue
         rate_regex = match_count / max(rows_scanned, 1)
         rate_validated = validated / max(match_count, 1)
-        np_strength = name_prior_strength(column, pii_type)
         score = column_pii_confidence(
             name_prior_strength=np_strength,
             regex_match_rate=rate_regex,
@@ -680,8 +701,15 @@ def scan_column(
     # NER findings — emitted as a separate detector so they don't collide on
     # (column_id, pii_type, detector) with regex findings of the same type.
     for ner_type, count in ner_counts.items():
-        rate_regex = count / max(rows_scanned, 1)
         np_strength = name_prior_strength(column, ner_type)
+        # Same structural-pointer suppression: a spaCy entity hit on a UUID
+        # or surrogate-key pointer column without a positive name prior is
+        # almost always a false positive.  NER's "self-validation" doesn't
+        # help here — it's still spotting an entity-shaped substring, not
+        # a confirmed PII value.
+        if is_struct_pointer and np_strength == 0.0:
+            continue
+        rate_regex = count / max(rows_scanned, 1)
         score = column_pii_confidence(
             name_prior_strength=np_strength,
             regex_match_rate=rate_regex,
