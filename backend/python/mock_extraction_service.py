@@ -37,6 +37,114 @@ import pyarrow as pa
 import pyarrow.csv as pa_csv
 import pyarrow.parquet as pq
 
+# Optional drivers — imported lazily inside per-dialect connect helpers so the
+# mock service still starts when a specific driver is missing.  The
+# ImportError surfaces only when a job actually targets that DB type.
+try:
+    import mysql.connector as _mysql  # type: ignore[import-not-found]
+except ImportError:
+    _mysql = None  # type: ignore[assignment]
+try:
+    import pymssql as _pymssql  # type: ignore[import-not-found]
+except ImportError:
+    _pymssql = None  # type: ignore[assignment]
+try:
+    import oracledb as _oracledb  # type: ignore[import-not-found]
+except ImportError:
+    _oracledb = None  # type: ignore[assignment]
+
+
+# Default ports per dialect.
+_DIALECT_PORT: dict[str, int] = {
+    "postgres":  5432,
+    "mysql":     3306,
+    "sqlserver": 1433,
+    "oracle":    1521,
+}
+
+
+def _connect(conn_cfg: dict, password: str, *, connect_timeout: int = 30):
+    """Open a DBAPI connection for the requested ``type``.
+
+    Returns ``(conn, dialect)`` where ``dialect`` is one of
+    ``postgres / mysql / sqlserver / oracle``.  Raises ``ValueError`` on an
+    unknown type, or ``ImportError`` when the matching driver isn't
+    installed.
+    """
+    dialect = (conn_cfg.get("type") or "postgres").lower()
+    host = conn_cfg["host"]
+    port = int(conn_cfg.get("port") or _DIALECT_PORT.get(dialect, 5432))
+    db = conn_cfg["database"]
+    user = conn_cfg["user"]
+    app_name = conn_cfg.get("application_name", "mock-extractor")
+
+    if dialect == "postgres":
+        return psycopg2.connect(
+            host=host, port=port, dbname=db, user=user, password=password,
+            application_name=app_name, connect_timeout=connect_timeout,
+        ), dialect
+    if dialect == "mysql":
+        if _mysql is None:
+            raise ImportError("mysql-connector-python not installed")
+        return _mysql.connect(
+            host=host, port=port, database=db, user=user, password=password,
+            connection_timeout=connect_timeout,
+        ), dialect
+    if dialect == "sqlserver":
+        if _pymssql is None:
+            raise ImportError("pymssql not installed")
+        return _pymssql.connect(
+            server=host, port=str(port), database=db, user=user,
+            password=password, login_timeout=connect_timeout,
+            appname=app_name,
+        ), dialect
+    if dialect == "oracle":
+        if _oracledb is None:
+            raise ImportError("oracledb not installed")
+        # Oracle uses a service name / SID supplied in `database`.
+        dsn = _oracledb.makedsn(host, port, service_name=db)
+        return _oracledb.connect(
+            user=user, password=password, dsn=dsn,
+        ), dialect
+    raise ValueError(f"unsupported db type: {dialect!r}")
+
+
+def _arrow_type_for(dialect: str, type_name: str) -> pa.DataType:
+    """Map a dialect-specific type name to an Arrow type. Defaults to string."""
+    t = (type_name or "").lower()
+    # Common integer / numeric / temporal / boolean families across dialects.
+    if any(k in t for k in ("bigint", "int8", "int_8", "long")):
+        return pa.int64()
+    if "smallint" in t or "int2" in t or "tinyint" in t:
+        return pa.int16()
+    if "int" in t:  # plain int / integer / int4 / mediumint
+        return pa.int32()
+    if any(k in t for k in ("bool", "bit")) and "tinyint(1)" not in t:
+        # mysql `bit(1)` and pg `bool` -> bool. Treat sqlserver `bit` as bool.
+        if dialect == "sqlserver" and t == "bit":
+            return pa.bool_()
+        if dialect != "sqlserver" and "bool" in t:
+            return pa.bool_()
+    if "float8" in t or "double" in t:
+        return pa.float64()
+    if "float4" in t or "real" in t:
+        return pa.float32()
+    if any(k in t for k in ("numeric", "decimal", "number", "money")):
+        return pa.float64()
+    if "uuid" in t or "uniqueidentifier" in t:
+        return pa.string()
+    if "timestamp" in t and ("tz" in t or "with time zone" in t):
+        return pa.timestamp("us", tz="UTC")
+    if "timestamp" in t or "datetime" in t:
+        return pa.timestamp("us")
+    if t == "date":
+        return pa.date32()
+    if "bytea" in t or "blob" in t or "varbinary" in t or "image" in t or "raw" in t:
+        return pa.binary()
+    if "json" in t:
+        return pa.string()
+    return pa.string()
+
 PORT = int(os.environ.get("MOCK_EXTRACTION_PORT", "8080"))
 TOKEN = os.environ.get("EXTRACTION_SERVICE_TOKEN", "dev-token")
 STORAGE_PATH = Path(os.environ.get("STORAGE_PATH", "/tmp/discovery-parquet"))
@@ -110,8 +218,12 @@ def _resolve_pg_to_arrow(typ: str) -> pa.DataType:
 def extract_to_parquet(conn_cfg: dict, query: str, output_path: Path,
                        compression: str = "zstd",
                        compression_level: int = 3) -> dict:
-    """Connect to source DB, run COPY (...) TO STDOUT (FORMAT CSV, FORCE_QUOTE *, NULL ''),
-    decode CSV, and write a Parquet file. Returns manifest entry dict."""
+    """Connect to source DB, run the query, write a Parquet file.
+
+    Postgres uses the fast COPY path (csv stream straight into Arrow).
+    MySQL / SQL Server / Oracle use a generic DBAPI cursor with
+    ``fetchmany`` batches converted to Arrow record batches.
+    """
     output_path.parent.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
     # Prefer a per-request literal password (dev / API-supplied) when present;
@@ -122,12 +234,15 @@ def extract_to_parquet(conn_cfg: dict, query: str, output_path: Path,
     else:
         password = resolve_secret(conn_cfg["password_secret_ref"])
 
-    conn = psycopg2.connect(
-        host=conn_cfg["host"], port=conn_cfg.get("port", 5432),
-        dbname=conn_cfg["database"], user=conn_cfg["user"],
-        password=password,
-        application_name=conn_cfg.get("application_name", "mock-extractor"),
-    )
+    conn, dialect = _connect(conn_cfg, password)
+    if dialect != "postgres":
+        try:
+            return _extract_dbapi(
+                conn, dialect, query, output_path,
+                compression=compression, compression_level=compression_level,
+            )
+        finally:
+            conn.close()
     try:
         # First: introspect column types via a 0-row query
         cur = conn.cursor()
@@ -223,6 +338,108 @@ def extract_to_parquet(conn_cfg: dict, query: str, output_path: Path,
         conn.close()
 
 
+def _extract_dbapi(conn, dialect: str, query: str, output_path: Path, *,
+                   compression: str, compression_level: int) -> dict:
+    """Generic DBAPI extraction: cursor.execute → fetchmany → Arrow batches.
+
+    Used for every non-Postgres dialect.  Slower than Postgres COPY but
+    portable across mysql-connector-python, pymssql and python-oracledb.
+    """
+    cur = conn.cursor()
+    cur.execute(query)
+    descr = cur.description or []
+    if not descr:
+        with pq.ParquetWriter(str(output_path), pa.schema([]),
+                              compression=compression) as _w:
+            pass
+        return {
+            "path": str(output_path), "rows": 0,
+            "bytes": output_path.stat().st_size if output_path.exists() else 0,
+            "checksum_sha256": _sha256(output_path), "row_groups": 0,
+        }
+
+    col_names: list[str] = []
+    col_types: list[pa.DataType] = []
+    for d in descr:
+        # DBAPI's description is a 7-tuple; index 0 is name, 1 is type_code.
+        # pymssql, mysql-connector and oracledb expose the same shape.
+        name = d[0]
+        type_code = d[1]
+        # Best-effort: each driver returns its own type-code object — convert
+        # to its repr/str and let _arrow_type_for() pattern-match keywords.
+        type_name = ""
+        try:
+            type_name = type_code.__name__ if hasattr(type_code, "__name__") else str(type_code)
+        except Exception:
+            type_name = str(type_code)
+        col_names.append(str(name))
+        col_types.append(_arrow_type_for(dialect, type_name))
+
+    arrow_schema = pa.schema(
+        [pa.field(n, t) for n, t in zip(col_names, col_types)]
+    )
+
+    batch_size = 5_000
+    total_rows = 0
+    n_groups = 0
+    with pq.ParquetWriter(str(output_path), arrow_schema,
+                          compression=compression,
+                          compression_level=compression_level) as writer:
+        while True:
+            rows = cur.fetchmany(batch_size)
+            if not rows:
+                break
+            cols: list[list] = [[] for _ in col_names]
+            for r in rows:
+                # rows can be tuples (most drivers) or dict-like (mysql Row).
+                values = list(r) if not isinstance(r, dict) else [
+                    r.get(n) for n in col_names
+                ]
+                # Pad / truncate defensively.
+                if len(values) < len(col_names):
+                    values = values + [None] * (len(col_names) - len(values))
+                for i, v in enumerate(values[: len(col_names)]):
+                    cols[i].append(v)
+            arrays = []
+            for i, t in enumerate(col_types):
+                try:
+                    arrays.append(pa.array(cols[i], type=t))
+                except (pa.ArrowInvalid, pa.ArrowTypeError, ValueError):
+                    # Fallback to string when the values don't fit the inferred
+                    # Arrow type (common for Oracle NUMBER, MySQL JSON, etc).
+                    arrays.append(pa.array(
+                        [None if v is None else str(v) for v in cols[i]],
+                        type=pa.string(),
+                    ))
+                    # Rewrite the schema slot to string for consistency.
+                    col_types[i] = pa.string()
+                    arrow_schema = pa.schema([
+                        pa.field(n, t) for n, t in zip(col_names, col_types)
+                    ])
+            batch = pa.RecordBatch.from_arrays(arrays, names=col_names)
+            try:
+                writer.write_batch(batch)
+            except (pa.ArrowInvalid, pa.ArrowTypeError):
+                # Schema may have shifted to string mid-stream; reopen the
+                # writer from-scratch with the relaxed schema.
+                writer.close()
+                # Re-init with the (possibly relaxed) schema and replay this
+                # batch only. Earlier rows already on disk are kept.
+                writer = pq.ParquetWriter(
+                    str(output_path), arrow_schema,
+                    compression=compression, compression_level=compression_level,
+                )
+                writer.write_batch(batch)
+            total_rows += batch.num_rows
+            n_groups += 1
+    cur.close()
+    return {
+        "path": str(output_path), "rows": total_rows,
+        "bytes": output_path.stat().st_size,
+        "checksum_sha256": _sha256(output_path), "row_groups": n_groups,
+    }
+
+
 def _sha256(p: Path) -> str:
     h = hashlib.sha256()
     with open(p, "rb") as f:
@@ -283,9 +500,7 @@ class Handler(BaseHTTPRequestHandler):
                 cfg = body
                 inline = cfg.get("password_inline")
                 password = inline if inline else resolve_secret(cfg["password_secret_ref"])
-                conn = psycopg2.connect(host=cfg["host"], port=cfg.get("port", 5432),
-                                        dbname=cfg["database"], user=cfg["user"],
-                                        password=password, connect_timeout=10)
+                conn, _dialect = _connect(cfg, password, connect_timeout=10)
                 conn.close()
                 self._send_json(200, {"status": "ok"})
                 return

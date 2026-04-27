@@ -1,5 +1,8 @@
+export type SourceDbType = 'postgres' | 'mysql' | 'sqlserver' | 'oracle';
+
 export interface JobRequest {
   label: string;
+  db_type: SourceDbType;
   host: string;
   port: number;
   database: string;

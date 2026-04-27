@@ -386,6 +386,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private payloadFor(schema: string): JobRequest {
     return {
       label: `${schema} (dashboard)`,
+      db_type: 'postgres',
       host: SOURCE_DEFAULTS.host,
       port: SOURCE_DEFAULTS.port,
       database: SOURCE_DEFAULTS.database,

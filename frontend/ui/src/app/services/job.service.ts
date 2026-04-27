@@ -30,7 +30,10 @@ export interface RunLogEntry {
   sub_failed?: number;
 }
 
+export type SourceDbType = 'postgres' | 'mysql' | 'sqlserver' | 'oracle';
+
 export interface ConnectionTestRequest {
+  db_type: SourceDbType;
   host: string;
   port: number;
   database: string;
@@ -41,6 +44,7 @@ export interface ConnectionTestRequest {
 
 export interface ConnectionTestResult {
   ok: boolean;
+  db_type?: SourceDbType;
   host: string;
   port: number;
   database: string;

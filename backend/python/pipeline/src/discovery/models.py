@@ -35,7 +35,7 @@ class ConnectionConfig(BaseModel):
         process-wide env var on the extraction service. NEVER logged.
     """
 
-    type: Literal["postgres"]
+    type: Literal["postgres", "mysql", "sqlserver", "oracle"] = "postgres"
     host: str
     port: int
     database: str

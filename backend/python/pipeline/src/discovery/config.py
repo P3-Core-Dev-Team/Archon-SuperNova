@@ -97,7 +97,7 @@ class SourceDbConfig(BaseModel):
     never resolves this to an actual password.
     """
 
-    type: Literal["postgres"] = "postgres"
+    type: Literal["postgres", "mysql", "sqlserver", "oracle"] = "postgres"
     host: str = Field(description="Source DB hostname")
     port: int = 5432
     database: str = Field(description="Source DB name")

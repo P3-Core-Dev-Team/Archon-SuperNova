@@ -2,7 +2,14 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { JobService, ConnectionTestResult } from '../../services/job.service';
+import { JobService, ConnectionTestResult, SourceDbType } from '../../services/job.service';
+
+const DEFAULT_PORTS: Record<SourceDbType, number> = {
+  postgres:  5432,
+  mysql:     3306,
+  sqlserver: 1433,
+  oracle:    1521,
+};
 
 @Component({
   selector: 'app-job-submit',
@@ -19,8 +26,17 @@ import { JobService, ConnectionTestResult } from '../../services/job.service';
           <input formControlName="label" placeholder="e.g. AdventureWorks" autocomplete="off" />
         </div>
         <div>
-          <label>Schema</label>
-          <input formControlName="schema" placeholder="e.g. public" autocomplete="off" />
+          <label>DB type</label>
+          <select formControlName="db_type" (change)="onDbTypeChange()">
+            <option value="postgres">PostgreSQL</option>
+            <option value="mysql">MySQL</option>
+            <option value="sqlserver">SQL Server</option>
+            <option value="oracle">Oracle</option>
+          </select>
+        </div>
+        <div>
+          <label>{{ schemaLabel() }}</label>
+          <input formControlName="schema" [placeholder]="schemaPlaceholder()" autocomplete="off" />
         </div>
       </div>
 
@@ -34,8 +50,8 @@ import { JobService, ConnectionTestResult } from '../../services/job.service';
           <input formControlName="port" type="number" />
         </div>
         <div class="grow">
-          <label>Database</label>
-          <input formControlName="database" placeholder="test" autocomplete="off" />
+          <label>{{ databaseLabel() }}</label>
+          <input formControlName="database" [placeholder]="databasePlaceholder()" autocomplete="off" />
         </div>
       </div>
 
@@ -139,6 +155,7 @@ export class JobSubmitComponent {
 
   form = this.fb.nonNullable.group({
     label: ['', Validators.required],
+    db_type: ['postgres' as SourceDbType, Validators.required],
     schema: ['', Validators.required],
     host: ['localhost', Validators.required],
     port: [5432, [Validators.required, Validators.min(1)]],
@@ -150,8 +167,39 @@ export class JobSubmitComponent {
   // Connection-bearing fields. Any edit invalidates a prior test result so
   // the user has to re-test before Run is re-enabled.
   private readonly connFields = [
-    'host', 'port', 'database', 'user', 'password', 'schema',
+    'db_type', 'host', 'port', 'database', 'user', 'password', 'schema',
   ] as const;
+
+  // Labels and placeholders shift slightly per DB type (Oracle uses "service
+  // name" instead of "database", "schema" maps to the owner/user name, etc.).
+  databaseLabel(): string {
+    const t = this.form.controls.db_type.value;
+    return t === 'oracle' ? 'Service name' : 'Database';
+  }
+  databasePlaceholder(): string {
+    const t = this.form.controls.db_type.value;
+    return t === 'oracle' ? 'ORCLPDB1' : 'test';
+  }
+  schemaLabel(): string {
+    return this.form.controls.db_type.value === 'oracle' ? 'Schema (owner)' : 'Schema';
+  }
+  schemaPlaceholder(): string {
+    const t = this.form.controls.db_type.value;
+    if (t === 'mysql') return '(same as database)';
+    if (t === 'oracle') return 'HR';
+    if (t === 'sqlserver') return 'dbo';
+    return 'public';
+  }
+
+  onDbTypeChange(): void {
+    const t = this.form.controls.db_type.value as SourceDbType;
+    // Update port if it currently holds a *different* dialect's default.
+    const current = this.form.controls.port.value;
+    const known = Object.values(DEFAULT_PORTS) as number[];
+    if (known.includes(current as number) || !current) {
+      this.form.controls.port.setValue(DEFAULT_PORTS[t]);
+    }
+  }
 
   // Snapshot of the connection-field values that produced the last successful
   // test. If the user edits any of those fields, the test result is invalidated.
@@ -193,6 +241,7 @@ export class JobSubmitComponent {
     this.testResult.set(null);
     const v = this.form.getRawValue();
     this.jobs.testConnection({
+      db_type: v.db_type,
       host: v.host, port: v.port,
       database: v.database, user: v.user, password: v.password,
       schema: v.schema,
@@ -243,7 +292,7 @@ export class JobSubmitComponent {
 
   reset(): void {
     this.form.reset({
-      label: '', schema: '',
+      label: '', db_type: 'postgres', schema: '',
       host: 'localhost', port: 5432,
       database: '', user: '', password: '',
     });

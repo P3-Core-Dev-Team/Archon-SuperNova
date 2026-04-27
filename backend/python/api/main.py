@@ -27,7 +27,7 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 import psycopg2
 import yaml
@@ -117,9 +117,13 @@ def _require_secret(
 
 # ---------------------------------------------------------- Pydantic models
 
+SourceDbType = Literal["postgres", "mysql", "sqlserver", "oracle"]
+
+
 class JobRequest(BaseModel):
     """Submitted by the UI form."""
     label: str = Field(..., description="Friendly job label, e.g. 'AdventureWorks'")
+    db_type: SourceDbType = "postgres"
     host: str
     port: int = 5432
     database: str
@@ -132,6 +136,7 @@ class JobRequest(BaseModel):
 
 class ConnectionTestRequest(BaseModel):
     """Submitted by the UI's "Test connection" button before job submit."""
+    db_type: SourceDbType = "postgres"
     host: str
     port: int = 5432
     database: str
@@ -327,9 +332,9 @@ def _build_config(req: JobRequest, work_dir: Path) -> Path:
             "retry_backoff_seconds": 2,
         },
         "source_db": {
-            "type": "postgres",
+            "type": req.db_type,
             "host": req.host,
-            "port": req.port,
+            "port": req.port or _DEFAULT_PORTS.get(req.db_type, 5432),
             "database": req.database,
             "user": req.user,
             # Per-request literal password (the credential the user supplied
@@ -488,6 +493,142 @@ def _job_stats_from_db(schema_name: str) -> dict[str, int]:
 # ----------------------------------------------------------- HTTP routes
 
 
+_DEFAULT_PORTS: dict[str, int] = {
+    "postgres":  5432,
+    "mysql":     3306,
+    "sqlserver": 1433,
+    "oracle":    1521,
+}
+
+
+def _open_source_conn(req: ConnectionTestRequest, *, connect_timeout: int = 5):
+    """Open a DBAPI connection for the requested ``db_type``.
+
+    Imports drivers lazily so a missing optional dependency surfaces only
+    when that DB type is actually requested.
+    """
+    db = req.db_type
+    port = req.port or _DEFAULT_PORTS[db]
+    if db == "postgres":
+        return psycopg2.connect(
+            host=req.host, port=port, dbname=req.database, user=req.user,
+            password=req.password, connect_timeout=connect_timeout,
+        )
+    if db == "mysql":
+        import mysql.connector  # type: ignore[import-not-found]
+        return mysql.connector.connect(
+            host=req.host, port=port, database=req.database, user=req.user,
+            password=req.password, connection_timeout=connect_timeout,
+        )
+    if db == "sqlserver":
+        import pymssql  # type: ignore[import-not-found]
+        return pymssql.connect(
+            server=req.host, port=str(port), database=req.database,
+            user=req.user, password=req.password,
+            login_timeout=connect_timeout,
+        )
+    if db == "oracle":
+        import oracledb  # type: ignore[import-not-found]
+        # Oracle DSN: host:port/SERVICE_NAME (we treat req.database as the service name).
+        dsn = oracledb.makedsn(req.host, port, service_name=req.database)
+        return oracledb.connect(user=req.user, password=req.password, dsn=dsn)
+    raise ValueError(f"unsupported db_type: {db}")
+
+
+def _probe_source(conn, db_type: str, schema_name: str) -> dict[str, Any]:
+    """Run version + schema-existence + base-table count for any dialect.
+
+    Returns ``{server_version, current_user, table_count}`` or raises
+    ``RuntimeError("schema_missing")`` when the schema doesn't exist.
+    """
+    cur = conn.cursor()
+
+    if db_type == "postgres":
+        cur.execute("SELECT version(), current_database(), current_user")
+        version, _dbname, current_user = cur.fetchone()
+        cur.execute(
+            "SELECT 1 FROM information_schema.schemata WHERE schema_name = %s",
+            (schema_name,),
+        )
+        if cur.fetchone() is None:
+            raise RuntimeError("schema_missing")
+        cur.execute(
+            "SELECT count(*) FROM information_schema.tables "
+            "WHERE table_schema = %s AND table_type = 'BASE TABLE'",
+            (schema_name,),
+        )
+        table_count = int(cur.fetchone()[0])
+
+    elif db_type == "mysql":
+        cur.execute("SELECT version(), database(), current_user()")
+        version, _dbname, current_user = cur.fetchone()
+        # In MySQL, "schema" is synonymous with "database"; treat the request's
+        # schema_name as the target database name.
+        cur.execute(
+            "SELECT 1 FROM information_schema.schemata WHERE schema_name = %s",
+            (schema_name,),
+        )
+        if cur.fetchone() is None:
+            raise RuntimeError("schema_missing")
+        cur.execute(
+            "SELECT count(*) FROM information_schema.tables "
+            "WHERE table_schema = %s AND table_type = 'BASE TABLE'",
+            (schema_name,),
+        )
+        table_count = int(cur.fetchone()[0])
+
+    elif db_type == "sqlserver":
+        cur.execute("SELECT @@VERSION, DB_NAME(), SUSER_NAME()")
+        version, _dbname, current_user = cur.fetchone()
+        cur.execute(
+            "SELECT 1 FROM sys.schemas WHERE name = %s",
+            (schema_name,),
+        )
+        if cur.fetchone() is None:
+            raise RuntimeError("schema_missing")
+        cur.execute(
+            "SELECT count(*) FROM information_schema.tables "
+            "WHERE table_schema = %s AND table_type = 'BASE TABLE'",
+            (schema_name,),
+        )
+        table_count = int(cur.fetchone()[0])
+
+    elif db_type == "oracle":
+        # Oracle: schema_name maps to the owner / username.  The "database"
+        # in the connection request is the service name; row counts come
+        # from ALL_TABLES filtered by owner.
+        cur.execute(
+            "SELECT BANNER FROM v$version WHERE BANNER LIKE 'Oracle%' "
+            "FETCH FIRST 1 ROWS ONLY"
+        )
+        version_row = cur.fetchone()
+        version = version_row[0] if version_row else "Oracle (version unknown)"
+        cur.execute("SELECT user FROM dual")
+        current_user = cur.fetchone()[0]
+        # Schema (= owner) existence: any row in ALL_USERS.
+        cur.execute(
+            "SELECT 1 FROM all_users WHERE username = :s",
+            {"s": schema_name.upper()},
+        )
+        if cur.fetchone() is None:
+            raise RuntimeError("schema_missing")
+        cur.execute(
+            "SELECT count(*) FROM all_tables WHERE owner = :s",
+            {"s": schema_name.upper()},
+        )
+        table_count = int(cur.fetchone()[0])
+
+    else:
+        raise ValueError(f"unsupported db_type: {db_type}")
+
+    cur.close()
+    return {
+        "server_version": str(version).split("\n")[0].split(",")[0].strip(),
+        "current_user": str(current_user),
+        "table_count": table_count,
+    }
+
+
 @app.post(
     "/api/test_connection",
     dependencies=[Depends(_require_secret)],
@@ -495,67 +636,53 @@ def _job_stats_from_db(schema_name: str) -> dict[str, int]:
 def test_connection(req: ConnectionTestRequest) -> dict[str, Any]:
     """Probe the source DB before the user submits a discovery job.
 
-    Returns ``{ok: True, ...}`` when a basic connect + ``SELECT 1`` plus a
-    schema-existence check succeed, otherwise ``{ok: False, error: <msg>}``
-    with a 200 status (the UI distinguishes failure by the ``ok`` field
-    rather than HTTP status, so it can show the error inline next to the
-    Test-connection button).
+    Dispatches by ``db_type`` to the right driver (psycopg2 / mysql-connector
+    / pymssql / oracledb).  Returns ``{ok: True, ...}`` on success or
+    ``{ok: False, error, error_kind}`` on failure.  HTTP 200 either way —
+    the UI uses the ``ok`` field, not the status code.
     """
     info: dict[str, Any] = {
         "ok": False,
+        "db_type": req.db_type,
         "host": req.host,
-        "port": req.port,
+        "port": req.port or _DEFAULT_PORTS.get(req.db_type, 0),
         "database": req.database,
         "schema": req.schema_name,
     }
     try:
-        conn = psycopg2.connect(
-            host=req.host,
-            port=req.port,
-            dbname=req.database,
-            user=req.user,
-            password=req.password,
-            connect_timeout=5,
-        )
-    except psycopg2.OperationalError as exc:
-        info["error"] = f"connect failed: {exc.args[0].strip() if exc.args else exc}"
+        conn = _open_source_conn(req, connect_timeout=5)
+    except ImportError as exc:
+        info["error"] = f"driver not installed: {exc}"
         info["error_kind"] = "connect"
         return info
     except Exception as exc:
-        info["error"] = f"connect failed: {type(exc).__name__}: {exc}"
+        msg = exc.args[0].strip() if (exc.args and isinstance(exc.args[0], str)) else str(exc)
+        info["error"] = f"connect failed: {msg}"
         info["error_kind"] = "connect"
         return info
 
     try:
-        cur = conn.cursor()
-        cur.execute("SELECT version(), current_database(), current_user")
-        version, dbname, current_user = cur.fetchone()
-        info["server_version"] = version.split(",")[0]
-        info["current_user"] = current_user
-
-        cur.execute(
-            "SELECT 1 FROM information_schema.schemata WHERE schema_name = %s",
-            (req.schema_name,),
-        )
-        if cur.fetchone() is None:
-            info["error"] = f'schema "{req.schema_name}" not found in database "{dbname}"'
+        probe = _probe_source(conn, req.db_type, req.schema_name)
+        info.update(probe)
+    except RuntimeError as exc:
+        if str(exc) == "schema_missing":
+            info["error"] = (
+                f'schema "{req.schema_name}" not found in database "{req.database}"'
+            )
             info["error_kind"] = "schema_missing"
             return info
-
-        cur.execute(
-            """
-            SELECT count(*) FROM information_schema.tables
-            WHERE table_schema = %s AND table_type = 'BASE TABLE'
-            """,
-            (req.schema_name,),
-        )
-        info["table_count"] = int(cur.fetchone()[0])
+        info["error"] = f"probe failed: {exc}"
+        info["error_kind"] = "probe"
+        return info
     except Exception as exc:
         info["error"] = f"probe failed: {type(exc).__name__}: {exc}"
         info["error_kind"] = "probe"
         return info
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
 
     info["ok"] = True
     return info
