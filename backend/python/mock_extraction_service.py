@@ -113,13 +113,17 @@ def _arrow_type_for(dialect: str, type_name: str) -> pa.DataType:
     """Map a dialect-specific type name to an Arrow type. Defaults to string."""
     t = (type_name or "").lower()
     # Common integer / numeric / temporal / boolean families across dialects.
+    # tinyint(1) must be checked before the generic tinyint/int path so MySQL
+    # boolean-as-tinyint(1) is mapped to bool rather than int16.
+    if t == "tinyint(1)":
+        return pa.bool_()
     if any(k in t for k in ("bigint", "int8", "int_8")) or t == "long":
         return pa.int64()
     if "smallint" in t or "int2" in t or "tinyint" in t:
         return pa.int16()
     if "int" in t:  # plain int / integer / int4 / mediumint
         return pa.int32()
-    if any(k in t for k in ("bool", "bit")) and "tinyint(1)" not in t:
+    if any(k in t for k in ("bool", "bit")):
         # mysql `bit(1)` and pg `bool` -> bool. Treat sqlserver `bit` as bool.
         if dialect == "sqlserver" and t == "bit":
             return pa.bool_()
@@ -395,14 +399,27 @@ def _extract_dbapi(conn, dialect: str, query: str, output_path: Path, *,
 
     batch_size = 5_000
     total_rows = 0
-    n_groups = 0
-    # Use explicit try/finally instead of `with` so that when the schema-shift
-    # path reassigns `writer` the new writer is guaranteed to be closed too.
-    # The `with` context manager would only close the *original* writer on
-    # exit, leaving the reassigned writer's file handle open on exceptions.
-    writer = pq.ParquetWriter(str(output_path), arrow_schema,
-                              compression=compression,
-                              compression_level=compression_level)
+
+    # Collect all batches in memory before writing.  This is the only correct
+    # approach for Parquet: the format has a single footer that encodes the
+    # schema; re-opening the writer mid-stream truncates earlier row-groups.
+    # Sample-mode extraction is bounded (~5 000 rows × N cols), so buffering
+    # is safe.  When a column type degrades to string mid-stream we cast all
+    # earlier arrays for that column to string before the final write.
+    all_raw_cols: list[list[list]] = []   # per-batch: list of per-column lists
+    demoted: set[int] = set()             # column indices demoted to string
+
+    def _coerce_str(v):
+        """Stringify one value; .read() LOB objects (Oracle CLOB/NCLOB)."""
+        if v is None:
+            return None
+        if hasattr(v, "read"):
+            try:
+                return v.read()
+            except Exception:
+                return None
+        return str(v)
+
     try:
         while True:
             rows = cur.fetchmany(batch_size)
@@ -419,41 +436,46 @@ def _extract_dbapi(conn, dialect: str, query: str, output_path: Path, *,
                     values = values + [None] * (len(col_names) - len(values))
                 for i, v in enumerate(values[: len(col_names)]):
                     cols[i].append(v)
+            # Try to build typed arrays; demote columns that fail to string.
+            for i, t in enumerate(col_types):
+                if i in demoted:
+                    continue
+                try:
+                    pa.array(cols[i], type=t)
+                except (pa.ArrowInvalid, pa.ArrowTypeError, ValueError):
+                    # Mark this column as needing string demotion everywhere.
+                    demoted.add(i)
+                    col_types[i] = pa.string()
+            all_raw_cols.append(cols)
+            total_rows += len(rows)
+    finally:
+        cur.close()
+
+    # Final schema (after all demotions).
+    final_schema = pa.schema([pa.field(n, t) for n, t in zip(col_names, col_types)])
+
+    n_groups = 0
+    writer = pq.ParquetWriter(str(output_path), final_schema,
+                              compression=compression,
+                              compression_level=compression_level)
+    try:
+        for cols in all_raw_cols:
             arrays = []
             for i, t in enumerate(col_types):
-                try:
-                    arrays.append(pa.array(cols[i], type=t))
-                except (pa.ArrowInvalid, pa.ArrowTypeError, ValueError):
-                    # Fallback to string when the values don't fit the inferred
-                    # Arrow type (common for Oracle NUMBER, MySQL JSON, etc).
+                if i in demoted:
+                    # Fallback to string for Oracle CLOB/NCLOB/etc.
                     arrays.append(pa.array(
-                        [None if v is None else str(v) for v in cols[i]],
+                        [_coerce_str(v) for v in cols[i]],
                         type=pa.string(),
                     ))
-                    # Rewrite the schema slot to string for consistency.
-                    col_types[i] = pa.string()
-                    arrow_schema = pa.schema([
-                        pa.field(n, t) for n, t in zip(col_names, col_types)
-                    ])
-            batch = pa.RecordBatch.from_arrays(arrays, names=col_names)
-            try:
-                writer.write_batch(batch)
-            except (pa.ArrowInvalid, pa.ArrowTypeError):
-                # Schema may have shifted to string mid-stream; reopen the
-                # writer from-scratch with the relaxed schema.
-                writer.close()
-                # Re-init with the (possibly relaxed) schema and replay this
-                # batch only. Earlier rows already on disk are kept.
-                writer = pq.ParquetWriter(
-                    str(output_path), arrow_schema,
-                    compression=compression, compression_level=compression_level,
-                )
-                writer.write_batch(batch)
-            total_rows += batch.num_rows
+                else:
+                    arrays.append(pa.array(cols[i], type=t))
+            batch = pa.RecordBatch.from_arrays(arrays, schema=final_schema)
+            writer.write_batch(batch)
             n_groups += 1
     finally:
         writer.close()
-    cur.close()
+
     return {
         "path": str(output_path), "rows": total_rows,
         "bytes": output_path.stat().st_size,
