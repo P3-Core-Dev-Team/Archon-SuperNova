@@ -26,8 +26,8 @@ const DEFAULT_PORTS: Record<SourceDbType, number> = {
           <input formControlName="label" placeholder="e.g. AdventureWorks" autocomplete="off" />
         </div>
         <div>
-          <label>DB type</label>
-          <select formControlName="db_type" (change)="onDbTypeChange()">
+          <label for="db_type">DB type</label>
+          <select id="db_type" formControlName="db_type" (change)="onDbTypeChange()">
             <option value="postgres">PostgreSQL</option>
             <option value="mysql">MySQL</option>
             <option value="sqlserver">SQL Server</option>
@@ -216,7 +216,7 @@ export class JobSubmitComponent {
 
   private connFingerprint(): string {
     const v = this.form.getRawValue();
-    return [v.host, v.port, v.database, v.user, v.password, v.schema].join('|');
+    return [v.db_type, v.host, v.port, v.database, v.user, v.password, v.schema].join('|');
   }
 
   // Test enabled iff every connection field is filled and valid.
@@ -273,12 +273,7 @@ export class JobSubmitComponent {
     this.jobs.submit(payload).subscribe({
       next: job => {
         this.submitting.set(false);
-        this.form.reset({
-          label: '', schema: '',
-          host: 'localhost', port: 5432,
-          database: '', user: '', password: '',
-        });
-        this.testResult.set(null);
+        this.reset();
         this.router.navigate(['/jobs', job.job_id]);
       },
       error: err => {
