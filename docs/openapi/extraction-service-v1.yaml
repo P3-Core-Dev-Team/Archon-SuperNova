@@ -1,0 +1,234 @@
+openapi: 3.0.3
+info:
+  title: Discovery Extraction Service
+  version: 1.1.1
+  description: |
+    Synchronous Postgres → Parquet extraction service.
+
+    Behaviour changes in 1.1.1:
+      - `ExtractionOptions.timeout_seconds` default raised from 3600 to 7200
+        to match the Python client's 2h request-timeout ceiling. A 1h
+        server-side timeout was killing large-table extractions while the
+        client kept waiting.
+
+    Breaking changes vs 1.0.0:
+      - Removed async endpoints (`POST /api/v1/extract/async`,
+        `GET /api/v1/extractions/{id}`, `POST /api/v1/extractions/{id}/cancel`).
+      - Removed `ExtractionAccepted` schema and the `queued` / `cancelled`
+        states from `ExtractionStatus`.
+      - Removed `jdbc_url` and `additional_jdbc_properties` from
+        `ConnectionConfig` (URL is built server-side from host/port/database).
+      - `user` is now required.
+      - The `type` enum is reduced to `postgres` (the only supported source
+        in this monolith build).
+  contact:
+    name: Discovery Team
+    url: https://github.com/discovery
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+paths:
+  /api/v1/extract:
+    post:
+      summary: Synchronous extraction (blocks until done)
+      tags:
+        - extraction
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExtractionRequest' }
+      responses:
+        '200':
+          description: Extraction completed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExtractionResponse' }
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorInfo' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorInfo' }
+        '429':
+          description: Bulkhead full (too many concurrent extractions)
+          headers:
+            Retry-After:
+              schema: { type: integer }
+              description: Seconds to wait before retrying.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorInfo' }
+
+  /api/v1/connections/test:
+    post:
+      summary: Validate a connection config without extracting
+      tags:
+        - connections
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ConnectionConfig' }
+      responses:
+        '200':
+          description: Connection successful
+        '400':
+          description: Connection failed (with error details)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorInfo' }
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorInfo' }
+
+  /actuator/health:
+    get:
+      summary: Spring Boot health endpoint
+      tags:
+        - management
+      responses:
+        '200':
+          description: Service health status
+
+  /actuator/prometheus:
+    get:
+      summary: Prometheus metrics endpoint
+      tags:
+        - management
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Prometheus-formatted metrics
+          content:
+            text/plain:
+              schema: { type: string }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ConnectionConfig:
+      type: object
+      required: [type, host, port, database, user]
+      properties:
+        type: { type: string, enum: [postgres] }
+        host: { type: string }
+        port: { type: integer }
+        database: { type: string }
+        user: { type: string }
+        password_secret_ref:
+          type: string
+          description: |
+            Reference of the form `env://VAR_NAME` or `vault://path`. Plain
+            strings are rejected; the service will not accept inline
+            credentials in the JSON payload.
+        ssl_mode:
+          type: string
+          enum: [disable, require, verify-ca, verify-full]
+          default: require
+        application_name:
+          type: string
+          default: discovery-extractor
+
+    OutputConfig:
+      type: object
+      required: [path]
+      properties:
+        path: { type: string, description: "Local filesystem path for the output Parquet file" }
+        compression: { type: string, enum: [zstd, snappy, gzip, none], default: zstd }
+        compression_level: { type: integer, default: 3 }
+        row_group_size: { type: integer, default: 100000 }
+        page_size: { type: integer, default: 1048576 }
+
+    ExtractionOptions:
+      type: object
+      properties:
+        fetch_size: { type: integer, default: 10000 }
+        timeout_seconds:
+          type: integer
+          default: 7200
+          description: |
+            Server-side extraction timeout in seconds. Default raised from
+            3600 to 7200 in v1.1.1 to match the Python client's 2h ceiling
+            for huge-table extractions (spec section 10).
+        max_rows: { type: integer, nullable: true }
+        tag: { type: string, description: "Free-form caller tag for tracing" }
+
+    ExtractionRequest:
+      type: object
+      required: [connection, query, output]
+      properties:
+        connection: { $ref: '#/components/schemas/ConnectionConfig' }
+        query:
+          type: string
+          description: |
+            ALLOWED query patterns (validated server-side):
+              - SELECT * FROM <schema>.<table>
+              - SELECT col1, col2, ... FROM <schema>.<table>
+              - SELECT ... FROM information_schema.*
+              - SELECT ... FROM pg_catalog.*
+            FORBIDDEN: JOIN, GROUP BY, aggregate functions, DISTINCT, subqueries, CTEs.
+        output: { $ref: '#/components/schemas/OutputConfig' }
+        options:
+          $ref: '#/components/schemas/ExtractionOptions'
+
+    ManifestEntry:
+      type: object
+      properties:
+        path: { type: string }
+        rows: { type: integer, format: int64 }
+        bytes: { type: integer, format: int64 }
+        checksum_sha256: { type: string }
+        row_groups: { type: integer }
+
+    ExtractionStatus:
+      type: string
+      enum: [running, completed, failed]
+
+    ErrorInfo:
+      type: object
+      required: [code, message, retryable]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        retryable: { type: boolean }
+
+    ExtractionResponse:
+      type: object
+      properties:
+        extraction_id: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/ExtractionStatus' }
+        manifest:
+          type: object
+          properties:
+            files:
+              type: array
+              items: { $ref: '#/components/schemas/ManifestEntry' }
+            duration_ms: { type: integer, format: int64 }
+            rows_per_second: { type: integer, format: int64 }
+            bytes_per_second: { type: integer, format: int64 }
+        error:
+          allOf:
+            - { $ref: '#/components/schemas/ErrorInfo' }
+            - type: object
+              nullable: true
+
+security:
+  - bearerAuth: []

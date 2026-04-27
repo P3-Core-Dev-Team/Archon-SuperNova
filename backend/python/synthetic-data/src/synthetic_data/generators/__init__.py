@@ -1,0 +1,1 @@
+"""Table generator sub-package."""
