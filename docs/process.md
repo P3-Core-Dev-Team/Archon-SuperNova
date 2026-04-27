@@ -2,7 +2,10 @@
 
 This document traces a single discovery job from "user clicks Run" to
 "results visible in the UI". Read alongside [architecture.md](architecture.md)
-for the component map.
+for the component map, and [example.md](example.md) for a worked example
+on a 10-table schema covering nine different relationship patterns
+(one-to-many, junction, composite FK, self-ref, polymorphic, JSONB,
+UUID-keyed, low-cardinality lookup, PII propagation).
 
 ## Timeline of a job
 
