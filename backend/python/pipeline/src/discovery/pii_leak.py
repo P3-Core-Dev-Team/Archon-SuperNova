@@ -76,7 +76,12 @@ def run_phase_pii_leak(
         conn.execute(pii_leaks_t.delete())
 
         # 1. PII source columns (direct identifiers, high score).
-        sources = conn.execute(
+        # Deduplicate to unique column_ids: a single column can have multiple
+        # pii_findings rows (e.g. EMAIL + PERSON_NAME both in
+        # DIRECT_IDENTIFIER_TYPES).  Iterating duplicates produces identical
+        # (source_col_id, target_col_id, "value_overlap") pairs which violate
+        # the unique constraint on pii_leaks.
+        sources_raw = conn.execute(
             select(
                 pii_findings_t.c.column_id,
                 pii_findings_t.c.pii_type,
@@ -86,6 +91,13 @@ def run_phase_pii_leak(
                 pii_findings_t.c.pii_type.in_(list(DIRECT_IDENTIFIER_TYPES)),
             )
         ).fetchall()
+        # Keep only unique column_ids (pii_type is not used in the insert).
+        seen_source_ids: set[int] = set()
+        sources: list[Any] = []
+        for row in sources_raw:
+            if int(row[0]) not in seen_source_ids:
+                seen_source_ids.add(int(row[0]))
+                sources.append(row)
 
         if not sources:
             log.info("phase_pii_leak.no_sources")
