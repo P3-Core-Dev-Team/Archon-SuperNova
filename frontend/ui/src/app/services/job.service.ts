@@ -18,6 +18,18 @@ import {
 // subprocess pipeline runs. Shipping it as a constant in client code is fine.
 const DISCOVERY_API_TOKEN = 'dev-secret';
 
+export interface RunLogEntry {
+  phase: string;
+  scope_type: string;
+  scope_id: number;
+  status: string;
+  started_at: string | null;
+  ended_at: string | null;
+  error_message: string | null;
+  sub_total?: number;
+  sub_failed?: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class JobService {
   private http = inject(HttpClient);
@@ -47,6 +59,12 @@ export class JobService {
   log(jobId: string, tail = 200): Observable<{ log: string }> {
     return this.http.get<{ log: string }>(
       `${this.base}/jobs/${jobId}/log?tail=${tail}`,
+    );
+  }
+
+  runLog(jobId: string): Observable<{ entries: RunLogEntry[] }> {
+    return this.http.get<{ entries: RunLogEntry[] }>(
+      `${this.base}/jobs/${jobId}/run_log`,
     );
   }
 

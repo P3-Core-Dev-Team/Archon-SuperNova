@@ -3,7 +3,7 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription, interval, switchMap } from 'rxjs';
 import { Job } from '../../models/job.model';
-import { JobService } from '../../services/job.service';
+import { JobService, RunLogEntry } from '../../services/job.service';
 import { RelationshipGraphComponent } from '../relationship-graph/relationship-graph.component';
 import { PiiTableComponent } from '../pii-table/pii-table.component';
 import { ExportBarComponent } from '../export-bar/export-bar.component';
@@ -92,7 +92,40 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
           <app-pii-table [jobId]="j.job_id" />
         }
         @if (tab() === 'log') {
-          <pre class="log card">{{ logText() }}</pre>
+          <div class="card runlog-card">
+            <h3 class="runlog-title">Phase status</h3>
+            @if (runLog().length === 0) {
+              <p class="muted">No phase entries yet.</p>
+            } @else {
+              <table class="runlog-table">
+                <thead>
+                  <tr>
+                    <th>Phase</th>
+                    <th>Scope</th>
+                    <th>Status</th>
+                    <th>Sub-tasks</th>
+                    <th>Started</th>
+                    <th>Duration</th>
+                    <th>Error</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (e of runLog(); track $index) {
+                    <tr [class.row-failed]="e.status === 'failed'">
+                      <td><code>{{ e.phase }}</code></td>
+                      <td>{{ e.scope_type }}{{ e.scope_id ? ('/' + e.scope_id) : '' }}</td>
+                      <td><span class="pill {{ e.status }}">{{ e.status }}</span></td>
+                      <td>{{ subTasks(e) }}</td>
+                      <td>{{ e.started_at | date:'HH:mm:ss.SSS' }}</td>
+                      <td>{{ phaseDuration(e) }}</td>
+                      <td class="err">{{ e.error_message }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
+          </div>
+          <pre class="log card">{{ logText() || '(no log output yet)' }}</pre>
         }
       </div>
     </ng-container>
@@ -155,6 +188,35 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
       white-space: pre-wrap;
       background: #0d1117;
     }
+    .runlog-card { margin-bottom: 16px; }
+    .runlog-title { margin: 0 0 12px 0; font-size: 14px; color: #c9d1d9; }
+    .runlog-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
+    }
+    .runlog-table th, .runlog-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid #30363d;
+      text-align: left;
+      vertical-align: top;
+    }
+    .runlog-table th { color: #8b949e; font-weight: 500; }
+    .runlog-table tr.row-failed { background: #2a0b0b; }
+    .runlog-table .err { color: #ffabab; max-width: 360px; word-break: break-word; }
+    .pill {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 10px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .pill.succeeded { background: #1f6f3f; color: #a3f0c2; }
+    .pill.running   { background: #1f4e7e; color: #aedcff; }
+    .pill.failed    { background: #6f1f1f; color: #ffb3b3; }
+    .pill.skipped   { background: #3a3a3a; color: #c9c9c9; }
   `],
 })
 export class JobDetailComponent implements OnInit, OnDestroy {
@@ -165,6 +227,7 @@ export class JobDetailComponent implements OnInit, OnDestroy {
   loadError = signal<string | null>(null);
   tab = signal<Tab>('clusters');
   logText = signal<string>('');
+  runLog = signal<RunLogEntry[]>([]);
   private sub?: Subscription;
   private logSub?: Subscription;
 
@@ -198,11 +261,16 @@ export class JobDetailComponent implements OnInit, OnDestroy {
         error: () => {},
       });
 
-    // Log polling — only fetches when the log tab is open.
+    // Log polling — only fetches when the log tab is open.  Pulls both the
+    // raw stdout/stderr (/log) and the structured per-phase audit (/run_log).
     this.logSub = interval(2000).subscribe(() => {
       if (this.tab() === 'log') {
         this.jobsSvc.log(id, 200).subscribe({
           next: r => this.logText.set(r.log),
+          error: () => {},
+        });
+        this.jobsSvc.runLog(id).subscribe({
+          next: r => this.runLog.set(r.entries),
           error: () => {},
         });
       }
@@ -223,5 +291,21 @@ export class JobDetailComponent implements OnInit, OnDestroy {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
     return `${m}m ${s}s`;
+  }
+
+  subTasks(e: RunLogEntry): string {
+    if (e.sub_total === undefined) return '—';
+    if (e.sub_failed) return `${e.sub_total} (${e.sub_failed} failed)`;
+    return `${e.sub_total}`;
+  }
+
+  phaseDuration(e: RunLogEntry): string {
+    if (!e.started_at) return '—';
+    const start = new Date(e.started_at).getTime();
+    const end = e.ended_at ? new Date(e.ended_at).getTime() : Date.now();
+    const ms = Math.max(0, end - start);
+    if (ms < 1000) return `${ms}ms`;
+    const sec = ms / 1000;
+    return sec < 60 ? `${sec.toFixed(1)}s` : `${Math.floor(sec/60)}m ${Math.round(sec%60)}s`;
   }
 }

@@ -17,6 +17,7 @@ shared `discovery_results` Postgres DB; the API queries it on demand.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -617,6 +618,9 @@ def get_job(job_id: str) -> JobStatus:
     return _job_status(job)
 
 
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+
+
 @app.get("/api/jobs/{job_id}/log")
 def get_job_log(job_id: str, tail: int = 200) -> dict[str, str]:
     job = _jobs.get(job_id)
@@ -627,7 +631,98 @@ def get_job_log(job_id: str, tail: int = 200) -> dict[str, str]:
         return {"log": ""}
     with log_path.open() as f:
         lines = f.readlines()[-tail:]
-    return {"log": "".join(lines)}
+    # The pipeline uses structlog + rich for coloured console output, so the
+    # log file is full of ANSI escape sequences. Browsers render them as
+    # invisible control characters, which makes the Run-log tab appear blank.
+    # Strip them server-side so the UI shows plain text.
+    return {"log": _ANSI_ESCAPE_RE.sub("", "".join(lines))}
+
+
+@app.get("/api/jobs/{job_id}/run_log")
+def get_job_run_log(job_id: str, detail: str = "rollup") -> dict[str, Any]:
+    """Structured per-phase audit from the ``discovery.run_log`` table.
+
+    The ``/log`` endpoint above returns the raw subprocess stdout/stderr;
+    this returns the phase status timeline that the UI's Run-log tab
+    renders.
+
+    ``detail`` modes:
+
+    * ``rollup`` (default): one row per ``phase`` summarising status
+      across all scopes (global + table + column). Plus every failed
+      sub-scope row so problems are still visible. ~14-30 rows for a
+      typical job — what the UI table should display.
+    * ``full``: every ``run_log`` row (can be thousands; one per column
+      for fingerprint / pii_scan / validate). Used by deep-debug views.
+    """
+    if job_id not in _jobs:
+        raise HTTPException(404, "job not found")
+    conn = psycopg2.connect(**RESULTS_DB_DSN, options="-c search_path=discovery")
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT phase, scope_type, scope_id, status,
+                   started_at, ended_at, error_message
+            FROM run_log
+            ORDER BY started_at ASC NULLS LAST, log_id ASC
+            """
+        )
+        raw = cur.fetchall()
+    finally:
+        conn.close()
+
+    def _row(r: tuple) -> dict[str, Any]:
+        return {
+            "phase": r[0],
+            "scope_type": r[1],
+            "scope_id": r[2],
+            "status": r[3],
+            "started_at": r[4].isoformat() if r[4] else None,
+            "ended_at": r[5].isoformat() if r[5] else None,
+            "error_message": r[6],
+        }
+
+    if detail == "full":
+        return {"entries": [_row(r) for r in raw]}
+
+    # Rollup mode: one summary row per phase plus every non-succeeded sub-scope.
+    phase_groups: dict[str, list[tuple]] = {}
+    for r in raw:
+        phase_groups.setdefault(r[0], []).append(r)
+
+    summary: list[dict[str, Any]] = []
+    for phase, rows in phase_groups.items():
+        # Prefer the global-scope row as the headline; otherwise aggregate.
+        global_row = next((r for r in rows if r[1] == "global"), None)
+        sub_total = sum(1 for r in rows if r[1] != "global")
+        sub_failed = sum(1 for r in rows if r[1] != "global" and r[3] == "failed")
+        if global_row is not None:
+            entry = _row(global_row)
+        else:
+            # Synthesise a phase-level entry from the sub-scopes.
+            started = min((r[4] for r in rows if r[4]), default=None)
+            ended = max((r[5] for r in rows if r[5]), default=None)
+            any_fail = any(r[3] == "failed" for r in rows)
+            entry = {
+                "phase": phase,
+                "scope_type": "phase",
+                "scope_id": 0,
+                "status": "failed" if any_fail else "succeeded",
+                "started_at": started.isoformat() if started else None,
+                "ended_at": ended.isoformat() if ended else None,
+                "error_message": None,
+            }
+        if sub_total:
+            entry["sub_total"] = sub_total
+            entry["sub_failed"] = sub_failed
+        summary.append(entry)
+
+    # Append every failed sub-scope row so the UI still surfaces failures.
+    failures = [_row(r) for r in raw if r[1] != "global" and r[3] == "failed"]
+
+    summary.sort(key=lambda e: e.get("started_at") or "")
+    return {"entries": summary + failures}
 
 
 _ROLE_SUFFIXES_API: frozenset[str] = frozenset({
