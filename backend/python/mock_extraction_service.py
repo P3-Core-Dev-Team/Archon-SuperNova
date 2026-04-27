@@ -113,7 +113,7 @@ def _arrow_type_for(dialect: str, type_name: str) -> pa.DataType:
     """Map a dialect-specific type name to an Arrow type. Defaults to string."""
     t = (type_name or "").lower()
     # Common integer / numeric / temporal / boolean families across dialects.
-    if any(k in t for k in ("bigint", "int8", "int_8", "long")):
+    if any(k in t for k in ("bigint", "int8", "int_8")) or t == "long":
         return pa.int64()
     if "smallint" in t or "int2" in t or "tinyint" in t:
         return pa.int16()
@@ -382,9 +382,14 @@ def _extract_dbapi(conn, dialect: str, query: str, output_path: Path, *,
     batch_size = 5_000
     total_rows = 0
     n_groups = 0
-    with pq.ParquetWriter(str(output_path), arrow_schema,
-                          compression=compression,
-                          compression_level=compression_level) as writer:
+    # Use explicit try/finally instead of `with` so that when the schema-shift
+    # path reassigns `writer` the new writer is guaranteed to be closed too.
+    # The `with` context manager would only close the *original* writer on
+    # exit, leaving the reassigned writer's file handle open on exceptions.
+    writer = pq.ParquetWriter(str(output_path), arrow_schema,
+                              compression=compression,
+                              compression_level=compression_level)
+    try:
         while True:
             rows = cur.fetchmany(batch_size)
             if not rows:
@@ -432,6 +437,8 @@ def _extract_dbapi(conn, dialect: str, query: str, output_path: Path, *,
                 writer.write_batch(batch)
             total_rows += batch.num_rows
             n_groups += 1
+    finally:
+        writer.close()
     cur.close()
     return {
         "path": str(output_path), "rows": total_rows,
