@@ -11,12 +11,16 @@ import {
   PiiTable,
   RelationshipGraph,
   SchemaList,
+  SourceDbType,
 } from '../models/job.model';
 
 // MVP-only shared secret for POST /api/jobs. This is NOT a real auth secret --
 // the backend uses it solely to keep random web-origin pages from triggering
 // subprocess pipeline runs. Shipping it as a constant in client code is fine.
 const DISCOVERY_API_TOKEN = 'dev-secret';
+
+// Re-export so components can import SourceDbType from this service barrel.
+export type { SourceDbType } from '../models/job.model';
 
 export interface RunLogEntry {
   phase: string;
@@ -29,8 +33,6 @@ export interface RunLogEntry {
   sub_total?: number;
   sub_failed?: number;
 }
-
-export type SourceDbType = 'postgres' | 'mysql' | 'sqlserver' | 'oracle';
 
 export interface ConnectionTestRequest {
   db_type: SourceDbType;
