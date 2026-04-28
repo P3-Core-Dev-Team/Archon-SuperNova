@@ -133,7 +133,7 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
     </ng-container>
   `,
   styles: [`
-    .back { color: #8b949e; font-size: 13px; }
+    .back { color: #656d76; font-size: 13px; }
     .header {
       display: flex;
       align-items: center;
@@ -146,27 +146,27 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
       display: flex;
       flex-wrap: wrap;
       gap: 14px;
-      color: #8b949e;
+      color: #656d76;
       font-size: 13px;
       margin-bottom: 18px;
     }
-    .meta strong { color: #e6edf3; }
+    .meta strong { color: #1f2328; }
     .meta .erd-link {
-      color: #58a6ff;
+      color: #0969da;
       text-decoration: none;
       font-size: 12px;
     }
     .meta .erd-link:hover { text-decoration: underline; }
     .meta code {
-      background: #21262d;
+      background: #f6f8fa;
       padding: 1px 6px;
       border-radius: 4px;
-      color: #e6edf3;
+      color: #1f2328;
     }
     .tabs {
       display: flex;
       gap: 4px;
-      border-bottom: 1px solid #30363d;
+      border-bottom: 1px solid #d0d7de;
       margin-bottom: 18px;
     }
     .tabs button {
@@ -174,24 +174,24 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
       border: none;
       border-bottom: 2px solid transparent;
       border-radius: 0;
-      color: #8b949e;
+      color: #656d76;
       padding: 10px 16px;
     }
     .tabs button.active {
-      color: #e6edf3;
-      border-bottom-color: #58a6ff;
+      color: #1f2328;
+      border-bottom-color: #0969da;
     }
-    .error { color: #ffabab; background: #3a0d0d; border-color: #f85149; }
+    .error { color: #cf222e; background: #ffebe9; border-color: #cf222e; }
     .log {
       max-height: 540px;
       overflow: auto;
       font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
       font-size: 12px;
       white-space: pre-wrap;
-      background: #0d1117;
+      background: #f6f8fa;
     }
     .runlog-card { margin-bottom: 16px; }
-    .runlog-title { margin: 0 0 12px 0; font-size: 14px; color: #c9d1d9; }
+    .runlog-title { margin: 0 0 12px 0; font-size: 14px; color: #1f2328; }
     .runlog-table {
       width: 100%;
       border-collapse: collapse;
@@ -200,13 +200,13 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
     }
     .runlog-table th, .runlog-table td {
       padding: 6px 10px;
-      border-bottom: 1px solid #30363d;
+      border-bottom: 1px solid #d0d7de;
       text-align: left;
       vertical-align: top;
     }
-    .runlog-table th { color: #8b949e; font-weight: 500; }
-    .runlog-table tr.row-failed { background: #2a0b0b; }
-    .runlog-table .err { color: #ffabab; max-width: 360px; word-break: break-word; }
+    .runlog-table th { color: #656d76; font-weight: 500; }
+    .runlog-table tr.row-failed { background: #ffebe9; }
+    .runlog-table .err { color: #cf222e; max-width: 360px; word-break: break-word; }
     .pill {
       display: inline-block;
       padding: 1px 8px;
@@ -215,10 +215,10 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
       text-transform: uppercase;
       letter-spacing: 0.4px;
     }
-    .pill.succeeded { background: #1f6f3f; color: #a3f0c2; }
-    .pill.running   { background: #1f4e7e; color: #aedcff; }
-    .pill.failed    { background: #6f1f1f; color: #ffb3b3; }
-    .pill.skipped   { background: #3a3a3a; color: #c9c9c9; }
+    .pill.succeeded { background: #dafbe1; color: #1a7f37; }
+    .pill.running   { background: #ddf4ff; color: #0969da; }
+    .pill.failed    { background: #ffebe9; color: #cf222e; }
+    .pill.skipped   { background: #d0d7de; color: #656d76; }
   `],
 })
 export class JobDetailComponent implements OnInit, OnDestroy {

@@ -9,66 +9,66 @@ html, body {
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                "Helvetica Neue", Arial, sans-serif;
-  background: #0e1116;
-  color: #e6edf3;
+  background: #ffffff;
+  color: #1f2328;
   font-size: 14px;
   line-height: 1.5;
   height: 100%;
 }
 
-a { color: #58a6ff; text-decoration: none; }
+a { color: #0969da; text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 button {
   font-family: inherit;
   font-size: 14px;
   cursor: pointer;
-  border: 1px solid #30363d;
-  background: #21262d;
-  color: #e6edf3;
+  border: 1px solid #d0d7de;
+  background: #f6f8fa;
+  color: #1f2328;
   padding: 6px 14px;
   border-radius: 6px;
   transition: background 0.1s;
 
-  &:hover:not([disabled]) { background: #30363d; }
+  &:hover:not([disabled]) { background: #d0d7de; }
   &[disabled] { opacity: 0.45; cursor: not-allowed; }
   &.primary {
-    background: #238636;
-    border-color: #2ea043;
-    &:hover:not([disabled]) { background: #2ea043; }
+    background: #1a7f37;
+    border-color: #1f883d;
+    &:hover:not([disabled]) { background: #1f883d; }
   }
   &.danger {
-    background: #b62324;
-    border-color: #f85149;
-    &:hover:not([disabled]) { background: #da3633; }
+    background: #a40e26;
+    border-color: #cf222e;
+    &:hover:not([disabled]) { background: #cf222e; }
   }
 }
 
 input, select, textarea {
   font-family: inherit;
   font-size: 14px;
-  background: #0d1117;
-  color: #e6edf3;
-  border: 1px solid #30363d;
+  background: #f6f8fa;
+  color: #1f2328;
+  border: 1px solid #d0d7de;
   border-radius: 6px;
   padding: 6px 10px;
   outline: none;
-  &:focus { border-color: #58a6ff; }
+  &:focus { border-color: #0969da; }
 }
 
 label {
   display: block;
   margin-bottom: 4px;
   font-size: 12px;
-  color: #8b949e;
+  color: #656d76;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .card {
-  background: #161b22;
-  border: 1px solid #30363d;
+  background: #ffffff;
+  border: 1px solid #d0d7de;
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 16px;
@@ -83,10 +83,10 @@ label {
   letter-spacing: 0.4px;
   text-transform: uppercase;
 
-  &.queued     { background: #30363d; color: #8b949e; }
-  &.running    { background: #1f6feb; color: white; animation: pulse 1.5s infinite; }
-  &.succeeded  { background: #238636; color: white; }
-  &.failed     { background: #da3633; color: white; }
+  &.queued     { background: #d0d7de; color: #656d76; }
+  &.running    { background: #0969da; color: white; animation: pulse 1.5s infinite; }
+  &.succeeded  { background: #1a7f37; color: white; }
+  &.failed     { background: #cf222e; color: white; }
 }
 
 @keyframes pulse {
@@ -103,21 +103,21 @@ table {
 th, td {
   text-align: left;
   padding: 8px 10px;
-  border-bottom: 1px solid #21262d;
+  border-bottom: 1px solid #d0d7de;
 }
 
 th {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  color: #8b949e;
+  color: #656d76;
   font-weight: 600;
-  background: #0d1117;
+  background: #f6f8fa;
   position: sticky;
   top: 0;
 }
 
-tr:hover td { background: #161b22; }
+tr:hover td { background: #f6f8fa; }
 
-.muted { color: #8b949e; }
+.muted { color: #656d76; }
 .mono  { font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace; }

@@ -219,8 +219,8 @@ import {
     .panel {
       position: relative;
       width: 100%;
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: #ffffff;
+      border: 1px solid #d0d7de;
       border-radius: 6px;
       margin-top: 16px;
       max-height: 0;
@@ -252,8 +252,8 @@ import {
     }
     .close {
       background: transparent;
-      border: 1px solid #30363d;
-      color: #8b949e;
+      border: 1px solid #d0d7de;
+      color: #656d76;
       width: 28px;
       height: 28px;
       border-radius: 4px;
@@ -261,7 +261,7 @@ import {
       padding: 0;
       line-height: 1;
     }
-    .close:hover { color: #e6edf3; border-color: #58a6ff; }
+    .close:hover { color: #1f2328; border-color: #0969da; }
     .picker label {
       display: flex;
       flex-direction: column;
@@ -271,27 +271,27 @@ import {
     }
     .picker select {
       width: 100%;
-      background: #0d1117;
-      border: 1px solid #30363d;
-      color: #e6edf3;
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+      color: #1f2328;
       padding: 6px 8px;
       border-radius: 4px;
       font: inherit;
     }
-    section { border-top: 1px solid #21262d; padding-top: 10px; }
+    section { border-top: 1px solid #f6f8fa; padding-top: 10px; }
     .sec-title {
       font-size: 11px;
       letter-spacing: 0.6px;
       text-transform: uppercase;
-      color: #8b949e;
+      color: #656d76;
       margin-bottom: 8px;
     }
     table.data {
       width: 100%;
       border-collapse: collapse;
       font-size: 13px;
-      background: #0d1117;
-      border: 1px solid #21262d;
+      background: #f6f8fa;
+      border: 1px solid #f6f8fa;
       border-radius: 4px;
       overflow: hidden;
     }
@@ -301,19 +301,19 @@ import {
       font-size: 11px;
       letter-spacing: 0.5px;
       text-transform: uppercase;
-      color: #8b949e;
-      border-bottom: 1px solid #30363d;
-      background: #161b22;
+      color: #656d76;
+      border-bottom: 1px solid #d0d7de;
+      background: #ffffff;
       font-weight: 600;
     }
     table.data tbody td {
       padding: 6px 10px;
-      border-bottom: 1px solid #1a1f26;
+      border-bottom: 1px solid #ddf4ff;
       vertical-align: top;
     }
     table.data tbody tr:last-child td { border-bottom: none; }
-    table.data tbody tr:hover { background: #161b22; }
-    table.data .num { color: #8b949e; font-family: ui-monospace, monospace; }
+    table.data tbody tr:hover { background: #f6f8fa; }
+    table.data .num { color: #656d76; font-family: ui-monospace, monospace; }
     table.data .cell-center { text-align: center; }
     table.data .cell-right { text-align: right; font-variant-numeric: tabular-nums; }
     table.data tr.pk-row { background: rgba(63, 185, 80, 0.06); }
@@ -321,7 +321,7 @@ import {
     table.data tr.pii-validated { background: rgba(248, 81, 73, 0.06); }
     table.data .ex { max-width: 220px; word-break: break-word; }
     .count {
-      color: #8b949e;
+      color: #656d76;
       font-weight: 400;
       letter-spacing: 0;
       text-transform: none;
@@ -336,13 +336,13 @@ import {
       font-weight: 700;
       letter-spacing: 0.4px;
     }
-    .badge.pk { background: #3fb950; color: #0d1117; }
-    .badge.fk { background: #58a6ff; color: #0d1117; }
-    .badge.pii-type { background: #1f6feb; color: white; }
-    .arrow { color: #8b949e; }
+    .badge.pk { background: #1a7f37; color: #f6f8fa; }
+    .badge.fk { background: #0969da; color: #f6f8fa; }
+    .badge.pii-type { background: #0969da; color: white; }
+    .arrow { color: #656d76; }
     .conf {
       margin-left: auto;
-      color: #8b949e;
+      color: #656d76;
       font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
       font-size: 12px;
     }
@@ -355,13 +355,13 @@ import {
     .pad { padding: 24px 0; }
     .empty { padding: 40px 0; }
     .small { font-size: 12px; }
-    .muted { color: #8b949e; }
+    .muted { color: #656d76; }
     .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace; }
     .error {
-      color: #ffabab;
+      color: #cf222e;
       padding: 10px 12px;
-      background: #3a0d0d;
-      border: 1px solid #f85149;
+      background: #ffebe9;
+      border: 1px solid #cf222e;
       border-radius: 6px;
       font-size: 13px;
     }

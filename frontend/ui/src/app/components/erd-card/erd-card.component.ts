@@ -120,7 +120,7 @@ interface EdgeLine {
                  (mouseleave)="hoveredTable.set(null)">
               <div class="erd-card-header"
                    [style.background]="bridgeColorFor(c.table) || null"
-                   [style.color]="bridgeColorFor(c.table) ? '#0d1117' : null">
+                   [style.color]="bridgeColorFor(c.table) ? '#f6f8fa' : null">
                 @if (isBridge(c.table)) { <span class="bridge-pin" title="Cross-cluster bridge">⤴</span> }
                 {{ c.table }}
               </div>
@@ -181,9 +181,9 @@ interface EdgeLine {
       </div>
 
       <div class="legend">
-        <div class="legend-row"><span class="swatch" style="background:#3fb950"></span> &ge; 0.95</div>
-        <div class="legend-row"><span class="swatch" style="background:#d29922"></span> 0.85 &ndash; 0.95</div>
-        <div class="legend-row"><span class="swatch" style="background:#8b949e"></span> &lt; 0.85</div>
+        <div class="legend-row"><span class="swatch" style="background:#1a7f37"></span> &ge; 0.95</div>
+        <div class="legend-row"><span class="swatch" style="background:#9a6700"></span> 0.85 &ndash; 0.95</div>
+        <div class="legend-row"><span class="swatch" style="background:#656d76"></span> &lt; 0.85</div>
         <div class="legend-row"><span class="badge pk">PK</span> primary key</div>
         <div class="legend-row"><span class="badge fk">FK</span> foreign key</div>
       </div>
@@ -192,7 +192,7 @@ interface EdgeLine {
   styles: [`
     :host {
       display: block;
-      color: #e6edf3;
+      color: #1f2328;
       font-size: 13px;
     }
     .erd-toolbar {
@@ -203,32 +203,32 @@ interface EdgeLine {
       flex-wrap: wrap;
     }
     .erd-toolbar .spacer { flex: 1; }
-    .muted { color: #8b949e; }
+    .muted { color: #656d76; }
     .warn {
-      color: #d29922;
+      color: #9a6700;
       background: rgba(210, 153, 34, 0.12);
       padding: 2px 8px;
       border-radius: 4px;
       font-size: 11px;
     }
     .back {
-      color: #58a6ff;
+      color: #0969da;
       text-decoration: none;
       font-size: 13px;
     }
     .back:hover { text-decoration: underline; }
     .error {
-      color: #ffabab;
-      background: #3a0d0d;
-      border: 1px solid #f85149;
+      color: #cf222e;
+      background: #ffebe9;
+      border: 1px solid #cf222e;
       border-radius: 6px;
       padding: 12px;
     }
     .empty {
       padding: 32px;
       text-align: center;
-      color: #8b949e;
-      border: 1px dashed #30363d;
+      color: #656d76;
+      border: 1px dashed #d0d7de;
       border-radius: 6px;
     }
     .erd-canvas {
@@ -236,8 +236,8 @@ interface EdgeLine {
       width: 100%;
       max-height: 720px;
       overflow: auto;
-      background: #0d1117;
-      border: 1px solid #30363d;
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
       border-radius: 8px;
       padding: 18px;
       /* Don't let card hover styles bleed -- isolate stacking. */
@@ -251,38 +251,38 @@ interface EdgeLine {
       z-index: 1;
     }
     .erd-card {
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: #ffffff;
+      border: 1px solid #d0d7de;
       border-radius: 6px;
       overflow: hidden;
       transition: opacity 0.15s ease, border-color 0.15s ease;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
     }
     .erd-card.dim { opacity: 0.3; }
     /* Cross-cluster bridge ("super-point") cards: dashed amber outline,
        muted background — visually distinct from cluster members. */
     .erd-card.bridge {
       border-style: dashed;
-      border-color: #d29922;
-      background: #181308;
+      border-color: #9a6700;
+      background: #fff8c5;
     }
     .erd-card.bridge .erd-card-header {
-      background: #2a210b;
-      color: #e3b341;
+      background: #fff8c5;
+      color: #9a6700;
     }
     .bridge-pin {
       display: inline-block;
       margin-right: 4px;
-      color: #d29922;
+      color: #9a6700;
       font-weight: 600;
     }
     .erd-card-header {
-      background: #1f6feb;
-      color: #fff;
+      background: #0969da;
+      color: #ffffff;
       padding: 8px 12px;
       font-weight: 600;
       font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
-      border-bottom: 1px solid #30363d;
+      border-bottom: 1px solid #d0d7de;
       letter-spacing: 0.2px;
     }
     .erd-card-body {
@@ -296,12 +296,12 @@ interface EdgeLine {
       padding: 5px 12px;
       font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace;
       font-size: 12px;
-      border-bottom: 1px solid #21262d;
+      border-bottom: 1px solid #f6f8fa;
       min-height: 24px;
     }
     .column-row:last-child { border-bottom: none; }
     .column-row.unknown {
-      color: #8b949e;
+      color: #656d76;
       font-style: italic;
       justify-content: center;
     }
@@ -320,19 +320,19 @@ interface EdgeLine {
       text-align: center;
       min-width: 22px;
     }
-    .badge.pk { background: #d29922; color: #0d1117; }
-    .badge.fk { background: #1f6feb; color: #fff; }
+    .badge.pk { background: #9a6700; color: #f6f8fa; }
+    .badge.fk { background: #0969da; color: #ffffff; }
     .badge.none { background: transparent; }
     .col-name {
       flex: 1 1 auto;
-      color: #e6edf3;
+      color: #1f2328;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .col-type {
       flex: 0 0 auto;
-      color: #6e7681;
+      color: #8c959f;
       font-size: 11px;
     }
     .erd-svg {
@@ -350,7 +350,7 @@ interface EdgeLine {
       gap: 18px;
       flex-wrap: wrap;
       font-size: 11px;
-      color: #8b949e;
+      color: #656d76;
     }
     .legend-row { display: inline-flex; align-items: center; gap: 6px; }
     .swatch {
@@ -715,10 +715,10 @@ export class ErdCardComponent implements AfterViewInit, OnDestroy {
   }
 
   private colorFor(c: number | null): string {
-    if (c == null) return '#666';
-    if (c >= 0.95) return '#3fb950';
-    if (c >= 0.85) return '#d29922';
-    return '#8b949e';
+    if (c == null) return '#656d76';
+    if (c >= 0.95) return '#1a7f37';
+    if (c >= 0.85) return '#9a6700';
+    return '#656d76';
   }
 }
 

@@ -116,7 +116,7 @@ export interface ClustersResponse {
 
             @if (c.pii_table_count > 0) {
               <div class="pii-line">
-                <span class="lock">&#128274;</span>
+                <span class="lock">&#1a7f37;</span>
                 {{ c.pii_table_count }} table{{ c.pii_table_count !== 1 ? 's' : '' }} with PII
                 @if (c.subject_kinds.length > 0) {
                   <span class="pii-kinds">({{ c.subject_kinds.join(', ') }})</span>
@@ -146,11 +146,11 @@ export interface ClustersResponse {
       text-align: center;
       font-size: 14px;
     }
-    .muted { color: #8b949e; }
+    .muted { color: #656d76; }
     .error-box {
-      color: #ffabab;
-      background: #3a0d0d;
-      border: 1px solid #f85149;
+      color: #cf222e;
+      background: #ffebe9;
+      border: 1px solid #cf222e;
       border-radius: 6px;
       padding: 16px 20px;
       margin: 8px 0;
@@ -167,15 +167,15 @@ export interface ClustersResponse {
       gap: 6px 10px;
       align-items: center;
       font-size: 13px;
-      color: #8b949e;
+      color: #656d76;
       margin-bottom: 20px;
       padding: 10px 14px;
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: #ffffff;
+      border: 1px solid #d0d7de;
       border-radius: 6px;
     }
-    .overview-header strong { color: #e6edf3; }
-    .sep { color: #444c56; }
+    .overview-header strong { color: #1f2328; }
+    .sep { color: #656d76; }
 
     .grid {
       display: grid;
@@ -184,10 +184,10 @@ export interface ClustersResponse {
     }
 
     .card {
-      background: #161b22;
-      border: 1px solid #30363d;
+      background: #ffffff;
+      border: 1px solid #d0d7de;
       /* Top edge stripe is the cluster's color (matches the macro graph). */
-      border-top: 4px solid #30363d;
+      border-top: 4px solid #d0d7de;
       border-radius: 8px;
       padding: 12px 18px 16px;
       display: flex;
@@ -199,34 +199,34 @@ export interface ClustersResponse {
     .overview-header .spacer { flex: 1; }
     .overview-header .view-toggle {
       display: inline-flex;
-      border: 1px solid #30363d;
+      border: 1px solid #d0d7de;
       border-radius: 6px;
       overflow: hidden;
-      background: #0d1117;
+      background: #f6f8fa;
     }
     .overview-header .view-toggle .seg-btn {
       background: transparent;
-      color: #8b949e;
+      color: #656d76;
       border: none;
       padding: 5px 12px;
       font: inherit;
       font-size: 13px;
       cursor: pointer;
     }
-    .overview-header .view-toggle .seg-btn:hover { color: #e6edf3; background: #161b22; }
+    .overview-header .view-toggle .seg-btn:hover { color: #1f2328; background: #ffffff; }
     .overview-header .view-toggle .seg-btn.active {
-      background: #1f6feb;
+      background: #0969da;
       color: white;
     }
     .card:hover {
       transform: translateY(-1px);
-      border-color: #58a6ff;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+      border-color: #0969da;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
     }
 
     /* PII indicator: red left border */
     .card.pii-border {
-      border-left: 3px solid #f85149;
+      border-left: 3px solid #cf222e;
     }
 
     /* Junction-only cluster: dashed border */
@@ -240,23 +240,23 @@ export interface ClustersResponse {
     .card-name {
       font-size: 15px;
       font-weight: 700;
-      color: #e6edf3;
+      color: #1f2328;
       word-break: break-word;
     }
 
     .divider {
       height: 1px;
-      background: #30363d;
+      background: #d0d7de;
       margin: 2px 0 4px;
     }
 
     .stats-line {
       font-size: 13px;
-      color: #c9d1d9;
+      color: #1f2328;
     }
     .inter-line {
       font-size: 12px;
-      color: #8b949e;
+      color: #656d76;
     }
 
     .archetype-bar-row {
@@ -269,13 +269,13 @@ export interface ClustersResponse {
       height: 8px;
       border-radius: 4px;
       overflow: hidden;
-      background: #21262d;
+      background: #f6f8fa;
       display: flex;
     }
     .seg { height: 100%; transition: width 0.3s; }
     .archetype-labels {
       font-size: 11px;
-      color: #8b949e;
+      color: #656d76;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -284,20 +284,20 @@ export interface ClustersResponse {
 
     .pii-line {
       font-size: 12px;
-      color: #ffa198;
+      color: #cf222e;
       display: flex;
       align-items: baseline;
       gap: 4px;
       flex-wrap: wrap;
     }
     .pii-kinds {
-      color: #8b949e;
+      color: #656d76;
       font-size: 11px;
     }
 
     .modularity-line {
       font-size: 11px;
-      color: #6e7681;
+      color: #8c959f;
       margin-top: 2px;
     }
 
@@ -305,16 +305,16 @@ export interface ClustersResponse {
       display: inline-block;
       margin-top: 6px;
       font-size: 12px;
-      color: #58a6ff;
+      color: #0969da;
       text-decoration: none;
-      border: 1px solid #1f6feb;
+      border: 1px solid #0969da;
       border-radius: 4px;
       padding: 4px 10px;
       align-self: flex-start;
       transition: background 0.12s;
     }
     .open-btn:hover {
-      background: #1f6feb22;
+      background: #0969da22;
       text-decoration: none;
     }
   `],
@@ -386,12 +386,12 @@ export class ClusterOverviewComponent implements OnInit {
   }
 
   private static readonly ARCHETYPE_COLORS: Record<string, string> = {
-    FACT:      '#1f6feb',
-    DIMENSION: '#3fb950',
-    JUNCTION:  '#d29922',
-    BRIDGE:    '#a371f7',
-    REFERENCE: '#58a6ff',
-    UNKNOWN:   '#6e7681',
+    FACT:      '#0969da',
+    DIMENSION: '#1a7f37',
+    JUNCTION:  '#9a6700',
+    BRIDGE:    '#8250df',
+    REFERENCE: '#0969da',
+    UNKNOWN:   '#8c959f',
   };
 
   archetypeSegments(c: Cluster): Array<{ key: string; count: number; pct: number; color: string }> {
@@ -403,7 +403,7 @@ export class ClusterOverviewComponent implements OnInit {
         key,
         count,
         pct: (count / total) * 100,
-        color: ClusterOverviewComponent.ARCHETYPE_COLORS[key] ?? '#6e7681',
+        color: ClusterOverviewComponent.ARCHETYPE_COLORS[key] ?? '#8c959f',
       }));
   }
 

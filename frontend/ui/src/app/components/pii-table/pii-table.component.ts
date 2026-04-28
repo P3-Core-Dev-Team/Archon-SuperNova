@@ -90,7 +90,7 @@ import { PiiFinding } from '../../models/job.model';
       text-transform: none;
       letter-spacing: 0;
       font-size: 13px;
-      color: #e6edf3;
+      color: #1f2328;
       margin: 0;
     }
     .card.no-pad { padding: 0; overflow: auto; max-height: 640px; }
@@ -98,15 +98,15 @@ import { PiiFinding } from '../../models/job.model';
     th { cursor: pointer; user-select: none; }
     th.r, td.r { text-align: right; }
     .center { text-align: center; padding: 24px 0 !important; }
-    .small { font-size: 12px; color: #8b949e; }
+    .small { font-size: 12px; color: #656d76; }
     /* Confidence-tier row tinting (uses left border + faint background) */
     tr.tier-high   td { background: rgba(218, 54, 51, 0.10); }
-    tr.tier-high   td:first-child  { box-shadow: inset 3px 0 0 #f85149; }
+    tr.tier-high   td:first-child  { box-shadow: inset 3px 0 0 #cf222e; }
     tr.tier-mid    td { background: rgba(210, 153, 34, 0.10); }
-    tr.tier-mid    td:first-child  { box-shadow: inset 3px 0 0 #d29922; }
+    tr.tier-mid    td:first-child  { box-shadow: inset 3px 0 0 #9a6700; }
     tr.tier-low    td { background: rgba(139, 148, 158, 0.06); }
-    tr.tier-low    td:first-child  { box-shadow: inset 3px 0 0 #6e7681; }
-    tr:hover td { filter: brightness(1.15); }
+    tr.tier-low    td:first-child  { box-shadow: inset 3px 0 0 #8c959f; }
+    tr:hover td { background: #f6f8fa; }
     td.ex {
       max-width: 280px;
       overflow: hidden;
@@ -115,7 +115,7 @@ import { PiiFinding } from '../../models/job.model';
       cursor: help;
     }
     .pii-type {
-      background: #1f6feb;
+      background: #0969da;
       color: white;
       padding: 1px 8px;
       border-radius: 10px;
@@ -123,13 +123,13 @@ import { PiiFinding } from '../../models/job.model';
       font-weight: 600;
       letter-spacing: 0.4px;
     }
-    .ok { color: #3fb950; font-weight: 700; }
-    .no { color: #6e7681; }
+    .ok { color: #1a7f37; font-weight: 700; }
+    .no { color: #8c959f; }
     .error {
-      color: #ffabab;
+      color: #cf222e;
       padding: 12px;
-      background: #3a0d0d;
-      border: 1px solid #f85149;
+      background: #ffebe9;
+      border: 1px solid #cf222e;
       border-radius: 6px;
     }
   `],

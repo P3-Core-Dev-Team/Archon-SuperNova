@@ -13,7 +13,7 @@ import { ClusterDetailComponent } from './cluster-detail.component';
   styles: [`
     .back {
       display: inline-block;
-      color: #58a6ff;
+      color: #0969da;
       font-size: 13px;
       padding: 6px 0 12px;
       text-decoration: none;
