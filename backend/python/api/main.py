@@ -852,73 +852,90 @@ def submit_job(req: JobRequest) -> JobStatus:
 
 
 def _reset_pipeline_state_for_schema(schema_name: str) -> None:
-    """Wipe orchestration audit (run_log) and prior analysis rows so a
-    re-run produces fresh results.  Best-effort: swallow errors.
+    """Wipe prior analysis rows for *this* schema so a re-run produces
+    fresh results, but leave OTHER schemas' results intact.  Best-effort.
 
-    The pipeline's ``run_log`` is keyed (phase, "global", None) and is NOT
-    per-source-schema; without this reset, a previous job's "succeeded"
-    row makes ``_run_phase`` short-circuit with
-    ``phase_already_complete_skipping`` and the new job produces 0 results.
+    Two layers:
 
-    The reset is currently *global* (it wipes every schema's analysis
-    tables, not just ``schema_name``).  Per-schema retention would
-    require ON DELETE CASCADE on the existing FKs and a ``job_id`` column
-    on every analysis table — both bigger than this codepath warrants
-    today.  As-is, the architectural assumption is "single source schema
-    at a time"; previously-run schemas' results are wiped on each new
-    submission.
+    1. **Per-schema delete** of every analysis table that traces back to
+       ``tbl_inventory`` (relationships, fk_candidates, pii_findings,
+       pii_leaks, composite/polymorphic/jsonb relationships, clusters).
+       The existing FKs are NO ACTION (not CASCADE) so we delete dependents
+       in dependency order, scoping every statement to ``schema_name``.
 
-    The persistent ``jobs`` table is intentionally preserved — it carries
-    UI history.  Concurrent jobs against the same backend are unsupported.
+    2. **Global TRUNCATE of ``run_log``**. The orchestrator's
+       ``is_complete(phase, "global", None)`` check is global; without
+       wiping it, the new job's phase entries short-circuit on the prior
+       job's "succeeded" row and the new job produces 0 results.
+       ``run_log`` is reproducible from the results, so this is acceptable.
+
+    The downstream pipeline phases (extract / fingerprint / pii_scan /
+    candidate_gen / validate) all filter ``tbl_inventory`` by
+    ``config.source_db.schemas`` so leftover rows for other schemas
+    don't leak into this job's processing.
+
+    Concurrent jobs against the same backend are still unsupported.
     """
     try:
         conn = psycopg2.connect(**RESULTS_DB_DSN)
     except Exception as exc:
         print(f"[reset_state_skipped] db_connect_failed error={exc}", flush=True)
         return
+
+    # Reusable subquery snippets — substituted into each per-table DELETE.
+    cols_for_schema = (
+        "(SELECT column_id FROM discovery.col_inventory "
+        "  WHERE table_id IN (SELECT table_id FROM discovery.tbl_inventory "
+        "                      WHERE schema_name = %s))"
+    )
+    tids_for_schema = (
+        "(SELECT table_id FROM discovery.tbl_inventory WHERE schema_name = %s)"
+    )
+
+    deletes: list[tuple[str, str, int]] = [
+        # name, SQL, n_param_placeholders
+        ("relationships",
+         f"DELETE FROM discovery.relationships "
+         f"WHERE child_col_id IN {cols_for_schema} OR parent_col_id IN {cols_for_schema}", 2),
+        ("jsonb_relationships",
+         f"DELETE FROM discovery.jsonb_relationships "
+         f"WHERE child_col_id IN {cols_for_schema} OR parent_col_id IN {cols_for_schema}", 2),
+        ("fk_candidates",
+         f"DELETE FROM discovery.fk_candidates "
+         f"WHERE child_col_id IN {cols_for_schema} OR parent_col_id IN {cols_for_schema}", 2),
+        ("pii_leaks",
+         f"DELETE FROM discovery.pii_leaks "
+         f"WHERE source_col_id IN {cols_for_schema} OR target_col_id IN {cols_for_schema}", 2),
+        ("pii_findings",
+         f"DELETE FROM discovery.pii_findings WHERE table_id IN {tids_for_schema}", 1),
+        ("composite_relationships",
+         f"DELETE FROM discovery.composite_relationships "
+         f"WHERE child_table_id IN {tids_for_schema} OR parent_table_id IN {tids_for_schema}", 2),
+        ("polymorphic_relationships",
+         f"DELETE FROM discovery.polymorphic_relationships "
+         f"WHERE child_table_id IN {tids_for_schema} OR parent_table_id IN {tids_for_schema}", 2),
+        ("clusters",
+         "DELETE FROM discovery.clusters WHERE schema_name = %s", 1),
+        ("col_inventory",
+         f"DELETE FROM discovery.col_inventory WHERE table_id IN {tids_for_schema}", 1),
+        ("tbl_inventory",
+         "DELETE FROM discovery.tbl_inventory WHERE schema_name = %s", 1),
+    ]
     try:
-        conn.autocommit = True
+        conn.autocommit = False
         with conn.cursor() as cur:
-            # TRUNCATE every analysis table.  RESTART IDENTITY resets the
-            # BIGSERIAL PKs so col_id / table_id stay in a fresh range.
-            # CASCADE follows any FK chains between them.
-            cur.execute("""
-                TRUNCATE TABLE
-                  discovery.run_log,
-                  discovery.relationships,
-                  discovery.composite_relationships,
-                  discovery.polymorphic_relationships,
-                  discovery.jsonb_relationships,
-                  discovery.fk_candidates,
-                  discovery.pii_leaks,
-                  discovery.pii_findings,
-                  discovery.clusters,
-                  discovery.col_inventory,
-                  discovery.tbl_inventory
-                RESTART IDENTITY CASCADE
-            """)
+            for _name, stmt, n in deletes:
+                cur.execute(stmt, (schema_name,) * n)
+            # run_log is global; truncate so the new job's phases don't
+            # short-circuit on prior "succeeded" rows.
+            cur.execute("TRUNCATE TABLE discovery.run_log")
+            conn.commit()
     except Exception as exc:
-        # If a table is missing on an older DB schema, retry with a per-table
-        # truncate so we still clear what exists.
-        print(f"[reset_state_partial] schema={schema_name} primary_truncate_failed: {exc}",
-              flush=True)
+        print(f"[reset_state_failed] schema={schema_name} err={exc}", flush=True)
         try:
-            conn.autocommit = True
-            for tbl in (
-                "run_log", "relationships", "composite_relationships",
-                "polymorphic_relationships", "jsonb_relationships",
-                "fk_candidates", "pii_leaks", "pii_findings", "clusters",
-                "col_inventory", "tbl_inventory",
-            ):
-                try:
-                    with conn.cursor() as cur:
-                        cur.execute(
-                            f"TRUNCATE TABLE discovery.{tbl} RESTART IDENTITY CASCADE"
-                        )
-                except Exception:
-                    pass
-        except Exception as exc2:
-            print(f"[reset_state_failed] {exc2}", flush=True)
+            conn.rollback()
+        except Exception:
+            pass
     finally:
         conn.close()
 

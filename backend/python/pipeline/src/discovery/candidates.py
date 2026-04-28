@@ -1873,7 +1873,10 @@ def apply_global_cap(
 _PERSIST_BATCH = 500
 
 
-def _row_counts_from_parquet(engine: "Engine") -> dict[int, int]:
+def _row_counts_from_parquet(
+    engine: "Engine",
+    schemas: Optional[list[str]] = None,
+) -> dict[int, int]:
     """
     Read the exact row count for every extracted table directly from its
     parquet footer.  Cheap (pyarrow reads the footer only, not the data)
@@ -1893,10 +1896,13 @@ def _row_counts_from_parquet(engine: "Engine") -> dict[int, int]:
 
     out: dict[int, int] = {}
     with engine.connect() as conn:
-        rows = conn.execute(
+        stmt = (
             select(tbl_inventory_t.c.table_id, tbl_inventory_t.c.parquet_path)
             .where(tbl_inventory_t.c.parquet_path.is_not(None))
-        ).all()
+        )
+        if schemas:
+            stmt = stmt.where(tbl_inventory_t.c.schema_name.in_(list(schemas)))
+        rows = conn.execute(stmt).all()
 
     for table_id, parquet_path in rows:
         if not parquet_path:
@@ -1939,8 +1945,9 @@ def run_phase_4(engine: "Engine", config: "AppConfig") -> None:
         txn,
     )
 
+    schemas_scope = list(getattr(config.source_db, "schemas", None) or [])
     with engine.connect() as conn:
-        rows = conn.execute(
+        stmt = (
             select(
                 col_inventory_t.c.column_id,
                 col_inventory_t.c.table_id,
@@ -1969,7 +1976,11 @@ def run_phase_4(engine: "Engine", config: "AppConfig") -> None:
                     tbl_inventory_t.c.status == "extracted",
                 )
             )
-        ).mappings().all()
+        )
+        # Schema scope: drop tbl_inventory rows owned by other jobs.
+        if schemas_scope:
+            stmt = stmt.where(tbl_inventory_t.c.schema_name.in_(schemas_scope))
+        rows = conn.execute(stmt).mappings().all()
 
     raw_rows = list(rows)
     log.info("phase4.sketches_loaded", row_count=len(raw_rows))
@@ -2106,7 +2117,7 @@ def run_phase_4(engine: "Engine", config: "AppConfig") -> None:
     # to inferring PKs from `distinct_count == row_count AND null_pct ~= 0`.
     # Row counts are taken straight from the parquet file metadata (fast,
     # exact — pyarrow only reads the footer).
-    table_row_counts = _row_counts_from_parquet(engine)
+    table_row_counts = _row_counts_from_parquet(engine, schemas=schemas_scope or None)
     n_implicit = detect_implicit_pks(cols, table_row_counts)
     n_declared = sum(1 for c in cols if c.is_pk or c.is_unique_indexed)
     log.info(

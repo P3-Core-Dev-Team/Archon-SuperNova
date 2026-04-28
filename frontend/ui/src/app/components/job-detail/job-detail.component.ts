@@ -232,6 +232,11 @@ export class JobDetailComponent implements OnInit, OnDestroy {
   runLog = signal<RunLogEntry[]>([]);
   private sub?: Subscription;
   private logSub?: Subscription;
+  // toObservable() requires an injection context (ctor / class field init).
+  // Capture it here so the polling pipeline in ngOnInit can simply consume
+  // the result instead of calling toObservable() outside the context, which
+  // throws NG0203 at runtime and silently kills the Run-log tab.
+  private tab$ = toObservable(this.tab);
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -271,7 +276,7 @@ export class JobDetailComponent implements OnInit, OnDestroy {
     // complete before emitting — that's fine; they always complete.
     // catchError on each inner observable returns stale state so a transient
     // network hiccup doesn't wipe the display.
-    this.logSub = toObservable(this.tab)
+    this.logSub = this.tab$
       .pipe(
         switchMap(t => t === 'log' ? timer(0, 2000) : EMPTY),
         switchMap(() => combineLatest([

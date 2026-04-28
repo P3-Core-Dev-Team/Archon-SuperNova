@@ -384,8 +384,13 @@ def run_phase_3a(engine: "Engine", config: "AppConfig") -> None:
     # C4: Skip non-FK-eligible columns (STRING_LONG / BINARY / FLOAT / BOOL)
     # at the SQL layer.  Phase 4 would discard them anyway; fingerprinting
     # them wastes CPU and parquet IO.
+    # Schema scope: only fingerprint columns from tables this job inventoried,
+    # not stale rows from a previous job's other schemas (the per-schema reset
+    # in the API only deletes the target schema's rows; everything else
+    # persists in tbl_inventory).
+    schemas_scope = list(getattr(config.source_db, "schemas", None) or [])
     with engine.connect() as conn:
-        rows = conn.execute(
+        stmt = (
             select(
                 col_inventory_t.c.column_id,
                 col_inventory_t.c.column_name,
@@ -406,7 +411,10 @@ def run_phase_3a(engine: "Engine", config: "AppConfig") -> None:
                     tbl_inventory_t.c.status == "extracted",
                 )
             )
-        ).mappings().all()
+        )
+        if schemas_scope:
+            stmt = stmt.where(tbl_inventory_t.c.schema_name.in_(schemas_scope))
+        rows = conn.execute(stmt).mappings().all()
 
     pending = list(rows)
     log.info("phase3a.pending_count", count=len(pending))

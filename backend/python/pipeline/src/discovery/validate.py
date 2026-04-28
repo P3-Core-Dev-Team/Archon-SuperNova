@@ -848,6 +848,13 @@ def run_phase_5(
     if validate_only_primary and has_tier:
         # F1.2 / A5: skip advisory_lowconf candidates entirely.
         where_clauses.append(fk_candidates_t.c.tier == "primary")
+    # Schema scope: only validate candidates whose endpoints are in this
+    # job's configured schemas.  Without the filter, leftover tbl_inventory
+    # rows from prior jobs would generate phantom candidate joins.
+    schemas_scope = list(getattr(config.source_db, "schemas", None) or [])
+    if schemas_scope:
+        where_clauses.append(child_tbl.c.schema_name.in_(schemas_scope))
+        where_clauses.append(parent_tbl.c.schema_name.in_(schemas_scope))
 
     with engine.connect() as conn:
         rows = conn.execute(

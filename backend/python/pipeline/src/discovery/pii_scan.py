@@ -926,11 +926,14 @@ def run_phase_3b(engine: "Engine", config: "AppConfig") -> None:
             log.info("pii_ner_status", message="pii_ner module unavailable")
 
     TEXT_CLASSES = ("STRING_SHORT", "STRING_LONG")
+    # Schema scope: drop tbl_inventory rows owned by other jobs (multi-schema
+    # state in the same results DB).
+    schemas_scope = list(getattr(config.source_db, "schemas", None) or [])
     with engine.connect() as conn:
         # LEFT JOIN run_log to filter out columns whose latest pii_scan run
         # status is 'succeeded'.  Failed / started / unscanned all proceed.
         rl = run_log_t.alias("rl")
-        rows = conn.execute(
+        stmt = (
             select(
                 col_inventory_t.c.column_id,
                 col_inventory_t.c.column_name,
@@ -961,7 +964,10 @@ def run_phase_3b(engine: "Engine", config: "AppConfig") -> None:
                     tbl_inventory_t.c.status == "extracted",
                 )
             )
-        ).mappings().all()
+        )
+        if schemas_scope:
+            stmt = stmt.where(tbl_inventory_t.c.schema_name.in_(schemas_scope))
+        rows = conn.execute(stmt).mappings().all()
 
     pending = [
         r for r in rows
