@@ -31,6 +31,13 @@ export const routes: Routes = [
       ),
   },
   {
+    path: 'jobs/:id/tables/:table_name',
+    loadComponent: () =>
+      import('./components/table-card/table-card-page.component').then(
+        m => m.TableCardPageComponent,
+      ),
+  },
+  {
     path: 'jobs/:id',
     component: JobDetailComponent,
   },

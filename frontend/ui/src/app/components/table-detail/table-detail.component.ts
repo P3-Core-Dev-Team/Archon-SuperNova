@@ -3,6 +3,7 @@ import {
 } from '@angular/core';
 import { CommonModule, DecimalPipe, PercentPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { JobService } from '../../services/job.service';
 import {
@@ -31,7 +32,7 @@ import {
 @Component({
   selector: 'app-table-detail',
   standalone: true,
-  imports: [CommonModule, FormsModule, DecimalPipe, PercentPipe],
+  imports: [CommonModule, FormsModule, RouterLink, DecimalPipe, PercentPipe],
   template: `
     <aside class="panel" [class.open]="open()">
       <div class="head">
@@ -43,7 +44,16 @@ import {
             <h3>Table detail</h3>
           }
         </div>
-        <button type="button" class="close" (click)="close()" title="Close panel">✕</button>
+        <div class="head-actions">
+          @if (tableName()) {
+            <a class="open-full"
+               [routerLink]="['/jobs', jobId, 'tables', tableName()]"
+               title="Open the queryviz-style full-page view for this table">
+              Open full view →
+            </a>
+          }
+          <button type="button" class="close" (click)="close()" title="Close panel">✕</button>
+        </div>
       </div>
 
       <div class="picker">
@@ -250,6 +260,21 @@ import {
       font-size: 16px;
       word-break: break-word;
     }
+    .head-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .open-full {
+      font-size: 12px;
+      color: #58a6ff;
+      text-decoration: none;
+      padding: 4px 10px;
+      border: 1px solid #30363d;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+    .open-full:hover { background: #161b22; border-color: #58a6ff; text-decoration: none; }
     .close {
       background: transparent;
       border: 1px solid #30363d;
