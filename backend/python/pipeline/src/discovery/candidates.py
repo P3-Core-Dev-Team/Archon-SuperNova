@@ -467,6 +467,75 @@ def _both_dense_serial(child: "ColSketch", parent: "ColSketch") -> bool:
 _DENSE_SERIAL_REJECT_NAMESIM: float = 0.4
 
 
+def _no_table_name_overlap(t1: str, t2: str) -> bool:
+    """True when two table names share no meaningful token overlap.
+
+    Used by the dense-serial PK→PK reject: when both ``id`` columns share
+    a 1..N range purely by coincidence, the column-name guard alone fails
+    (``id`` vs ``id`` is 100% similar by name), so we additionally require
+    that the *table* names overlap.
+
+    Strategy: strip the *longest common leading prefix* (at the underscore
+    boundary) before tokenising — this dynamically eats the schema's own
+    convention (every table is ``ads_*``, ``tbl_*``, …) without needing a
+    hand-curated prefix list.  When one side is fully consumed by the
+    common prefix the tables are by definition closely related, so we
+    return False.
+
+    Returns True only when the two tables share no recognisable subject
+    token — that's the coincidental serial-collision case.
+    """
+    if not t1 or not t2:
+        return False
+    a = t1.strip().lower()
+    b = t2.strip().lower()
+    # Longest common leading character prefix.
+    n = 0
+    for i in range(min(len(a), len(b))):
+        if a[i] == b[i]:
+            n = i + 1
+        else:
+            break
+    # Trim back to the last underscore boundary so we don't split a token
+    # mid-word (e.g. "ads_app" vs "ads_apple" → common is "ads_app",
+    # trimmed to "ads_" so tokens stay intact).
+    pref = a[:n]
+    last_us = pref.rfind("_")
+    if last_us >= 0:
+        pref_len = last_us + 1
+    else:
+        pref_len = 0
+    a_rest = a[pref_len:]
+    b_rest = b[pref_len:]
+
+    # If either side is now empty, the tables share a full subject prefix
+    # — strongly related, do not reject.
+    if not a_rest or not b_rest:
+        return False
+
+    def _toks(s: str) -> list[str]:
+        out = []
+        for tok in s.split("_"):
+            t = tok.strip()
+            if len(t) < 3:
+                continue
+            if t.endswith("s") and not t.endswith("ss") and len(t) > 3:
+                t = t[:-1]
+            out.append(t)
+        return out
+
+    ta = _toks(a_rest)
+    tb = _toks(b_rest)
+    if not ta or not tb:
+        # Fallback: literal substring check.
+        return a_rest not in b_rest and b_rest not in a_rest
+    for x in ta:
+        for y in tb:
+            if x == y or x in y or y in x:
+                return False
+    return True
+
+
 def _containment_from_jaccard(
     jaccard: float, child_distinct: int, parent_distinct: int
 ) -> float:
@@ -1038,8 +1107,24 @@ def sql_prefilter(
             # relationship is real.
             if (
                 _both_dense_serial(child, parent)
-                and effective_name_sim < _DENSE_SERIAL_REJECT_NAMESIM
                 and not role_bypass
+                and (
+                    # Original guard: column-name too dissimilar to be a real FK.
+                    effective_name_sim < _DENSE_SERIAL_REJECT_NAMESIM
+                    # NEW: column names extremely similar (e.g. ``id`` vs ``id``,
+                    # name_sim ≥ 0.85) but the table names share no recognisable
+                    # subject token.  Catches the worst FP class — two unrelated
+                    # tables both using bare ``id`` PKs whose 1..N ranges
+                    # accidentally overlap (``ads_app_tables.id`` ↔
+                    # ``ads_compression_algorithm.id``).  Anchored at the
+                    # high-name-sim end so synthetic test fixtures with
+                    # mid-similarity column pairs (``order_id`` vs ``group_id``)
+                    # still pass through to tier-classification as before.
+                    or (
+                        effective_name_sim >= 0.85
+                        and _no_table_name_overlap(child.table_name, parent.table_name)
+                    )
+                )
             ):
                 continue
 
