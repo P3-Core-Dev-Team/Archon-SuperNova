@@ -360,7 +360,7 @@ _NEW_PATTERNS: list[PatternDef] = [
     # 22. EU VAT — 2-letter prefix + 2-12 alnum
     PatternDef(
         name="VAT_EU",
-        regex_bytes=rb"\b[A-Z]{2}[A-Z0-9]{2,12}\b",
+        regex_bytes=rb"\b(AT|BE|BG|CY|CZ|DE|DK|EE|EL|ES|FI|FR|GB|HR|HU|IE|IT|LT|LU|LV|MT|NL|PL|PT|RO|SE|SI|SK)[A-Z0-9]{2,12}\b",
         validator="vat_eu",
         locale="EU",
         regulated=("GDPR",),
@@ -370,7 +370,7 @@ _NEW_PATTERNS: list[PatternDef] = [
     # 23. SWIFT BIC — 8 or 11 chars
     PatternDef(
         name="SWIFT_BIC",
-        regex_bytes=rb"\b[A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?\b",
+        regex_bytes=rb"\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?\b",
         validator="bic",
         locale="global",
         regulated=("PCI",),

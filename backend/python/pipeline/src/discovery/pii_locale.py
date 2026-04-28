@@ -25,6 +25,7 @@ to ``False`` and ``phone_valid`` returns ``True``; the dual-regex fallback in
 from __future__ import annotations
 
 import logging
+import re
 from typing import Callable, Optional
 
 log = logging.getLogger(__name__)
@@ -181,6 +182,28 @@ def geo_coord_in_range(value: str) -> bool:
     return -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0
 
 
+def vat_eu_valid(value: str) -> bool:
+    """Validate EU VAT number via stdnum or fallback regex."""
+    if _VAT_EU is not None:
+        try:
+            return bool(_VAT_EU(value))
+        except Exception:
+            return False
+    # Fallback regex ensures we don't match arbitrary 2-letter + 2-12 alnum strings.
+    return bool(re.match(r"^(AT|BE|BG|CY|CZ|DE|DK|EE|EL|ES|FI|FR|GB|HR|HU|IE|IT|LT|LU|LV|MT|NL|PL|PT|RO|SE|SI|SK)[A-Z0-9]{2,12}$", value))
+
+
+def bic_valid(value: str) -> bool:
+    """Validate SWIFT-BIC via stdnum or fallback regex."""
+    if _BIC is not None:
+        try:
+            return bool(_BIC(value))
+        except Exception:
+            return False
+    # Fallback regex enforces 4-bank + 2-country + 2-location + optional 3-branch.
+    return bool(re.match(r"^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$", value))
+
+
 # ---------------------------------------------------------------------------
 # Composite validator dispatch table
 # ---------------------------------------------------------------------------
@@ -193,8 +216,8 @@ LOCALE_VALIDATORS: dict[str, Callable[[str], bool]] = {
     "phone": phone_valid,
     # Banking / financial
     "iban": _wrap_stdnum(_IBAN, name="iban"),
-    "bic": _wrap_stdnum(_BIC, name="bic"),
-    "vat_eu": _wrap_stdnum(_VAT_EU, name="vat_eu"),
+    "bic": bic_valid,
+    "vat_eu": vat_eu_valid,
     "aba_us": _wrap_stdnum(_ABA_US, name="aba_us"),
     # Country IDs
     "aadhaar_in": _wrap_stdnum(_AADHAAR_IN, name="aadhaar_in"),
