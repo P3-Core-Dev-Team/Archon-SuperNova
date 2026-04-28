@@ -280,6 +280,7 @@ class _ExtractionRunner:
         table_ids: Iterable[int] | None = None,
         column_projection: bool = True,
         sample_pct: float = _DEFAULT_SAMPLE_PCT,
+        schemas: Iterable[str] | None = None,
     ) -> None:
         self._client = extraction_client
         self._engine = engine
@@ -295,6 +296,15 @@ class _ExtractionRunner:
         )
         self._column_projection = column_projection
         self._sample_pct = float(sample_pct)
+        # Schema scope: only extract rows whose schema_name is in this set.
+        # When None the runner picks up every row in tbl_inventory (legacy
+        # single-schema behaviour). Required to keep multi-schema state in
+        # the same results DB from cross-contaminating each other after
+        # ``_reset_pipeline_state_for_schema`` switched from a global
+        # TRUNCATE to a per-schema DELETE.
+        self._schemas: set[str] | None = (
+            {str(s) for s in schemas} if schemas is not None else None
+        )
 
     def run(self) -> None:
         """
@@ -578,6 +588,14 @@ class _ExtractionRunner:
             tbl_inventory_t.c.table_name,
         ).where(tbl_inventory_t.c.status.in_(["pending", "extracted"]))
 
+        # Scope to this job's configured schemas.  Without this filter the
+        # extractor picks up tbl_inventory rows left behind by any other
+        # schema's prior job (the per-schema reset in the API only deletes
+        # the *target* schema's rows, by design — other schemas' results
+        # survive cross-job).
+        if self._schemas is not None:
+            stmt = stmt.where(tbl_inventory_t.c.schema_name.in_(self._schemas))
+
         if self._mode == "full_subset" and self._table_ids is not None:
             stmt = stmt.where(tbl_inventory_t.c.table_id.in_(self._table_ids))
 
@@ -706,6 +724,9 @@ def run_phase_2(
         table_ids=table_ids,
         column_projection=column_projection,
         sample_pct=pct,
+        # Filter to the schemas this job configured so we don't pick up
+        # stale tbl_inventory rows from a previous job's other schemas.
+        schemas=getattr(src_cfg, "schemas", None) or None,
     )
 
     runner.run()

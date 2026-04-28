@@ -735,9 +735,57 @@ def test_connection(req: ConnectionTestRequest) -> dict[str, Any]:
 def submit_job(req: JobRequest) -> JobStatus:
     """Submit a new discovery job. Spawns a background runner.
 
+    Pre-flight: verify the source DB is reachable AND the requested schema
+    exists AND has at least one table.  Without this check a typo'd schema
+    name (e.g. "archon" when only "public" exists) silently produces a
+    succeeded job with 0 relationships / 0 PII / 0 clusters because the
+    inventory phase finds nothing — confusing for users who can't tell
+    "we found nothing" from "we never looked".  Reject with a clear 400
+    instead.
+
     MVP: GETs are unauthenticated (so the dashboard can poll without auth
     glue in the frontend). Only this POST is gated by X-Discovery-Token.
     """
+    # Pre-flight schema existence check.  Wrap the JobRequest in a
+    # ConnectionTestRequest shape and run the same probe the
+    # /api/test_connection endpoint uses.
+    probe_req = ConnectionTestRequest(
+        db_type=req.db_type,
+        host=req.host, port=req.port,
+        database=req.database, user=req.user, password=req.password,
+        schema=req.schema_name,
+    )
+    try:
+        _probe_conn = _open_source_conn(probe_req, connect_timeout=5)
+        try:
+            probe = _probe_source(_probe_conn, req.db_type, req.schema_name)
+        finally:
+            try:
+                _probe_conn.close()
+            except Exception:
+                pass
+    except RuntimeError as exc:
+        if str(exc) == "schema_missing":
+            raise HTTPException(
+                400,
+                f'schema "{req.schema_name}" not found in database '
+                f'"{req.database}". Use Test connection to verify the '
+                'database/schema before submitting.',
+            )
+        raise HTTPException(400, f"source DB probe failed: {exc}")
+    except ImportError as exc:
+        raise HTTPException(400, f"db driver not installed: {exc}")
+    except Exception as exc:
+        msg = exc.args[0].strip() if (exc.args and isinstance(exc.args[0], str)) else str(exc)
+        raise HTTPException(400, f"source DB connect failed: {msg}")
+
+    if probe.get("table_count", 0) == 0:
+        raise HTTPException(
+            400,
+            f'schema "{req.schema_name}" exists but contains no base tables — '
+            'nothing to discover. Pick a schema with at least one table.',
+        )
+
     job_id = uuid.uuid4().hex[:12]
     work_dir = Path(tempfile.mkdtemp(prefix=f"disc-{job_id}-"))
     try:
@@ -811,6 +859,14 @@ def _reset_pipeline_state_for_schema(schema_name: str) -> None:
     per-source-schema; without this reset, a previous job's "succeeded"
     row makes ``_run_phase`` short-circuit with
     ``phase_already_complete_skipping`` and the new job produces 0 results.
+
+    The reset is currently *global* (it wipes every schema's analysis
+    tables, not just ``schema_name``).  Per-schema retention would
+    require ON DELETE CASCADE on the existing FKs and a ``job_id`` column
+    on every analysis table — both bigger than this codepath warrants
+    today.  As-is, the architectural assumption is "single source schema
+    at a time"; previously-run schemas' results are wiped on each new
+    submission.
 
     The persistent ``jobs`` table is intentionally preserved — it carries
     UI history.  Concurrent jobs against the same backend are unsupported.

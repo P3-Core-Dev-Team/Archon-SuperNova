@@ -62,13 +62,16 @@ setsid bash -c "exec env \
 disown
 API_PID=$!
 
-# --- 3. Angular dev server (npm start, port 4200) -------------------------
-echo "[start] ng serve on :${UI_PORT}"
+# --- 3. Angular dev server (port 4200, bound to 0.0.0.0 for LAN access) ----
+# Explicit ng args (host + port + proxy) so the UI is reachable from other
+# machines on the network, not just localhost.  npm start's package-script
+# default would bind ::1 only.
+echo "[start] ng serve on 0.0.0.0:${UI_PORT}"
 setsid bash -c "
   source \"\${HOME}/.nvm/nvm.sh\" >/dev/null
   nvm use 20 >/dev/null 2>&1
   cd '$BASE/frontend/ui'
-  exec npm start
+  exec npx ng serve --host 0.0.0.0 --port $UI_PORT --proxy-config proxy.conf.json --disable-host-check
 " >/tmp/ng.log 2>&1 < /dev/null &
 disown
 UI_PID=$!
