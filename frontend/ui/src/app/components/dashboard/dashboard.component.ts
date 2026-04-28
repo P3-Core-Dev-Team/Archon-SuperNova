@@ -171,17 +171,17 @@ const SOURCE_DEFAULTS = {
       flex-wrap: wrap;
     }
     .primary {
-      background: #1a7f37;
-      border: 1px solid #1f883d;
+      background: #238636;
+      border: 1px solid #2ea043;
       color: white;
       padding: 6px 16px;
       border-radius: 6px;
       cursor: pointer;
     }
-    .primary:hover:not(:disabled) { background: #1f883d; }
+    .primary:hover:not(:disabled) { background: #2ea043; }
     .primary:disabled { opacity: 0.6; cursor: not-allowed; }
     .link {
-      color: #0969da;
+      color: #58a6ff;
       padding: 4px 8px;
     }
     .link.small { font-size: 12px; }
@@ -218,38 +218,38 @@ const SOURCE_DEFAULTS = {
     .metric-label {
       font-size: 11px;
       text-transform: uppercase;
-      color: #656d76;
+      color: #8b949e;
       letter-spacing: 0.4px;
     }
     .metric-value {
       font-size: 16px;
       font-weight: 600;
-      color: #1f2328;
+      color: #e6edf3;
     }
     .metric-value.small { font-size: 12px; font-weight: 400; }
     .card-actions {
       display: flex;
       align-items: center;
       gap: 8px;
-      border-top: 1px solid #d0d7de;
+      border-top: 1px solid #30363d;
       padding-top: 10px;
     }
     .card-actions button {
-      background: #f6f8fa;
-      border: 1px solid #d0d7de;
-      color: #1f2328;
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #e6edf3;
       padding: 4px 12px;
       border-radius: 4px;
       cursor: pointer;
     }
-    .card-actions button:hover:not(:disabled) { background: #d0d7de; }
+    .card-actions button:hover:not(:disabled) { background: #30363d; }
     .section {
       margin: 24px 0 12px;
     }
     .error {
-      background: #ffebe9;
-      border: 1px solid #cf222e;
-      color: #cf222e;
+      background: #3a0d0d;
+      border: 1px solid #f85149;
+      color: #ffabab;
       padding: 8px 12px;
       border-radius: 6px;
       margin-bottom: 12px;

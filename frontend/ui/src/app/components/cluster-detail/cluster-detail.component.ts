@@ -69,11 +69,11 @@ type Archetype = 'FACT' | 'DIMENSION' | 'LOOKUP' | 'BRIDGE' | 'UNKNOWN' | string
 
 function archetypeColour(a: Archetype): string {
   switch (a) {
-    case 'FACT':      return '#bc4c00';  // coral-red
-    case 'DIMENSION': return '#0969da';  // sky-blue
-    case 'LOOKUP':    return '#1a7f37';  // green
-    case 'BRIDGE':    return '#8250df';  // lavender
-    default:          return '#656d76';  // muted grey
+    case 'FACT':      return '#f78166';  // coral-red
+    case 'DIMENSION': return '#79c0ff';  // sky-blue
+    case 'LOOKUP':    return '#56d364';  // green
+    case 'BRIDGE':    return '#d2a8ff';  // lavender
+    default:          return '#8b949e';  // muted grey
   }
 }
 
@@ -352,27 +352,27 @@ function cardLabel(c: string | null | undefined): string {
       display: inline-flex;
       gap: 0;
       align-self: flex-start;
-      border: 1px solid #d0d7de;
+      border: 1px solid #30363d;
       border-radius: 6px;
       overflow: hidden;
-      background: #f6f8fa;
+      background: #0d1117;
     }
     .view-toggle .seg-btn {
       background: transparent;
-      color: #656d76;
+      color: #8b949e;
       border: none;
       padding: 7px 14px;
       font: inherit;
       font-size: 13px;
       cursor: pointer;
     }
-    .view-toggle .seg-btn:hover { color: #1f2328; background: #ffffff; }
+    .view-toggle .seg-btn:hover { color: #e6edf3; background: #161b22; }
     .view-toggle .seg-btn.active {
-      background: #0969da;
+      background: #1f6feb;
       color: white;
     }
     .erd-section {
-      border-top: 1px solid #f6f8fa;
+      border-top: 1px solid #21262d;
       padding-top: 12px;
     }
     .bridge-legend {
@@ -385,13 +385,13 @@ function cardLabel(c: string | null | undefined): string {
       width: 14px; height: 14px;
       vertical-align: middle;
       margin-right: 6px;
-      border: 2px dashed #9a6700;
-      background: #fff8c5;
+      border: 2px dashed #d29922;
+      background: #181308;
       border-radius: 2px;
     }
     .bridge-legend code.mono {
-      color: #9a6700;
-      background: #fff8c5;
+      color: #e3b341;
+      background: #2a210b;
       padding: 1px 5px;
       border-radius: 3px;
       margin-right: 2px;
@@ -403,18 +403,18 @@ function cardLabel(c: string | null | undefined): string {
       justify-content: space-between;
       gap: 16px;
     }
-    h2 { margin: 0; font-size: 20px; color: #1f2328; }
+    h2 { margin: 0; font-size: 20px; color: #e6edf3; }
     .subtitle { margin: 0; font-size: 13px; }
     .back-btn {
-      background: #f6f8fa;
-      border: 1px solid #d0d7de;
-      color: #0969da;
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #58a6ff;
       padding: 4px 12px;
       border-radius: 6px;
       cursor: pointer;
       font-size: 13px;
     }
-    .back-btn:hover { background: #d0d7de; }
+    .back-btn:hover { background: #30363d; }
 
     /* Archetype bar */
     .arch-bar-row {
@@ -428,22 +428,22 @@ function cardLabel(c: string | null | undefined): string {
     .arch-legend { display: flex; gap: 8px; flex-wrap: wrap; }
     .arch-badge {
       display: inline-block;
-      border: 1px solid #656d76;
+      border: 1px solid #8b949e;
       border-radius: 8px;
       font-size: 11px;
       font-weight: 700;
       padding: 1px 8px;
-      color: #1f2328;
+      color: #e6edf3;
       letter-spacing: 0.4px;
     }
     .arch-chip {
       display: inline-block;
-      border: 1px solid #656d76;
+      border: 1px solid #8b949e;
       border-radius: 4px;
       font-size: 10px;
       font-weight: 700;
       padding: 1px 6px;
-      color: #1f2328;
+      color: #e6edf3;
       letter-spacing: 0.3px;
     }
 
@@ -457,21 +457,21 @@ function cardLabel(c: string | null | undefined): string {
       margin-right: 4px;
       border: 1.5px solid transparent;
     }
-    .pii-direct  { border-color: #cf222e; color: #cf222e; background: rgba(248,81,73,.08); }
-    .pii-advisory{ border-color: #9a6700; color: #9a6700; background: rgba(210,153,34,.08); }
+    .pii-direct  { border-color: #f85149; color: #f85149; background: rgba(248,81,73,.08); }
+    .pii-advisory{ border-color: #d29922; color: #d29922; background: rgba(210,153,34,.08); }
 
     /* Section headers */
-    section { border-top: 1px solid #f6f8fa; padding-top: 12px; }
+    section { border-top: 1px solid #21262d; padding-top: 12px; }
     .sec-title {
       font-size: 11px;
       letter-spacing: 0.6px;
       text-transform: uppercase;
-      color: #656d76;
+      color: #8b949e;
       margin-bottom: 8px;
       font-weight: 600;
     }
     .count {
-      color: #656d76;
+      color: #8b949e;
       font-weight: 400;
       letter-spacing: 0;
       text-transform: none;
@@ -484,8 +484,8 @@ function cardLabel(c: string | null | undefined): string {
       width: 100%;
       border-collapse: collapse;
       font-size: 13px;
-      background: #f6f8fa;
-      border: 1px solid #f6f8fa;
+      background: #0d1117;
+      border: 1px solid #21262d;
       border-radius: 4px;
       overflow: hidden;
     }
@@ -495,36 +495,36 @@ function cardLabel(c: string | null | undefined): string {
       font-size: 11px;
       letter-spacing: 0.5px;
       text-transform: uppercase;
-      color: #656d76;
-      border-bottom: 1px solid #d0d7de;
-      background: #ffffff;
+      color: #8b949e;
+      border-bottom: 1px solid #30363d;
+      background: #161b22;
       font-weight: 600;
     }
     table.data tbody td {
       padding: 6px 10px;
-      border-bottom: 1px solid #ddf4ff;
+      border-bottom: 1px solid #1a1f26;
       vertical-align: top;
     }
     table.data tbody tr:last-child td { border-bottom: none; }
-    table.data tbody tr:hover { background: #f6f8fa; }
+    table.data tbody tr:hover { background: #161b22; }
     table.data .cell-center { text-align: center; }
     table.data .cell-right  { text-align: right; font-variant-numeric: tabular-nums; }
     table.data tr.pii-validated { background: rgba(248,81,73,0.06); }
-    .arrow { color: #656d76; }
+    .arrow { color: #8b949e; }
 
     /* Archival placeholder */
     .archival-row { padding: 8px 0; }
     .archival-btn {
-      background: #f6f8fa;
-      border: 1px solid #d0d7de;
-      color: #656d76;
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #484f58;
       padding: 6px 14px;
       border-radius: 6px;
       cursor: not-allowed;
       font-size: 13px;
     }
 
-    .badge-yes { color: #1a7f37; font-weight: 700; }
+    .badge-yes { color: #3fb950; font-weight: 700; }
 
     /* Error / not-found boxes */
     .not-found-box, .error-box {
@@ -533,16 +533,16 @@ function cardLabel(c: string | null | undefined): string {
       font-size: 13px;
     }
     .not-found-box {
-      background: #fff8c5;
-      border: 1px solid #9a6700;
-      color: #9a6700;
+      background: #261a08;
+      border: 1px solid #d29922;
+      color: #e3b341;
     }
     .error-box {
-      background: #ffebe9;
-      border: 1px solid #cf222e;
-      color: #cf222e;
+      background: #3a0d0d;
+      border: 1px solid #f85149;
+      color: #ffabab;
     }
-    .muted  { color: #656d76; }
+    .muted  { color: #8b949e; }
     .small  { font-size: 12px; }
     .mono   { font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace; }
   `],

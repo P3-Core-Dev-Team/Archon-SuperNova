@@ -114,28 +114,28 @@ const DEFAULT_PORTS: Record<SourceDbType, number> = {
       margin-top: 8px;
     }
     .error {
-      background: #ffebe9;
-      border: 1px solid #cf222e;
-      color: #cf222e;
+      background: #3a0d0d;
+      border: 1px solid #f85149;
+      color: #ffabab;
       padding: 8px 12px;
       border-radius: 6px;
       margin-bottom: 12px;
     }
     .success {
-      background: #dafbe1;
-      border: 1px solid #1f883d;
-      color: #1a7f37;
+      background: #0e2e1d;
+      border: 1px solid #2ea043;
+      color: #aaf0c1;
       padding: 8px 12px;
       border-radius: 6px;
       margin-bottom: 12px;
     }
     button.secondary {
-      background: #f6f8fa;
-      color: #1f2328;
-      border: 1px solid #d0d7de;
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
     }
     button.secondary:hover:not(:disabled) {
-      background: #d0d7de;
+      background: #30363d;
     }
     button.primary:disabled, button.secondary:disabled {
       opacity: 0.45;

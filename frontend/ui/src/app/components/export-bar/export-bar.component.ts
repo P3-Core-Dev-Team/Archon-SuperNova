@@ -49,7 +49,7 @@ import {
       font-size: 12px;
     }
     .err {
-      color: #cf222e;
+      color: #ffabab;
       margin-left: 8px;
     }
     .small { font-size: 12px; }

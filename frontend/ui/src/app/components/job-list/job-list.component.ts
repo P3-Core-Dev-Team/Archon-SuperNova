@@ -70,24 +70,24 @@ import { JobService } from '../../services/job.service';
     }
     h2 { margin: 0; }
     .primary-link {
-      background: #1a7f37;
-      border: 1px solid #1f883d;
+      background: #238636;
+      border: 1px solid #2ea043;
       color: white;
       padding: 6px 14px;
       border-radius: 6px;
     }
-    .primary-link:hover { background: #1f883d; text-decoration: none; }
+    .primary-link:hover { background: #2ea043; text-decoration: none; }
     .card.no-pad { padding: 0; overflow: auto; }
     tr.row-clickable { cursor: pointer; }
-    tr.row-clickable:hover td { background: #ddf4ff; }
-    tr.highlight td { background: #ddf4ff !important; }
+    tr.row-clickable:hover td { background: #1c222b; }
+    tr.highlight td { background: #1f2937 !important; }
     table th:nth-child(6), table th:nth-child(7),
     table td:nth-child(6), table td:nth-child(7) { text-align: right; }
     .error {
-      color: #cf222e;
+      color: #ffabab;
       padding: 10px 14px;
-      background: #ffebe9;
-      border: 1px solid #cf222e;
+      background: #3a0d0d;
+      border: 1px solid #f85149;
       border-radius: 6px;
       margin-bottom: 12px;
     }

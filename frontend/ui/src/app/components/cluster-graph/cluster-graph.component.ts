@@ -23,9 +23,9 @@ import { JobService } from '../../services/job.service';
 import { Cluster, ClusterDetail, RelationshipEdge, RelationshipGraph } from '../../models/job.model';
 
 const CLUSTER_PALETTE = [
-  '#0969da', '#1a7f37', '#9a6700', '#8250df', '#cf222e',
-  '#0969da', '#1a7f37', '#9a6700', '#8250df', '#cf222e',
-  '#0969da', '#1a7f37', '#bc4c00', '#8250df', '#cf222e',
+  '#58a6ff', '#3fb950', '#d29922', '#a371f7', '#ff7b72',
+  '#79c0ff', '#56d364', '#e3b341', '#bc8cff', '#ffa198',
+  '#39c5cf', '#7ee787', '#f0883e', '#d2a8ff', '#ff9492',
 ];
 export function clusterColor(clusterId: number): string {
   return CLUSTER_PALETTE[((clusterId % CLUSTER_PALETTE.length) + CLUSTER_PALETTE.length) % CLUSTER_PALETTE.length];
@@ -76,24 +76,24 @@ const SINGLETON_LABEL = '(unclustered / singletons)';
     }
     .cg-toolbar .spacer { flex: 1; }
     .cg-toolbar .fit-btn {
-      background: #ffffff;
-      border: 1px solid #d0d7de;
-      color: #1f2328;
+      background: #161b22;
+      border: 1px solid #30363d;
+      color: #e6edf3;
       padding: 5px 12px;
       border-radius: 4px;
       cursor: pointer;
     }
-    .cg-toolbar .fit-btn:hover:not(:disabled) { border-color: #0969da; }
+    .cg-toolbar .fit-btn:hover:not(:disabled) { border-color: #58a6ff; }
     .cg-graph {
       width: 100%;
       height: 640px;
-      background: #f6f8fa;
-      border: 1px solid #d0d7de;
+      background: #0d1117;
+      border: 1px solid #30363d;
       border-radius: 8px;
     }
     .cg-graph.hidden { display: none; }
     .center { text-align: center; padding: 30px 0; }
-    .muted { color: #656d76; }
+    .muted { color: #8b949e; }
     .small { font-size: 12px; }
     .footer { margin-top: 8px; }
     .pad { padding: 24px 0; }
@@ -247,7 +247,7 @@ export class ClusterGraphComponent implements AfterViewInit, OnDestroy {
           face: 'ui-monospace, SFMono-Regular, monospace',
           size: 14,
           strokeWidth: 4,
-          strokeColor: '#d0d7de',
+          strokeColor: '#30363d',
         } as any,
       });
     }
@@ -273,7 +273,7 @@ export class ClusterGraphComponent implements AfterViewInit, OnDestroy {
             face: 'ui-monospace, SFMono-Regular, monospace',
             size: 12,
             strokeWidth: 2,
-            strokeColor: '#f6f8fa',
+            strokeColor: '#0d1117',
           } as any,
         });
       });
@@ -289,9 +289,9 @@ export class ClusterGraphComponent implements AfterViewInit, OnDestroy {
         physics: false as any,
         shape: 'box',
         widthConstraint: { minimum: COLUMN_WIDTH - 40, maximum: COLUMN_WIDTH - 40 } as any,
-        color: { background: '#f6f8fa', border: '#d0d7de' } as any,
+        color: { background: '#21262d', border: '#30363d' } as any,
         font: {
-          color: '#1f2328',
+          color: '#e6edf3',
           face: 'ui-monospace, SFMono-Regular, monospace',
           size: 12,
         } as any,
@@ -306,7 +306,7 @@ export class ClusterGraphComponent implements AfterViewInit, OnDestroy {
         from: e.from,
         to: e.to,
         title: `${e.label}\nconfidence ${e.confidence == null ? '?' : e.confidence.toFixed(3)}`,
-        color: { color: edgeColor(e.confidence), highlight: '#0969da', opacity: 0.85 } as any,
+        color: { color: edgeColor(e.confidence), highlight: '#58a6ff', opacity: 0.85 } as any,
         smooth: { enabled: true, type: 'curvedCW', roundness: 0.18 } as any,
         arrows: { to: { enabled: true, scaleFactor: 0.6 } } as any,
       });
@@ -330,7 +330,7 @@ export class ClusterGraphComponent implements AfterViewInit, OnDestroy {
         fixed: { x: true, y: true } as any,
         physics: false as any,
         shape: 'box',
-        color: { background: '#0969da', border: '#0969da' } as any,
+        color: { background: '#1f6feb', border: '#58a6ff' } as any,
         font: { color: '#ffffff', face: 'ui-monospace', size: 12 } as any,
       });
     });
@@ -385,8 +385,8 @@ export class ClusterGraphComponent implements AfterViewInit, OnDestroy {
 
 // Shared helper — confidence-tier edge color (matches relationship-graph).
 function edgeColor(c: number | null | undefined): string {
-  if (c == null) return '#656d76';
-  if (c >= 0.95) return '#1a7f37';
-  if (c >= 0.85) return '#9a6700';
-  return '#656d76';
+  if (c == null) return '#666';
+  if (c >= 0.95) return '#3fb950';
+  if (c >= 0.85) return '#d29922';
+  return '#8b949e';
 }

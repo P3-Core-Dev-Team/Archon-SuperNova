@@ -51,10 +51,10 @@ import { clusterColor } from '../cluster-graph/cluster-graph.component';
       <div #container class="graph"></div>
       <div class="legend">
         <div class="legend-title">Confidence</div>
-        <div class="legend-row"><span class="swatch" style="background:#1a7f37"></span> ≥ 0.95</div>
-        <div class="legend-row"><span class="swatch" style="background:#9a6700"></span> 0.85 – 0.95</div>
-        <div class="legend-row"><span class="swatch" style="background:#656d76"></span> &lt; 0.85</div>
-        <div class="legend-row"><span class="swatch" style="background:#656d76"></span> unknown</div>
+        <div class="legend-row"><span class="swatch" style="background:#3fb950"></span> ≥ 0.95</div>
+        <div class="legend-row"><span class="swatch" style="background:#d29922"></span> 0.85 – 0.95</div>
+        <div class="legend-row"><span class="swatch" style="background:#8b949e"></span> &lt; 0.85</div>
+        <div class="legend-row"><span class="swatch" style="background:#666"></span> unknown</div>
         <div class="legend-divider"></div>
         <div class="legend-title">Cardinality</div>
         <div class="legend-row"><span class="card-glyph">|—|</span> 1:1 (one-to-one)</div>
@@ -101,7 +101,7 @@ import { clusterColor } from '../cluster-graph/cluster-graph.component';
       text-transform: none;
       letter-spacing: 0;
       font-size: 13px;
-      color: #1f2328;
+      color: #e6edf3;
     }
     /* Prominent live count of currently-visible relationships. */
     .counter {
@@ -109,20 +109,20 @@ import { clusterColor } from '../cluster-graph/cluster-graph.component';
       align-items: baseline;
       gap: 6px;
       padding: 4px 10px;
-      background: #ffffff;
-      border: 1px solid #d0d7de;
+      background: #161b22;
+      border: 1px solid #30363d;
       border-radius: 6px;
     }
     .counter .big {
       font-size: 18px;
-      color: #0969da;
+      color: #58a6ff;
       font-variant-numeric: tabular-nums;
     }
     .slider-label input[type=range] { width: 160px; }
     .slider-label .mono {
       min-width: 36px;
       text-align: right;
-      color: #0969da;
+      color: #58a6ff;
       font-weight: 600;
     }
     /* Per-tier live counters next to the slider. */
@@ -138,18 +138,18 @@ import { clusterColor } from '../cluster-graph/cluster-graph.component';
       font-size: 12px;
       font-variant-numeric: tabular-nums;
       border: 1px solid;
-      background: #f6f8fa;
+      background: #0d1117;
     }
-    .pill.tier-high    { color: #1a7f37; border-color: rgba(63, 185, 80, 0.5); }
-    .pill.tier-med     { color: #9a6700; border-color: rgba(210, 153, 34, 0.5); }
-    .pill.tier-low     { color: #656d76; border-color: rgba(139, 148, 158, 0.5); }
-    .pill.tier-unknown { color: #656d76;    border-color: #1f2328; }
+    .pill.tier-high    { color: #3fb950; border-color: rgba(63, 185, 80, 0.5); }
+    .pill.tier-med     { color: #d29922; border-color: rgba(210, 153, 34, 0.5); }
+    .pill.tier-low     { color: #8b949e; border-color: rgba(139, 148, 158, 0.5); }
+    .pill.tier-unknown { color: #999;    border-color: #444; }
     .graph-wrap { position: relative; }
     .graph {
       width: 100%;
       height: 620px;
-      background: #f6f8fa;
-      border: 1px solid #d0d7de;
+      background: #0d1117;
+      border: 1px solid #30363d;
       border-radius: 8px;
       position: relative;
     }
@@ -158,7 +158,7 @@ import { clusterColor } from '../cluster-graph/cluster-graph.component';
       bottom: 12px;
       right: 12px;
       background: rgba(13, 17, 23, 0.85);
-      border: 1px solid #d0d7de;
+      border: 1px solid #30363d;
       border-radius: 6px;
       padding: 8px 10px;
       font-size: 12px;
@@ -168,7 +168,7 @@ import { clusterColor } from '../cluster-graph/cluster-graph.component';
       font-size: 10px;
       letter-spacing: 0.6px;
       text-transform: uppercase;
-      color: #656d76;
+      color: #8b949e;
       margin-bottom: 4px;
     }
     .legend-row { display: flex; align-items: center; gap: 6px; line-height: 1.6; }
@@ -180,7 +180,7 @@ import { clusterColor } from '../cluster-graph/cluster-graph.component';
     }
     .legend-divider {
       height: 1px;
-      background: #d0d7de;
+      background: #30363d;
       margin: 6px -2px 4px;
     }
     .card-glyph {
@@ -188,14 +188,14 @@ import { clusterColor } from '../cluster-graph/cluster-graph.component';
       min-width: 30px;
       font-family: ui-monospace, SFMono-Regular, monospace;
       font-size: 11px;
-      color: #1f2328;
+      color: #c9d1d9;
       text-align: center;
       letter-spacing: -1px;
     }
     .toolbar button.active {
-      background: #0969da;
-      border-color: #0969da;
-      color: #ffffff;
+      background: #1f6feb;
+      border-color: #58a6ff;
+      color: #fff;
     }
     .overlay {
       position: absolute;
@@ -213,14 +213,14 @@ import { clusterColor } from '../cluster-graph/cluster-graph.component';
       font-size: 11px;
       letter-spacing: 0.6px;
       text-transform: uppercase;
-      color: #656d76;
+      color: #8b949e;
       margin-bottom: 6px;
     }
     .error {
-      color: #cf222e;
+      color: #ffabab;
       padding: 12px;
-      background: #ffebe9;
-      border: 1px solid #cf222e;
+      background: #3a0d0d;
+      border: 1px solid #f85149;
       border-radius: 6px;
       margin-top: 8px;
     }
@@ -409,8 +409,8 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
     this.nodesData.clear();
     this.nodesData.add(nodes.map(n => {
       const cid = tableToCluster.get(n.id);
-      const fill = cid != null ? clusterColor(cid) : '#0969da';
-      const border = cid != null ? clusterColor(cid) : '#0969da';
+      const fill = cid != null ? clusterColor(cid) : '#1f6feb';
+      const border = cid != null ? clusterColor(cid) : '#58a6ff';
       return {
         id: n.id,
         label: n.label,
@@ -426,7 +426,7 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
           face: 'ui-monospace, SFMono-Regular, monospace',
           size: 13,
           strokeWidth: 3,
-          strokeColor: '#f6f8fa',
+          strokeColor: '#0d1117',
         },
         shape: 'dot',
         color: { background: fill, border },
@@ -474,7 +474,7 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
         // regardless of confidence-tier color.
         edge.font = {
           size: 12,
-          color: '#f6f8fa',
+          color: '#0d1117',
           face: 'ui-monospace, SFMono-Regular, monospace',
           background: 'rgba(255,255,255,0.8)',
           strokeWidth: 0,
@@ -540,10 +540,10 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
   }
 
   private colorFor(c: number | null): string {
-    if (c == null) return '#656d76';
-    if (c >= 0.95) return '#1a7f37';
-    if (c >= 0.85) return '#9a6700';
-    return '#656d76';
+    if (c == null) return '#666';
+    if (c >= 0.95) return '#3fb950';
+    if (c >= 0.85) return '#d29922';
+    return '#8b949e';
   }
 
   private initNetwork(): void {

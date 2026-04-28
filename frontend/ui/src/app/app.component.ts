@@ -27,8 +27,8 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
       align-items: center;
       gap: 32px;
       padding: 14px 28px;
-      background: #ffffff;
-      border-bottom: 1px solid #d0d7de;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
     }
     .brand {
       margin: 0;
@@ -41,13 +41,13 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
       gap: 16px;
     }
     nav a {
-      color: #656d76;
+      color: #8b949e;
       padding: 4px 8px;
       border-radius: 4px;
       transition: color 0.1s, background 0.1s;
     }
-    nav a:hover { color: #1f2328; text-decoration: none; }
-    nav a.active { color: #1f2328; background: #f6f8fa; }
+    nav a:hover { color: #e6edf3; text-decoration: none; }
+    nav a.active { color: #e6edf3; background: #21262d; }
     main {
       padding: 24px 28px 60px;
       max-width: 1400px;

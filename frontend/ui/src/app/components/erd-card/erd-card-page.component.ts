@@ -22,10 +22,10 @@ import { ErdCardComponent } from './erd-card.component';
     }
   `,
   styles: [`
-    .back { color: #656d76; font-size: 13px; text-decoration: none; }
-    .back:hover { color: #0969da; text-decoration: underline; }
+    .back { color: #8b949e; font-size: 13px; text-decoration: none; }
+    .back:hover { color: #58a6ff; text-decoration: underline; }
     .title { margin: 12px 0 18px; }
-    .muted { color: #656d76; }
+    .muted { color: #8b949e; }
   `],
 })
 export class ErdCardPageComponent {
