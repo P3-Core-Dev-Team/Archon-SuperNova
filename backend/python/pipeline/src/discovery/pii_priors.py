@@ -246,6 +246,54 @@ def is_structural_key_name(column_name: str) -> bool:
     return bool(_STRUCTURAL_KEY_NAME_RE.search(column_name.strip().lower()))
 
 
+# ---------------------------------------------------------------------------
+# Free-text content names (description / comment / body / etc.)
+# ---------------------------------------------------------------------------
+#
+# These column names indicate free-form prose: a short blob of human-written
+# text that may incidentally contain PII-shaped substrings (emails, phone
+# numbers, account numbers, ...) but the column itself is NOT structurally a
+# PII column.  When the matched ``pii_type`` has *no* positive name-prior on
+# the column, the score is dampened so noisy free-text matches don't compete
+# with genuine PII columns at the persistence threshold.
+#
+# Caller convention (pii_score.column_pii_confidence): pass ``free_text_column``
+# when the name matches this set; the dampener is suppressed automatically
+# when the column ALSO has a positive name-prior for the matched type
+# (e.g. ``email_note`` matching EMAIL still scores cleanly).
+
+_FREE_TEXT_NAME_RE = re.compile(
+    r"^(description|desc|comments?|notes?|body|text|content|message|"
+    r"summary|subject|label|title|name|file_?name|category|status|"
+    r"created_by|modified_by|updated_by|deleted_by|owner|"
+    r"reason|remark|remarks|memo)$|"
+    r"_(description|desc|comments?|notes?|body|text|content|message|"
+    r"summary|subject|label|title|name|category|reason|remark|remarks|memo)$",
+    re.IGNORECASE,
+)
+
+
+def is_free_text_column_name(column_name: str) -> bool:
+    """Return True when *column_name* indicates a free-form prose column
+    (``description``, ``comment``, ``notes``, ``body``, ``message``,
+    ``title``, ``name``, ``file_name``, ``status``, ``created_by``, …).
+
+    Free-text columns may contain *any* shape of value — including email
+    addresses, phone numbers, IBANs — but the column itself is not a PII
+    column structurally.  Surfacing every such match at confidence 1.0
+    floods the findings table.
+
+    Used by :func:`pii_score.column_pii_confidence` to dampen the score
+    when the column name says "this is prose" and the matched ``pii_type``
+    has no positive prior on the column.  When a positive prior *does*
+    exist (e.g. ``email_notes`` is named for EMAIL), the dampener is
+    skipped so genuine name-matched PII still surfaces.
+    """
+    if not column_name:
+        return False
+    return bool(_FREE_TEXT_NAME_RE.search(column_name.strip().lower()))
+
+
 def name_prior_strength(column_name: str, pii_type: str) -> float:
     """Return the Bayesian π_name component for (column_name, pii_type).
 

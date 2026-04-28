@@ -55,6 +55,8 @@ def column_pii_confidence(
     *,
     negative_prior: bool = False,
     negative_prior_dampen: float = 0.2,
+    free_text_column: bool = False,
+    free_text_dampen: float = 0.4,
 ) -> float:
     """Combine three signals into a single confidence score in ``[0, 1]``.
 
@@ -79,12 +81,26 @@ def column_pii_confidence(
         Multiplier applied when ``negative_prior`` is True.  Default 0.2 keeps
         the score non-zero (so ``address.phone`` could still surface a real
         PESEL with high regex evidence) but knocks it well below threshold.
+    free_text_column
+        When True, the column name implies free-form prose
+        (``description`` / ``comments`` / ``notes`` / ``body`` / ``title`` /
+        etc. — see :func:`pii_priors.is_free_text_column_name`).  Such
+        columns may incidentally contain PII-shaped substrings but the
+        column itself is not a PII column structurally.  The dampener
+        applies **only when there is no positive name-prior for the
+        matched type**, so a column named ``email_notes`` still scores
+        cleanly for EMAIL.
+    free_text_dampen
+        Multiplier applied when ``free_text_column`` triggers (default 0.4).
+        A regex-saturating + validator-passing finding lands at
+        ``score = 0.4`` instead of ``1.0`` — visible to the operator as
+        "advisory" but well below the ``0.85`` confident threshold.
 
     Returns
     -------
     float
         Bayesian combined confidence, ``1 - (1 - πN)(1 - πM)(1 - πV)``,
-        post-multiplied by the negative-prior dampener if applicable.
+        post-multiplied by any active dampeners.
     """
     pi_name = max(0.0, min(1.0, name_prior_strength))
     pi_match = _saturate_match_rate(regex_match_rate)
@@ -93,6 +109,12 @@ def column_pii_confidence(
     if negative_prior:
         dampen = max(0.0, min(1.0, negative_prior_dampen))
         score *= dampen
+    # Free-text dampener: only when the column name looks like prose AND
+    # there's no positive prior for THIS pii_type.  Skipping the dampen
+    # when pi_name > 0 means a deliberate hit like ``email_note`` keeps
+    # full confidence.
+    if free_text_column and pi_name == 0.0:
+        score *= max(0.0, min(1.0, free_text_dampen))
     return score
 
 

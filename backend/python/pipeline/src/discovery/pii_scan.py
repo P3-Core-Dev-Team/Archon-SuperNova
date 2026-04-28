@@ -55,6 +55,7 @@ from discovery.pii_patterns import (  # noqa: F401  (re-exports)
     get_pattern,
 )
 from discovery.pii_priors import (
+    is_free_text_column_name,
     is_structural_pointer_name,
     name_prior,
     name_prior_strength,
@@ -661,6 +662,13 @@ def scan_column(
     # ``api_key`` and ``password_hash`` legitimately hold credentials.
     is_struct_pointer = is_structural_pointer_name(column)
 
+    # Free-text content names (``description``, ``comments``, ``notes``,
+    # ``body``, ``title``, ``status``, ``created_by``, …).  Findings on
+    # such columns are dampened in the score formula when there's no
+    # positive name-prior for the matched type — these columns may carry
+    # PII-shaped substrings without being PII columns themselves.
+    is_free_text = is_free_text_column_name(column)
+
     seen_types: set[str] = set()
 
     # Regex / Hyperscan findings
@@ -678,6 +686,7 @@ def scan_column(
             name_prior_strength=np_strength,
             regex_match_rate=rate_regex,
             validator_pass_rate=rate_validated,
+            free_text_column=is_free_text,
         )
         spec = SPECIFICITY.get(pii_type, 50)
         findings.append(
@@ -714,6 +723,7 @@ def scan_column(
             name_prior_strength=np_strength,
             regex_match_rate=rate_regex,
             validator_pass_rate=1.0,  # NER is its own validator
+            free_text_column=is_free_text,
         )
         findings.append(
             PIIFinding(
