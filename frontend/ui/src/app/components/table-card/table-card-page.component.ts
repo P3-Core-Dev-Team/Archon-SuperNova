@@ -57,7 +57,7 @@ interface FkRow {
            toggle on the right.  Shared between both modes per the spec. -->
       <div class="page-header">
         <div class="title-row">
-          <h1 class="mono">{{ tableName }}</h1>
+          <h1 class="mono">{{ tableName() }}</h1>
           <span class="title-desc muted">{{ headerDescription() }}</span>
         </div>
         <div class="view-toggle" role="tablist" aria-label="Switch view">
@@ -105,7 +105,7 @@ interface FkRow {
               <span class="pill-module">{{ mapModuleBadge() }}</span>
               <span class="pill-sep">|</span>
             }
-            <span class="mono pill-name">{{ tableName }}</span>
+            <span class="mono pill-name">{{ tableName() }}</span>
           </div>
           <div class="map-chip top-left chip-below muted small">
             {{ mapEdges().length }} connection{{ mapEdges().length === 1 ? '' : 's' }}
@@ -185,7 +185,7 @@ interface FkRow {
 
             @for (n of mapCards(); track n.id) {
               <div class="map-card"
-                   [class.focal]="n.id === tableName"
+                   [class.focal]="n.id === tableName()"
                    [class.dim]="hoveredCardId() && hoveredCardId() !== n.id && !isCardAdjacentToHover(n.id)"
                    [style.left.px]="n.x"
                    [style.top.px]="n.y"
@@ -199,7 +199,7 @@ interface FkRow {
                 </div>
                 <div class="card-desc">
                   {{ n.rows | number }} row{{ n.rows === 1 ? '' : 's' }}
-                  @if (n.id !== tableName) {
+                  @if (n.id !== tableName()) {
                     @if (n.fieldCount > 0) { · {{ n.fieldCount }} field{{ n.fieldCount === 1 ? '' : 's' }} }
                   }
                 </div>
@@ -947,7 +947,13 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
   @ViewChild('mapWrap') private mapWrapEl?: ElementRef<HTMLDivElement>;
 
   jobId = '';
-  tableName = '';
+  /** Reactive focal-table name driven by the route's :table_name param.
+   * Must be a signal (not a plain property) so the computed cards/edges/
+   * outFks/inFks/groupedRelationships recompute when the user navigates
+   * between tables (search hit click, neighbour-card click, browser
+   * forward / back) — the same component instance is reused on a sibling
+   * route change, so ngOnInit doesn't re-fire. */
+  tableName = signal('');
 
   // 'table' (queryviz field-detail page) | 'map' (focal-table 1-hop graph).
   // Synced with the URL ?view= param so the toggle is shareable + bookmarkable.
@@ -1020,7 +1026,7 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
   /** Short one-liner shown next to the table name in the page header. */
   headerDescription = computed(() => {
     const j = this.job();
-    const tbl = this.tableName;
+    const tbl = this.tableName();
     if (!j) return '';
     const cols = this.columns().length;
     const fkOut = this.outFks().length;
@@ -1034,7 +1040,7 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
     const set = new Set<string>();
     for (const f of this.outFks()) set.add(f.parentTable);
     for (const f of this.inFks()) set.add(f.childTable);
-    set.delete(this.tableName);
+    set.delete(this.tableName());
     return set.size;
   });
 
@@ -1061,7 +1067,7 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
 
   /** Tables to render: focal + every distinct 1-hop neighbour. */
   mapCards = computed<{ id: string; label: string; rows: number; fieldCount: number; relCount: number; module: string | null; width: number; height: number; x: number; y: number; }[]>(() => {
-    const focal = this.tableName;
+    const focal = this.tableName();
     const out = this.outFks();
     const inb = this.inFks();
     const neighbours = new Set<string>();
@@ -1158,7 +1164,7 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
   mapEdges = computed(() => {
     const cards = this.mapCards();
     const byId = new Map(cards.map(c => [c.id, c]));
-    const focal = this.tableName;
+    const focal = this.tableName();
     const focalCard = byId.get(focal);
     if (!focalCard) return [];
 
@@ -1245,7 +1251,7 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
     return { w: maxX + 80, h: maxY + 80 };
   });
 
-  mapModuleBadge = computed(() => this.moduleBadge(this.tableName));
+  mapModuleBadge = computed(() => this.moduleBadge(this.tableName()));
 
   searchHits = computed<string[]>(() => {
     const q = this.searchQuery().trim().toLowerCase();
@@ -1300,7 +1306,7 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
   onMapMouseUp(_ev: MouseEvent): void { this.mapDragging = false; }
 
   onMapCardClick(n: { id: string }): void {
-    if (n.id === this.tableName) return;
+    if (n.id === this.tableName()) return;
     // Promote neighbour to focal — navigate to its map view.
     this.router.navigate(['/jobs', this.jobId, 'tables', n.id], {
       queryParams: { view: 'map' },
@@ -1313,7 +1319,7 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
 
   exportMap(): void {
     // Copy a Mermaid snippet covering the focal + neighbours to clipboard.
-    const lines: string[] = [`%% Archon-SuperNova focal map: ${this.tableName}`, 'erDiagram'];
+    const lines: string[] = [`%% Archon-SuperNova focal map: ${this.tableName()}`, 'erDiagram'];
     for (const e of this.mapEdges()) {
       lines.push(`  ${e.fromTable} ||--o{ ${e.toTable} : "${e.joinLabel}"`);
     }
@@ -1326,7 +1332,7 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
   isCardAdjacentToHover(cardId: string): boolean {
     const h = this.hoveredCardId();
     if (!h) return false;
-    if (cardId === this.tableName) return true;
+    if (cardId === this.tableName()) return true;
     if (cardId === h) return true;
     // Edge between the hovered card and this card?
     return this.mapEdges().some(e =>
@@ -1432,7 +1438,7 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
       return;
     }
     this.jobId = id;
-    this.tableName = tbl;
+    this.tableName.set(tbl);
     // Hydrate the view signal from the URL on first load.
     const v0 = this.route.snapshot.queryParamMap.get('view');
     this.view.set(v0 === 'map' ? 'map' : 'table');
@@ -1441,6 +1447,24 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
       const v = qp.get('view');
       const next = v === 'map' ? 'map' : 'table';
       if (next !== this.view()) this.view.set(next);
+    });
+    // Same component is reused on a sibling-route nav (Angular doesn't
+    // re-create the component when only :table_name changes), so we have
+    // to listen for paramMap updates ourselves and reload focal state.
+    this.route.paramMap.subscribe(pm => {
+      const newTbl = pm.get('table_name');
+      if (!newTbl || newTbl === this.tableName()) return;
+      this.tableName.set(newTbl);
+      // Reset transient interaction state so the new focal lands fresh.
+      this.searchQuery.set('');
+      this.hoveredCardId.set(null);
+      // Re-fit the new radial layout to the canvas (mapCards is computed
+      // off tableName + allEdges, so it'll have the new neighbours by
+      // the next paint).
+      if (this.view() === 'map') {
+        requestAnimationFrame(() => this.fitMapToScreen());
+        setTimeout(() => this.fitMapToScreen(), 50);
+      }
     });
 
     forkJoin({
@@ -1475,14 +1499,14 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
   columns = computed<ColumnRow[]>(() => {
     const piiByCol = new Map<string, string[]>();
     for (const f of this.allPii()) {
-      if (f.table_name === this.tableName) {
+      if (f.table_name === this.tableName()) {
         const arr = piiByCol.get(f.column_name) ?? [];
         if (!arr.includes(f.pii_type)) arr.push(f.pii_type);
         piiByCol.set(f.column_name, arr);
       }
     }
     return this.allColumns()
-      .filter(c => c.table === this.tableName)
+      .filter(c => c.table === this.tableName())
       .sort((a, b) => a.ordinal - b.ordinal)
       .map(c => ({
         ordinal: c.ordinal,
@@ -1497,19 +1521,19 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
 
   outFks = computed<FkRow[]>(() =>
     this.allEdges()
-      .filter(e => e.from === this.tableName)
+      .filter(e => e.from === this.tableName())
       .map(e => this.parseEdge(e))
   );
 
   inFks = computed<FkRow[]>(() =>
     this.allEdges()
-      .filter(e => e.to === this.tableName)
+      .filter(e => e.to === this.tableName())
       .map(e => this.parseEdge(e))
   );
 
   piiRows = computed<PiiFinding[]>(() =>
     this.allPii()
-      .filter(p => p.table_name === this.tableName)
+      .filter(p => p.table_name === this.tableName())
       .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
   );
 
