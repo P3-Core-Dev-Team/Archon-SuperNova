@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { JobService } from '../../services/job.service';
 import {
@@ -48,8 +48,29 @@ interface FkRow {
     }
 
     @if (!loading() && !error()) {
+      <!-- Page header: table name + description on the left, table | map
+           toggle on the right.  Shared between both modes per the spec. -->
+      <div class="page-header">
+        <div class="title-row">
+          <h1 class="mono">{{ tableName }}</h1>
+          <span class="title-desc muted">{{ headerDescription() }}</span>
+        </div>
+        <div class="view-toggle" role="tablist" aria-label="Switch view">
+          <button type="button"
+                  role="tab"
+                  [class.active]="view() === 'table'"
+                  [attr.aria-selected]="view() === 'table'"
+                  (click)="setView('table')">table</button>
+          <span class="sep">|</span>
+          <button type="button"
+                  role="tab"
+                  [class.active]="view() === 'map'"
+                  [attr.aria-selected]="view() === 'map'"
+                  (click)="setView('map')">map</button>
+        </div>
+      </div>
+
       <div class="header">
-        <h1 class="mono">{{ tableName }}</h1>
         <div class="badges">
           <span class="badge schema">{{ job()?.schema_name }}</span>
           <span class="badge stat">{{ columns().length }} columns</span>
@@ -59,6 +80,28 @@ interface FkRow {
           }
         </div>
       </div>
+
+      @if (view() === 'map') {
+        <!-- MAP mode placeholder — full implementation lands in the next
+             step.  For now we surface focal-table + 1-hop summary so the
+             toggle is visible and functional. -->
+        <div class="map-placeholder card">
+          <div class="muted">
+            <strong>Map view</strong> — focal-table graph with 1-hop neighbours
+            coming next.  This is the queryviz "map" mode skeleton; the
+            cards-and-bezier renderer is already in place on the
+            Relationships graph tab.  Switch back to <em>table</em> to see
+            the full per-table detail page.
+          </div>
+          <div class="map-stats muted small">
+            Focal: <code>{{ tableName }}</code> ·
+            {{ outFks().length + inFks().length }} connections ·
+            {{ uniqueNeighborCount() }} neighbour table(s)
+          </div>
+        </div>
+      }
+
+      @if (view() === 'table') {
 
       <div class="layout">
         <div class="main">
@@ -192,13 +235,87 @@ interface FkRow {
           </section>
         </aside>
       </div>
+      }
     }
   `,
   styles: [`
     :host { display: block; max-width: 1400px; margin: 0 auto; padding: 0 4px; }
     .back { color: #8b949e; font-size: 13px; }
+
+    /* Top page header — table name + description on the left, view toggle on
+       the right.  Shared by both modes per the queryviz two-mode spec. */
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      margin: 16px 0 6px;
+      flex-wrap: wrap;
+    }
+    .title-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      min-width: 0;
+    }
+    .title-row h1 {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 500;
+      letter-spacing: -0.3px;
+      color: #e6edf3;
+    }
+    .title-desc {
+      font-size: 13px;
+      max-width: 600px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .view-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+    .view-toggle button {
+      background: transparent;
+      border: none;
+      color: #8b949e;
+      padding: 4px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      letter-spacing: 0;
+      text-transform: lowercase;
+      cursor: pointer;
+    }
+    .view-toggle button.active {
+      background: #1f6feb;
+      color: #fff;
+    }
+    .view-toggle .sep {
+      color: #30363d;
+      font-size: 12px;
+      user-select: none;
+    }
+
+    /* Placeholder shown while MAP-mode skeleton ships in a follow-up. */
+    .map-placeholder {
+      padding: 28px;
+      text-align: center;
+    }
+    .map-placeholder .map-stats {
+      margin-top: 12px;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+    }
+
     .header {
-      margin: 16px 0 18px;
+      margin: 6px 0 18px;
       display: flex;
       align-items: baseline;
       gap: 18px;
@@ -352,10 +469,15 @@ interface FkRow {
 })
 export class TableCardPageComponent implements OnInit {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private jobsSvc = inject(JobService);
 
   jobId = '';
   tableName = '';
+
+  // 'table' (queryviz field-detail page) | 'map' (focal-table 1-hop graph).
+  // Synced with the URL ?view= param so the toggle is shareable + bookmarkable.
+  view = signal<'table' | 'map'>('table');
 
   loading = signal(true);
   error = signal<string | null>(null);
@@ -364,6 +486,40 @@ export class TableCardPageComponent implements OnInit {
   private allColumns = signal<ColumnInfo[]>([]);
   private allEdges = signal<RelationshipEdge[]>([]);
   private allPii = signal<PiiFinding[]>([]);
+
+  setView(v: 'table' | 'map'): void {
+    if (this.view() === v) return;
+    this.view.set(v);
+    // Update URL without reloading the component.  ``replaceUrl: true`` so
+    // the browser back-button doesn't bounce between toggle states.
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { view: v },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  /** Short one-liner shown next to the table name in the page header. */
+  headerDescription = computed(() => {
+    const j = this.job();
+    const tbl = this.tableName;
+    if (!j) return '';
+    const cols = this.columns().length;
+    const fkOut = this.outFks().length;
+    const fkIn = this.inFks().length;
+    return `${cols} field${cols === 1 ? '' : 's'} · ${fkOut + fkIn} relationship${
+      fkOut + fkIn === 1 ? '' : 's'} in ${j.schema_name}`;
+  });
+
+  /** Distinct neighbour tables for the focal-map summary placeholder. */
+  uniqueNeighborCount = computed(() => {
+    const set = new Set<string>();
+    for (const f of this.outFks()) set.add(f.parentTable);
+    for (const f of this.inFks()) set.add(f.childTable);
+    set.delete(this.tableName);
+    return set.size;
+  });
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -375,6 +531,15 @@ export class TableCardPageComponent implements OnInit {
     }
     this.jobId = id;
     this.tableName = tbl;
+    // Hydrate the view signal from the URL on first load.
+    const v0 = this.route.snapshot.queryParamMap.get('view');
+    this.view.set(v0 === 'map' ? 'map' : 'table');
+    // Stay in sync if the param changes via browser back/forward.
+    this.route.queryParamMap.subscribe(qp => {
+      const v = qp.get('view');
+      const next = v === 'map' ? 'map' : 'table';
+      if (next !== this.view()) this.view.set(next);
+    });
 
     forkJoin({
       job: this.jobsSvc.get(id),
