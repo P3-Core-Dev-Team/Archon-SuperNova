@@ -1,4 +1,7 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  AfterViewInit, Component, ElementRef, HostListener, OnInit,
+  ViewChild, computed, inject, signal,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -418,13 +421,29 @@ interface FkRow {
 
     /* === MAP mode: focal-table 1-hop graph ============================ */
 
+    /* Viewport-bleed: the host is constrained to max-width:1400px with auto
+       margins, but in map mode the canvas spans the full viewport below the
+       page header.  margin-left/right calc(50% - 50vw) negates the host's
+       centring without affecting surrounding TABLE-mode content.
+       Border-radius + side-borders are dropped to feel edge-to-edge. */
     .map-wrap {
       position: relative;
-      width: 100%;
-      height: 720px;
+      width: 100vw;
+      margin-left: calc(50% - 50vw);
+      margin-right: calc(50% - 50vw);
+      /* Fill remaining vertical space below the page header.  The header
+         (back link + page-header row + badges row) is roughly 180 px tall;
+         the --map-top-offset CSS custom property lets a parent override the
+         constant if its layout changes.  min-height keeps the canvas usable
+         when the viewport is short (e.g. landscape phones). */
+      height: calc(100vh - var(--map-top-offset, 196px));
+      min-height: 480px;
       background: #0d1117;
-      border: 1px solid #30363d;
-      border-radius: 8px;
+      border-top: 1px solid #30363d;
+      border-bottom: 1px solid #30363d;
+      border-left: none;
+      border-right: none;
+      border-radius: 0;
       overflow: hidden;
       cursor: grab;
       margin-top: 6px;
@@ -918,10 +937,14 @@ interface FkRow {
     .error { color: #ffabab; background: #3a0d0d; border-color: #f85149; }
   `],
 })
-export class TableCardPageComponent implements OnInit {
+export class TableCardPageComponent implements OnInit, AfterViewInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private jobsSvc = inject(JobService);
+
+  // Reference to the map's bordered canvas wrapper so fit-to-screen can
+  // measure its real size after the viewport-bleed CSS settles.
+  @ViewChild('mapWrap') private mapWrapEl?: ElementRef<HTMLDivElement>;
 
   jobId = '';
   tableName = '';
@@ -949,6 +972,49 @@ export class TableCardPageComponent implements OnInit {
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
+    if (v === 'map') {
+      // Wait for Angular to render the map block + the next paint so the
+      // viewport-bleed CSS has measured.  rAF is enough on first toggle;
+      // fall through to a setTimeout(0) cushion when rAF fires too early
+      // (the @if branch hasn't projected its DOM yet).
+      requestAnimationFrame(() => this.fitMapToScreen());
+      setTimeout(() => this.fitMapToScreen(), 50);
+    }
+  }
+
+  /** Compute a transform that fits the radial card layout into the
+   * available viewport-sized canvas, with a small margin.  Called on
+   * initial MAP render, on toggle into MAP mode, and on window resize. */
+  fitMapToScreen(): void {
+    if (this.view() !== 'map') return;
+    const wrap = this.mapWrapEl?.nativeElement;
+    const sz = this.mapContentSize();
+    if (!wrap || sz.w === 0 || sz.h === 0) return;
+    const ww = wrap.clientWidth;
+    const wh = wrap.clientHeight;
+    if (ww === 0 || wh === 0) return;
+    const margin = 60;
+    const sx = (ww - margin * 2) / sz.w;
+    const sy = (wh - margin * 2) / sz.h;
+    const z = Math.min(1, Math.max(0.2, Math.min(sx, sy)));
+    this.mapZoom.set(z);
+    this.mapPanX.set((ww - sz.w * z) / 2);
+    this.mapPanY.set((wh - sz.h * z) / 2);
+  }
+
+  ngAfterViewInit(): void {
+    // If the user landed directly on ?view=map (deep link), the data
+    // load below will eventually populate mapCards(); kick off a fit on
+    // the next frame after that completes.  ngOnInit's forkJoin schedules
+    // the actual call; this hook just ensures mapWrapEl is bound first.
+  }
+
+  /** Window-level resize keeps the focal map fit-to-screen as users
+   * resize the browser.  Throttled by rAF so the layout doesn't thrash. */
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    if (this.view() !== 'map') return;
+    requestAnimationFrame(() => this.fitMapToScreen());
   }
 
   /** Short one-liner shown next to the table name in the page header. */
@@ -1389,6 +1455,14 @@ export class TableCardPageComponent implements OnInit {
         this.allEdges.set(r.rels.edges ?? []);
         this.allPii.set(r.pii.findings ?? []);
         this.loading.set(false);
+        // Deep-link case: ?view=map on first load — once the data lands
+        // and the map block has been projected, fit the radial layout to
+        // the new full-viewport canvas.  rAF + setTimeout(50) covers
+        // first-paint + a relayout cushion.
+        if (this.view() === 'map') {
+          requestAnimationFrame(() => this.fitMapToScreen());
+          setTimeout(() => this.fitMapToScreen(), 50);
+        }
       },
       error: err => {
         this.error.set(err?.error?.detail ?? err?.message ?? 'Failed to load table.');
