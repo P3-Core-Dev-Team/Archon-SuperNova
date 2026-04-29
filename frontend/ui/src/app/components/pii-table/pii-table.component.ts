@@ -1,13 +1,14 @@
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { JobService } from '../../services/job.service';
 import { PiiFinding } from '../../models/job.model';
 
 @Component({
   selector: 'app-pii-table',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="toolbar">
       <input type="search" placeholder="Filter detector / PII type / column…"
@@ -45,7 +46,10 @@ import { PiiFinding } from '../../models/job.model';
           </thead>
           <tbody>
             <tr *ngFor="let f of filtered()" [class]="'tier-' + tier(f)">
-              <td class="mono">{{ f.table_name }}</td>
+              <td class="mono">
+                <a class="tlink" [routerLink]="['/jobs', jobId(), 'tables', f.table_name]"
+                   title="Open the queryviz-style page for this table">{{ f.table_name }}</a>
+              </td>
               <td class="mono">{{ f.column_name }}</td>
               <td><span class="pii-type">{{ f.pii_type }}</span></td>
               <td class="mono small">{{ f.detector }}</td>

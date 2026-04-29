@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
 import { catchError, of } from 'rxjs';
 import { ErdCardComponent } from '../erd-card/erd-card.component';
 import { clusterColor } from '../cluster-graph/cluster-graph.component';
@@ -91,7 +92,7 @@ function cardLabel(c: string | null | undefined): string {
 @Component({
   selector: 'app-cluster-detail',
   standalone: true,
-  imports: [CommonModule, DecimalPipe, ErdCardComponent],
+  imports: [CommonModule, DecimalPipe, RouterLink, ErdCardComponent],
   template: `
     <div class="cluster-wrapper">
 
@@ -182,7 +183,8 @@ function cardLabel(c: string | null | undefined): string {
                 Dashed amber cards are tables OUTSIDE this cluster joined via FK
                 — your cluster's "super-points" connecting to:
                 @for (b of detail()!.bridge_tables; track b.table_name; let last = $last) {
-                  <code class="mono">{{ b.table_name }}</code>
+                  <a class="tlink mono" [routerLink]="['/jobs', jobId(), 'tables', b.table_name]"
+                     title="Open the queryviz-style page">{{ b.table_name }}</a>
                   @if (b.to_cluster_name) {
                     <span class="muted">→ {{ b.to_cluster_name }}</span>
                   }{{ last ? '' : ', ' }}
@@ -216,7 +218,10 @@ function cardLabel(c: string | null | undefined): string {
             <tbody>
               @for (t of detail()!.tables; track t.table_id) {
                 <tr>
-                  <td><code class="mono">{{ t.table_name }}</code></td>
+                  <td>
+                    <a class="tlink mono" [routerLink]="['/jobs', jobId(), 'tables', t.table_name]"
+                       title="Open the queryviz-style page">{{ t.table_name }}</a>
+                  </td>
                   <td class="cell-right mono">{{ t.row_count | number }}</td>
                   <td>
                     <span class="arch-chip" [style.border-color]="archetypeColour(t.archetype)">
@@ -305,7 +310,10 @@ function cardLabel(c: string | null | undefined): string {
               <tbody>
                 @for (p of detail()!.pii_findings; track $index) {
                   <tr [class.pii-validated]="p.validated">
-                    <td class="mono">{{ p.table_name }}</td>
+                    <td>
+                      <a class="tlink mono" [routerLink]="['/jobs', jobId(), 'tables', p.table_name]"
+                         title="Open the queryviz-style page">{{ p.table_name }}</a>
+                    </td>
                     <td><code class="mono">{{ p.column_name }}</code></td>
                     <td>
                       <span

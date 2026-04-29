@@ -118,12 +118,14 @@ interface EdgeLine {
                  [attr.data-table]="c.table"
                  (mouseenter)="hoveredTable.set(c.table)"
                  (mouseleave)="hoveredTable.set(null)">
-              <div class="erd-card-header"
-                   [style.background]="bridgeColorFor(c.table) || null"
-                   [style.color]="bridgeColorFor(c.table) ? '#0d1117' : null">
+              <a class="erd-card-header"
+                 [routerLink]="['/jobs', jobId(), 'tables', c.table]"
+                 [style.background]="bridgeColorFor(c.table) || null"
+                 [style.color]="bridgeColorFor(c.table) ? '#0d1117' : null"
+                 title="Open the queryviz-style page for this table">
                 @if (isBridge(c.table)) { <span class="bridge-pin" title="Cross-cluster bridge">⤴</span> }
                 {{ c.table }}
-              </div>
+              </a>
               <div class="erd-card-body">
                 @if (c.unknown) {
                   <div class="column-row unknown">(columns unknown)</div>

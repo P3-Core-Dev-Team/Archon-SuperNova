@@ -121,3 +121,18 @@ tr:hover td { background: #161b22; }
 
 .muted { color: #8b949e; }
 .mono  { font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, monospace; }
+
+// Table-name navigation links — wherever a table_name is rendered in a
+// list / cell, .tlink deep-links to /jobs/:id/tables/:name (the
+// queryviz-style per-table page).  Subtle dotted underline-on-hover so the
+// click affordance is visible without competing with the data.
+.tlink {
+  color: #58a6ff;
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+  cursor: pointer;
+}
+.tlink:hover {
+  border-bottom-color: #58a6ff;
+  text-decoration: none;
+}
