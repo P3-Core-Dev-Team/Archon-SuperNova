@@ -9,6 +9,8 @@ import { JobService } from '../../services/job.service';
 import { RelationshipEdge } from '../../models/job.model';
 import { clusterColor } from '../cluster-graph/cluster-graph.component';
 
+type RelType = 'header_item' | 'master_lookup' | 'config' | 'text' | 'history';
+
 @Component({
   selector: 'app-relationship-graph',
   standalone: true,
@@ -50,18 +52,18 @@ import { clusterColor } from '../cluster-graph/cluster-graph.component';
     <div class="graph-wrap">
       <div #container class="graph"></div>
       <div class="legend">
-        <div class="legend-title">Confidence</div>
-        <div class="legend-row"><span class="swatch" style="background:#3fb950"></span> ≥ 0.95</div>
-        <div class="legend-row"><span class="swatch" style="background:#d29922"></span> 0.85 – 0.95</div>
-        <div class="legend-row"><span class="swatch" style="background:#8b949e"></span> &lt; 0.85</div>
-        <div class="legend-row"><span class="swatch" style="background:#666"></span> unknown</div>
+        <div class="legend-title">Relationship</div>
+        <div class="legend-row"><span class="swatch" style="background:#58a6ff"></span> header / item</div>
+        <div class="legend-row"><span class="swatch" style="background:#3fb950"></span> master lookup</div>
+        <div class="legend-row"><span class="swatch" style="background:#bc8cff"></span> config</div>
+        <div class="legend-row"><span class="swatch" style="background:#d29922"></span> text</div>
+        <div class="legend-row"><span class="swatch" style="background:#8b949e"></span> history</div>
         <div class="legend-divider"></div>
         <div class="legend-title">Cardinality</div>
-        <div class="legend-row"><span class="card-glyph">|—|</span> 1:1 (one-to-one)</div>
-        <div class="legend-row"><span class="card-glyph">|—&lt;</span> 1:N (one-to-many)</div>
-        <div class="legend-row"><span class="card-glyph">&gt;—|</span> N:1 (many-to-one)</div>
-        <div class="legend-row"><span class="card-glyph">&gt;—&lt;</span> N:M (many-to-many)</div>
-        <div class="legend-row"><span class="card-glyph">→</span> unknown</div>
+        <div class="legend-row"><span class="card-glyph">|—|</span> 1:1</div>
+        <div class="legend-row"><span class="card-glyph">|—&lt;</span> 1:N</div>
+        <div class="legend-row"><span class="card-glyph">&gt;—|</span> N:1</div>
+        <div class="legend-row"><span class="card-glyph">&gt;—&lt;</span> N:M</div>
       </div>
       @if (loading()) {
         <div class="overlay muted">Loading graph…</div>
@@ -406,30 +408,60 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
     nodes: { id: string; label: string; value: number }[],
     tableToCluster: Map<string, number>,
   ): void {
+    // Pre-compute degree (FK in/out count) per table from the loaded edges
+    // so the card footer can show "{N} fields" — actual column counts aren't
+    // in the relationships payload, so we use the degree as a proxy of
+    // structural significance.
+    const degree = new Map<string, number>();
+    for (const e of this.allEdges) {
+      degree.set(e.from, (degree.get(e.from) ?? 0) + 1);
+      degree.set(e.to, (degree.get(e.to) ?? 0) + 1);
+    }
+
     this.nodesData.clear();
     this.nodesData.add(nodes.map(n => {
       const cid = tableToCluster.get(n.id);
-      const fill = cid != null ? clusterColor(cid) : '#1f6feb';
-      const border = cid != null ? clusterColor(cid) : '#58a6ff';
+      const accent = cid != null ? clusterColor(cid) : '#58a6ff';
+      const deg = degree.get(n.id) ?? 0;
+      const moduleHint = this.moduleBadge(n.id);
+      // vis-network's font.multi='html' supports <b>/<i>/<code>; build a
+      // 3-line "card" label: bold mono table name + module badge, separator,
+      // small muted footer with edge-degree.
+      const label =
+        `<b>${this.escape(n.label)}</b>${moduleHint ? `  <code>${moduleHint}</code>` : ''}\n` +
+        `${n.value.toLocaleString()} row${n.value === 1 ? '' : 's'}\n` +
+        `${deg} relationship${deg === 1 ? '' : 's'}`;
       return {
         id: n.id,
-        label: n.label,
+        label,
         value: n.value,
         title: cid != null
           ? `${n.label}\n${n.value} row${n.value === 1 ? '' : 's'}\ncluster #${cid}`
           : `${n.label}\n${n.value} row${n.value === 1 ? '' : 's'}`,
-        font: {
-          // White labels with a thin dark stroke so the text remains
-          // legible whether the cluster color is light (e.g. amber) or
-          // dark (e.g. red).
-          color: '#ffffff',
-          face: 'ui-monospace, SFMono-Regular, monospace',
-          size: 13,
-          strokeWidth: 3,
-          strokeColor: '#0d1117',
+        // shape:'box' = rounded-rect background; chromeOnly is set false so
+        // the border + fill render even when the node is unselected.
+        shape: 'box',
+        // shapeProperties.borderRadius gives the rounded corners.
+        shapeProperties: { borderRadius: 8 },
+        color: {
+          background: '#161b22',
+          border: '#30363d',
+          highlight: { background: '#1c222b', border: accent },
+          hover: { background: '#1c222b', border: accent },
         },
-        shape: 'dot',
-        color: { background: fill, border },
+        borderWidth: 1,
+        borderWidthSelected: 2,
+        margin: { top: 12, right: 14, bottom: 12, left: 14 } as any,
+        font: {
+          multi: 'html',
+          face: 'ui-monospace, SFMono-Regular, monospace',
+          color: '#e6edf3',
+          size: 12,
+          align: 'left',
+          // Let the multi-line label flow; vis-network respects \n breaks.
+          bold: { color: '#e6edf3', size: 14, face: 'ui-monospace, SFMono-Regular, monospace' } as any,
+        } as any,
+        widthConstraint: { minimum: 140, maximum: 220 },
       };
     }));
     this.applyFilter();
@@ -437,6 +469,36 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
       this.initNetwork();
     }
     this.loading.set(false);
+  }
+
+  /** Best-effort module classifier from table-name prefix.  Not perfect —
+   * users can override later via a config map.  Lower-case table name is
+   * scanned for the most-specific known prefix first.  Returns ``null``
+   * when no recognised module shows up so the badge is hidden. */
+  private moduleBadge(tableName: string): string | null {
+    const t = tableName.toLowerCase();
+    const map: [RegExp, string][] = [
+      [/^ads_app/,         'APP'],
+      [/^ads_st_/,         'STG'],
+      [/^ads_user/,        'USR'],
+      [/^ads_open_metadata/, 'META'],
+      [/^ads_ingestion/,   'INGEST'],
+      [/^ads_master_job|^ads_job/, 'JOB'],
+      [/_audit$|_log$|_history$|_event/, 'AUDIT'],
+      [/^ads_/,            'ADS'],
+      [/_lookup$|^lkp_|^ref_/, 'REF'],
+      [/^v_|^vw_/,         'VIEW'],
+    ];
+    for (const [re, badge] of map) {
+      if (re.test(t)) return badge;
+    }
+    return null;
+  }
+
+  /** Minimal HTML-escape so a stray ``<`` in a table name doesn't break the
+   * font.multi='html' rendering.  Three angle-brackets are enough. */
+  private escape(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   private applyFilter(): void {
@@ -456,27 +518,40 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
       else if (e.confidence >= 0.85) med++;
       else low++;
       const arrows = this.arrowsFor(e.cardinality);
-      const label = this.labelFor(e.cardinality);
+      const cardLabel = this.labelFor(e.cardinality);
+      const relType = this.classifyRelType(e);
+      const relColor = this.relTypeColor(relType);
       const tooltipCard = e.cardinality ? e.cardinality : 'unknown';
+      // Edge label = the joining column name(s), in lowercase mono with a
+      // dark pill background.  ``e.label`` from the API is "child_col → parent_col";
+      // we use the child_col side as the join key.
+      const joinCol = this.joinColumn(e.label);
       const edge: VisEdge = {
         id,
         from: e.from,
         to: e.to,
-        title: `${e.label}\nconfidence ${this.fmt(e.confidence)} • containment ${this.fmt(e.containment)}\ncardinality ${tooltipCard}`,
-        color: { color: this.colorFor(e.confidence) },
+        title: `${e.label}\ntype ${relType}\nconfidence ${this.fmt(e.confidence)} • containment ${this.fmt(e.containment)}\ncardinality ${tooltipCard}`,
+        color: { color: relColor, highlight: '#58a6ff', hover: relColor },
         arrows,
-        smooth: false,
-        width: e.confidence == null ? 1 : Math.max(1, e.confidence * 3),
+        // Smooth bezier — the spec calls for "smooth cubic bezier curves
+        // connecting card borders, not straight lines".  vis-network's
+        // 'cubicBezier' produces the queryviz-style sweep.
+        smooth: { enabled: true, type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.5 } as any,
+        width: e.confidence == null ? 1.2 : Math.max(1.2, e.confidence * 2.5),
       };
-      if (label) {
-        edge.label = label;
-        // Small font with translucent white plate so the label reads over edge lines
-        // regardless of confidence-tier color.
+      // Combined label: join column + cardinality glyph — both render in a
+      // pill thanks to the font.background.  Avoids a double-label that
+      // would compete with the bezier path.
+      const labelText = joinCol
+        ? (cardLabel ? `${joinCol}  ${cardLabel}` : joinCol)
+        : (cardLabel ?? '');
+      if (labelText) {
+        edge.label = labelText;
         edge.font = {
-          size: 12,
-          color: '#0d1117',
+          size: 11,
+          color: '#c9d1d9',
           face: 'ui-monospace, SFMono-Regular, monospace',
-          background: 'rgba(255,255,255,0.8)',
+          background: '#0d1117',
           strokeWidth: 0,
           align: 'middle',
         } as VisEdge['font'];
@@ -486,6 +561,67 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
     this.edgesData.add(visEdges);
     this.visibleEdgeCount.set(visibleCount);
     this.tierCounts.set({ high, med, low, unknown: unk });
+  }
+
+  /** Classify a relationship into one of the 5 visual buckets per the spec.
+   * Heuristic — tuned for SAP/AdventureWorks-style schemas where the column
+   * names are conventionally meaningful.  Falls back to ``header_item`` for
+   * any "regular FK" that doesn't fit a more specific bucket.
+   *
+   * Buckets:
+   *   header_item    — child has ``_id`` ending → blue (most common shape)
+   *   master_lookup  — parent table is a tiny dictionary (status / category /
+   *                    country / language) → green
+   *   config         — parent table contains "config" / "policy" / "setting" → purple
+   *   text           — column involves "_text" / "_desc" / "_note" → amber
+   *   history        — child or parent contains "history" / "audit" / "_log" / "event" → gray
+   */
+  private classifyRelType(e: RelationshipEdge): RelType {
+    const join = (e.label || '').toLowerCase();
+    const fromT = e.from.toLowerCase();
+    const toT = e.to.toLowerCase();
+    if (/_audit|_log|_history|_event|change_log/.test(fromT) ||
+        /_audit|_log|_history|_event|change_log/.test(toT)) {
+      return 'history';
+    }
+    if (/config|setting|policy|rule|param/.test(toT)) {
+      return 'config';
+    }
+    if (/_text|_desc|_note|_message|_comment|_summary|_body/.test(join)) {
+      return 'text';
+    }
+    if (/status|category|country|language|currency|type|kind|locale|state|region|department|priority|level|code$/.test(toT)) {
+      return 'master_lookup';
+    }
+    return 'header_item';
+  }
+
+  private relTypeColor(t: RelType): string {
+    switch (t) {
+      case 'header_item':   return '#58a6ff';
+      case 'master_lookup': return '#3fb950';
+      case 'config':        return '#bc8cff';
+      case 'text':          return '#d29922';
+      case 'history':       return '#8b949e';
+    }
+  }
+
+  /** Extract the "child_col" half of the API-provided edge label
+   * ``child_col → parent_col`` so we render only one column-name on the
+   * edge.  Non-matching shapes return null → the edge keeps its
+   * cardinality glyph alone. */
+  private joinColumn(rawLabel: string | null | undefined): string | null {
+    if (!rawLabel) return null;
+    const arrow = ' → ';
+    if (rawLabel.includes(arrow)) {
+      const [child, parent] = rawLabel.split(arrow);
+      const c = (child ?? '').trim();
+      const p = (parent ?? '').trim();
+      if (c && p && c === p) return c;
+      // Different column names on each side: show "child→parent"
+      return `${c}→${p}`;
+    }
+    return rawLabel;
   }
 
   /**
@@ -539,12 +675,6 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
     return v == null ? '—' : v.toFixed(3);
   }
 
-  private colorFor(c: number | null): string {
-    if (c == null) return '#666';
-    if (c >= 0.95) return '#3fb950';
-    if (c >= 0.85) return '#d29922';
-    return '#8b949e';
-  }
 
   private initNetwork(): void {
     const options: Options = {
@@ -566,14 +696,18 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
         tooltipDelay: 250,
       },
       nodes: {
-        scaling: { min: 8, max: 28, label: { enabled: true, min: 12, max: 18 } },
+        // shape:'box' with rounded corners is the queryviz card look.  Per-node
+        // overrides in paintNodes() set background / border / multi-line label.
+        shape: 'box',
+        shapeProperties: { borderRadius: 8 },
         borderWidth: 1,
+        borderWidthSelected: 2,
       },
       edges: {
-        // Per-edge `arrows` objects override this default (used only when an
-        // edge falls back to plain arrow rendering).
+        // Per-edge `arrows` and `color` objects override these defaults.  Spec
+        // calls for cubic-bezier curves connecting card borders.
         arrows: { to: { enabled: true, type: 'arrow' } },
-        smooth: false,
+        smooth: { enabled: true, type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.5 } as any,
       },
     };
     this.network = new Network(
