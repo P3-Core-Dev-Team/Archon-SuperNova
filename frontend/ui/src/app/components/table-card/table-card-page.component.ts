@@ -13,6 +13,8 @@ import {
   RelationshipGraph,
 } from '../../models/job.model';
 
+type RelType = 'header_item' | 'master_lookup' | 'config' | 'text' | 'history';
+
 interface ColumnRow {
   ordinal: number;
   name: string;
@@ -105,132 +107,130 @@ interface FkRow {
 
       <div class="layout">
         <div class="main">
-          <!-- COLUMNS card -->
-          <section class="card">
-            <h3 class="section-title">Columns</h3>
-            <table class="cols">
+          <!-- FIELDS panel — queryviz: bordered card, header "fields (N)",
+               table FIELD | TYPE | LENGTH | KEY | DESCRIPTION -->
+          <section class="card panel">
+            <header class="panel-head">
+              <h3 class="panel-title">fields ({{ columns().length }})</h3>
+            </header>
+            <table class="fields">
               <thead>
                 <tr>
-                  <th class="num">#</th>
-                  <th>Field</th>
-                  <th>Type</th>
-                  <th class="num">Length</th>
-                  <th class="center">Key</th>
-                  <th class="center">PII</th>
+                  <th>field</th>
+                  <th>type</th>
+                  <th class="num">length</th>
+                  <th class="center key-col">key</th>
+                  <th>description</th>
                 </tr>
               </thead>
               <tbody>
                 @for (c of columns(); track c.name) {
-                  <tr [class.col-pk]="c.is_pk" [class.col-fk]="c.is_fk">
-                    <td class="num muted">{{ c.ordinal }}</td>
-                    <td><code>{{ c.name }}</code></td>
-                    <td class="muted small">{{ c.type }}</td>
+                  <tr>
+                    <td><code class="field-name">{{ c.name }}</code></td>
+                    <td class="muted small lower">{{ c.type }}</td>
                     <td class="num muted small">{{ c.length }}</td>
                     <td class="center">
-                      @if (c.is_pk) { <span class="kbadge pk">PK</span> }
-                      @if (c.is_fk) { <span class="kbadge fk">FK</span> }
+                      @if (c.is_pk) { <span class="kbadge pk" title="Primary key">PK</span> }
+                      @if (c.is_fk && !c.is_pk) { <span class="kbadge fk" title="Foreign key">FK</span> }
                     </td>
-                    <td class="center">
-                      @for (p of c.pii_types; track p) {
-                        <span class="kbadge pii">{{ p }}</span>
+                    <td class="muted small">
+                      @if (c.pii_types.length > 0) {
+                        @for (p of c.pii_types; track p) {
+                          <span class="kbadge pii">{{ p }}</span>
+                        }
+                      } @else {
+                        <span class="dash">—</span>
                       }
                     </td>
                   </tr>
                 }
                 @if (columns().length === 0) {
-                  <tr><td colspan="6" class="muted center">No columns inventoried.</td></tr>
+                  <tr><td colspan="5" class="muted center">No columns inventoried.</td></tr>
                 }
               </tbody>
             </table>
           </section>
-
-          <!-- PII findings card -->
-          @if (piiRows().length > 0) {
-            <section class="card">
-              <h3 class="section-title">PII findings ({{ piiRows().length }})</h3>
-              <table class="pii">
-                <thead>
-                  <tr>
-                    <th>Column</th>
-                    <th>Type</th>
-                    <th>Detector</th>
-                    <th class="num">Match rate</th>
-                    <th class="num">Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (p of piiRows(); track p.column_name + p.pii_type + p.detector) {
-                    <tr>
-                      <td><code>{{ p.column_name }}</code></td>
-                      <td><span class="kbadge pii">{{ p.pii_type }}</span></td>
-                      <td class="muted small">{{ p.detector }}</td>
-                      <td class="num muted small">{{ formatRate(p.match_rate) }}</td>
-                      <td class="num">
-                        <span [class.score-high]="(p.score ?? 0) >= 0.85"
-                              [class.score-mid]="(p.score ?? 0) >= 0.5 && (p.score ?? 0) < 0.85"
-                              [class.score-low]="(p.score ?? 0) < 0.5">
-                          {{ (p.score ?? 0).toFixed(2) }}
-                        </span>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </section>
-          }
         </div>
 
-        <!-- Sidebar -->
+        <!-- RELATIONSHIPS panel — grouped by relationship type per the
+             queryviz layout.  Each group: type name + subtitle, then
+             "→ references" (outbound) and "← referenced by" (inbound)
+             sections, each item is a clickable target-table card. -->
         <aside class="sidebar">
-          <section class="card sticky">
-            <h3 class="section-title">Foreign keys — outbound ({{ outFks().length }})</h3>
-            @if (outFks().length === 0) {
-              <p class="muted small">None.</p>
-            } @else {
-              <ul class="rel-list">
-                @for (f of outFks(); track f.childCol + f.parentTable + f.parentCol) {
-                  <li>
-                    <code class="mono small">{{ f.childCol }}</code>
-                    <span class="arrow">→</span>
-                    <a class="parent-link mono small"
-                       [routerLink]="['/jobs', jobId, 'tables', f.parentTable]">
-                      {{ f.parentTable }}.{{ f.parentCol }}
-                    </a>
-                    @if (f.confidence !== null) {
-                      <span class="conf">{{ f.confidence!.toFixed(2) }}</span>
-                    }
-                    @if (f.cardinality) {
-                      <span class="card-tag">{{ cardLabel(f.cardinality) }}</span>
-                    }
-                  </li>
-                }
-              </ul>
-            }
-          </section>
+          <section class="card panel">
+            <header class="panel-head">
+              <h3 class="panel-title">relationships ({{ outFks().length + inFks().length }})</h3>
+            </header>
 
-          <section class="card">
-            <h3 class="section-title">Foreign keys — inbound ({{ inFks().length }})</h3>
-            @if (inFks().length === 0) {
-              <p class="muted small">None.</p>
-            } @else {
-              <ul class="rel-list">
-                @for (f of inFks(); track f.childTable + f.childCol + f.parentCol) {
-                  <li>
-                    <a class="parent-link mono small"
-                       [routerLink]="['/jobs', jobId, 'tables', f.childTable]">
-                      {{ f.childTable }}.{{ f.childCol }}
+            @if (outFks().length + inFks().length === 0) {
+              <p class="muted small">No relationships discovered.</p>
+            }
+
+            @for (g of groupedRelationships(); track g.type) {
+              <div class="rel-group">
+                <div class="rel-group-head">
+                  <div class="rel-group-name" [style.color]="relTypeColor(g.type)">
+                    {{ relTypeLabel(g.type) }}
+                  </div>
+                  <div class="rel-group-sub muted small">{{ relTypeSubtitle(g.type) }}</div>
+                </div>
+
+                @if (g.outbound.length > 0) {
+                  <div class="rel-direction">→ references</div>
+                  @for (f of g.outbound; track f.parentTable + f.childCol + f.parentCol) {
+                    <a class="rel-card"
+                       [routerLink]="['/jobs', jobId, 'tables', f.parentTable]"
+                       [queryParams]="{ view: 'table' }">
+                      <div class="rel-card-head">
+                        <span class="rel-target mono">{{ f.parentTable }}</span>
+                      </div>
+                      <div class="rel-mappings">
+                        <span class="map-row">
+                          <span class="col-pill">{{ f.childCol }}</span>
+                          <span class="map-arrow">→</span>
+                          <span class="col-pill">{{ f.parentCol }}</span>
+                        </span>
+                      </div>
+                      <div class="rel-foot muted small">
+                        @if (f.cardinality) {
+                          <span class="card-tag">{{ cardLabel(f.cardinality) }}</span>
+                        }
+                        @if (f.confidence !== null) {
+                          <span class="conf">conf {{ f.confidence!.toFixed(2) }}</span>
+                        }
+                      </div>
                     </a>
-                    <span class="arrow">→</span>
-                    <code class="mono small">{{ f.parentCol }}</code>
-                    @if (f.confidence !== null) {
-                      <span class="conf">{{ f.confidence!.toFixed(2) }}</span>
-                    }
-                    @if (f.cardinality) {
-                      <span class="card-tag">{{ cardLabel(f.cardinality) }}</span>
-                    }
-                  </li>
+                  }
                 }
-              </ul>
+
+                @if (g.inbound.length > 0) {
+                  <div class="rel-direction">← referenced by</div>
+                  @for (f of g.inbound; track f.childTable + f.childCol + f.parentCol) {
+                    <a class="rel-card"
+                       [routerLink]="['/jobs', jobId, 'tables', f.childTable]"
+                       [queryParams]="{ view: 'table' }">
+                      <div class="rel-card-head">
+                        <span class="rel-target mono">{{ f.childTable }}</span>
+                      </div>
+                      <div class="rel-mappings">
+                        <span class="map-row">
+                          <span class="col-pill">{{ f.childCol }}</span>
+                          <span class="map-arrow">→</span>
+                          <span class="col-pill">{{ f.parentCol }}</span>
+                        </span>
+                      </div>
+                      <div class="rel-foot muted small">
+                        @if (f.cardinality) {
+                          <span class="card-tag">{{ cardLabel(f.cardinality) }}</span>
+                        }
+                        @if (f.confidence !== null) {
+                          <span class="conf">conf {{ f.confidence!.toFixed(2) }}</span>
+                        }
+                      </div>
+                    </a>
+                  }
+                }
+              </div>
             }
           </section>
         </aside>
@@ -425,6 +425,144 @@ interface FkRow {
     .score-mid  { color: #d29922; }
     .score-low  { color: #8b949e; }
 
+    /* === queryviz-flavoured panel + fields/relationships layout === */
+
+    .panel { padding: 0; overflow: hidden; }
+    .panel-head {
+      padding: 14px 18px;
+      border-bottom: 1px solid #30363d;
+      background: #1c222b;
+    }
+    .panel-title {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: #c9d1d9;
+      text-transform: lowercase;
+      letter-spacing: 0;
+    }
+
+    /* Fields table (left column) */
+    table.fields {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    table.fields th {
+      text-align: left;
+      padding: 10px 14px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #8b949e;
+      text-transform: lowercase;
+      letter-spacing: 0;
+      border-bottom: 1px solid #21262d;
+      background: transparent;
+      position: static;
+    }
+    table.fields th.num { text-align: right; }
+    table.fields th.center { text-align: center; }
+    table.fields td {
+      padding: 8px 14px;
+      border-bottom: 1px solid #1c222b;
+      vertical-align: middle;
+    }
+    table.fields tr:last-child td { border-bottom: none; }
+    table.fields tr:hover td { background: #1c222b; }
+    .field-name {
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 13px;
+      font-weight: 500;
+      color: #e6edf3;
+      text-transform: uppercase;
+      letter-spacing: 0.2px;
+    }
+    .lower { text-transform: lowercase; }
+    .key-col { width: 60px; }
+    .dash { color: #484f58; }
+
+    /* Relationships panel (right column) */
+    .rel-group {
+      padding: 14px 18px;
+      border-bottom: 1px solid #21262d;
+    }
+    .rel-group:last-child { border-bottom: none; }
+    .rel-group-head { margin-bottom: 8px; }
+    .rel-group-name {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: lowercase;
+    }
+    .rel-group-sub {
+      margin-top: 1px;
+      font-size: 11px;
+    }
+    .rel-direction {
+      font-size: 10px;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: #8b949e;
+      margin: 10px 0 6px;
+    }
+    .rel-card {
+      display: block;
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      text-decoration: none;
+      transition: border-color 0.12s, transform 0.12s;
+      cursor: pointer;
+    }
+    .rel-card:hover {
+      border-color: #58a6ff;
+      transform: translateY(-1px);
+    }
+    .rel-card-head { margin-bottom: 6px; }
+    .rel-target {
+      font-weight: 600;
+      font-size: 13px;
+      color: #e6edf3;
+      letter-spacing: -0.2px;
+    }
+    .rel-mappings { margin: 4px 0 6px; }
+    .map-row {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .col-pill {
+      display: inline-block;
+      background: #1c222b;
+      color: #c9d1d9;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+    }
+    .map-arrow { color: #6e7681; font-size: 11px; }
+    .rel-foot {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      align-items: baseline;
+    }
+    .rel-foot .card-tag {
+      font-size: 10px;
+      letter-spacing: 0.4px;
+      color: #c9d1d9;
+      text-transform: uppercase;
+    }
+    .rel-foot .conf {
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 10px;
+      color: #6e7681;
+    }
+
     .rel-list {
       list-style: none;
       margin: 0;
@@ -604,6 +742,78 @@ export class TableCardPageComponent implements OnInit {
   );
 
   piiCount = computed(() => this.piiRows().length);
+
+  // Relationship-type grouping ------------------------------------------
+  // 5-bucket classifier matching the relationship-graph component's
+  // colour palette: header_item / master_lookup / config / text / history.
+  // Outbound + inbound FKs are grouped under the same type so the queryviz
+  // panel shows "header / item → references {N}" + "← referenced by {M}"
+  // sub-sections within each group.
+
+  groupedRelationships = computed(() => {
+    const all = [
+      ...this.outFks().map(f => ({ ...f, dir: 'out' as const })),
+      ...this.inFks().map(f => ({ ...f, dir: 'in' as const })),
+    ];
+    const groups = new Map<RelType, { outbound: FkRow[]; inbound: FkRow[] }>();
+    for (const f of all) {
+      const t = this.classifyRelType(f);
+      const g = groups.get(t) ?? { outbound: [], inbound: [] };
+      if (f.dir === 'out') g.outbound.push(f);
+      else g.inbound.push(f);
+      groups.set(t, g);
+    }
+    // Stable type order — most common first.
+    const order: RelType[] = ['header_item', 'master_lookup', 'config', 'text', 'history'];
+    const out: { type: RelType; outbound: FkRow[]; inbound: FkRow[] }[] = [];
+    for (const t of order) {
+      const g = groups.get(t);
+      if (g) out.push({ type: t, ...g });
+    }
+    return out;
+  });
+
+  private classifyRelType(f: FkRow): RelType {
+    const childT = f.childTable.toLowerCase();
+    const parentT = f.parentTable.toLowerCase();
+    const join = `${f.childCol} → ${f.parentCol}`.toLowerCase();
+    if (/_audit|_log|_history|_event|change_log/.test(childT) ||
+        /_audit|_log|_history|_event|change_log/.test(parentT)) return 'history';
+    if (/config|setting|policy|rule|param/.test(parentT)) return 'config';
+    if (/_text|_desc|_note|_message|_comment|_summary|_body/.test(join)) return 'text';
+    if (/status|category|country|language|currency|type|kind|locale|state|region|department|priority|level|code$/.test(parentT)) return 'master_lookup';
+    return 'header_item';
+  }
+
+  relTypeLabel(t: RelType): string {
+    switch (t) {
+      case 'header_item':   return 'header / item';
+      case 'master_lookup': return 'master lookup';
+      case 'config':        return 'config';
+      case 'text':          return 'text';
+      case 'history':       return 'history';
+    }
+  }
+
+  relTypeSubtitle(t: RelType): string {
+    switch (t) {
+      case 'header_item':   return 'regular FK relationships between transactional tables';
+      case 'master_lookup': return 'references to a tiny dictionary / vocabulary table';
+      case 'config':        return 'links into configuration / policy / rule tables';
+      case 'text':          return 'free-form prose columns (notes / description / body)';
+      case 'history':       return 'historical / audit / event tracking records';
+    }
+  }
+
+  relTypeColor(t: RelType): string {
+    switch (t) {
+      case 'header_item':   return '#58a6ff';
+      case 'master_lookup': return '#3fb950';
+      case 'config':        return '#bc8cff';
+      case 'text':          return '#d29922';
+      case 'history':       return '#8b949e';
+    }
+  }
 
   // Helpers --------------------------------------------------------------
 
