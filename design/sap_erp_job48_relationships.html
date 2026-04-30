@@ -1,0 +1,242 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.wrap{font-family:var(--font-sans,sans-serif);color:var(--color-text-primary)}
+.toolbar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:0.5px solid var(--color-border-tertiary);flex-wrap:wrap}
+.toolbar-title{font-size:14px;font-weight:500;margin-right:4px}
+.count-badge{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--color-background-info);color:var(--color-text-info);font-weight:500}
+.filter-group{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.fchip{font-size:11px;padding:4px 10px;border-radius:16px;border:0.5px solid var(--color-border-tertiary);cursor:pointer;background:var(--color-background-primary);color:var(--color-text-secondary);transition:all .15s}
+.fchip.on{border-color:var(--color-border-info);background:var(--color-background-info);color:var(--color-text-info)}
+.search-wrap{padding:10px 16px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.search-wrap input{width:100%;font-size:12px;padding:7px 12px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-primary)}
+.col-header{display:grid;grid-template-columns:28px 1fr 90px 70px 60px 72px;gap:6px;align-items:center;padding:7px 16px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary)}
+.ch{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--color-text-secondary);font-weight:500;cursor:pointer;user-select:none}
+.ch:hover{color:var(--color-text-primary)}
+.rel-row{display:grid;grid-template-columns:28px 1fr 90px 70px 60px 72px;gap:6px;align-items:center;padding:9px 16px;border-bottom:0.5px solid var(--color-border-tertiary);cursor:pointer;transition:background .12s;font-size:12px}
+.rel-row:last-child{border-bottom:none}
+.rel-row:hover{background:var(--color-background-secondary)}
+.rel-row.expanded{background:var(--color-background-info)}
+.rank{font-size:11px;color:var(--color-text-tertiary);text-align:center}
+.pair-cell{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+.tbl{font-weight:500;font-size:12px;white-space:nowrap}
+.col-chip{font-size:10px;padding:1px 6px;border-radius:4px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);font-family:var(--font-mono,monospace);color:var(--color-text-secondary);white-space:nowrap}
+.arr{color:var(--color-text-tertiary);font-size:11px}
+.score-cell{display:flex;align-items:center;gap:5px}
+.sbar-w{width:48px;height:5px;border-radius:3px;background:var(--color-border-tertiary);overflow:hidden;flex-shrink:0}
+.sbar{height:100%;border-radius:3px}
+.sval{font-size:11px;font-family:var(--font-mono,monospace);min-width:28px}
+.card-tag{font-size:10px;padding:2px 7px;border-radius:10px;text-align:center;font-weight:500;white-space:nowrap}
+.tag-high{background:var(--color-background-success);color:var(--color-text-success)}
+.tag-med{background:var(--color-background-warning);color:var(--color-text-warning)}
+.tag-low{background:var(--color-background-secondary);color:var(--color-text-secondary)}
+.card-cell{font-size:11px;color:var(--color-text-secondary);font-family:var(--font-mono,monospace)}
+.detail-panel{padding:12px 16px 12px 52px;background:var(--color-background-info);border-bottom:0.5px solid var(--color-border-info);display:none;grid-column:1/-1}
+.detail-panel.open{display:block}
+.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
+.dcard{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:8px 12px}
+.dlabel{font-size:10px;color:var(--color-text-secondary);margin-bottom:3px}
+.dval{font-size:13px;font-weight:500}
+.detail-btns{display:flex;gap:6px}
+.footer{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary)}
+.footer-info{font-size:11px;color:var(--color-text-secondary)}
+</style>
+
+<div class="wrap" style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden">
+
+  <div class="toolbar">
+    <span class="toolbar-title">Relationships</span>
+    <span class="count-badge" id="count-badge">31 results</span>
+    <div class="filter-group">
+      <span class="fchip on" onclick="setFilter('all',this)">All</span>
+      <span class="fchip" onclick="setFilter('high',this)">High ≥0.80</span>
+      <span class="fchip" onclick="setFilter('med',this)">Med 0.60–0.79</span>
+      <span class="fchip" onclick="setFilter('1:N',this)">1:N</span>
+      <span class="fchip" onclick="setFilter('N:1',this)">N:1</span>
+      <span class="fchip" onclick="setFilter('1:1',this)">1:1</span>
+    </div>
+  </div>
+
+  <div class="search-wrap">
+    <input type="text" id="search-box" placeholder="Search table or column name…" oninput="applyFilters()">
+  </div>
+
+  <div class="col-header">
+    <span class="ch">#</span>
+    <span class="ch" onclick="sortBy('pair')">Table pair &#8597;</span>
+    <span class="ch" onclick="sortBy('score')">Score &#8597;</span>
+    <span class="ch" onclick="sortBy('card')">Cardinality &#8597;</span>
+    <span class="ch">Domain</span>
+    <span class="ch">Confidence</span>
+  </div>
+
+  <div id="rel-list"></div>
+
+  <div class="footer">
+    <span class="footer-info" id="footer-info">Showing 31 of 31 · Job #48 · SAP ERP</span>
+    <button onclick="sendPrompt('Export all 31 SAP ERP job #48 relationships as JSON output')">Export JSON ↗</button>
+  </div>
+</div>
+
+<script>
+const rels = [
+  {a:'KNA1',ca:'KUNNR',b:'VBAK',cb:'KUNNR',score:.97,card:'1:N',domain:'Customer',lib:'Valentine+RapidFuzz'},
+  {a:'VBAK',ca:'VBELN',b:'VBAP',cb:'VBELN',score:.96,card:'1:N',domain:'Sales',lib:'Valentine+RapidFuzz'},
+  {a:'MARA',ca:'MATNR',b:'MARC',cb:'MATNR',score:.95,card:'1:N',domain:'Inventory',lib:'Valentine+RapidFuzz'},
+  {a:'LFA1',ca:'LIFNR',b:'EKKO',cb:'LIFNR',score:.94,card:'1:N',domain:'Procurement',lib:'Valentine+RapidFuzz'},
+  {a:'EKKO',ca:'EBELN',b:'EKPO',cb:'EBELN',score:.93,card:'1:N',domain:'Procurement',lib:'Valentine+RapidFuzz'},
+  {a:'PA0001',ca:'PERNR',b:'PA0008',cb:'PERNR',score:.92,card:'1:1',domain:'HR',lib:'Valentine+RapidFuzz'},
+  {a:'BKPF',ca:'BELNR',b:'BSEG',cb:'BELNR',score:.91,card:'1:N',domain:'Finance',lib:'Valentine+RapidFuzz'},
+  {a:'VBAK',ca:'VBELN',b:'LIKP',cb:'VBELN',score:.89,card:'1:N',domain:'Logistics',lib:'Valentine+spaCy'},
+  {a:'KNA1',ca:'KUNNR',b:'KNVV',cb:'KUNNR',score:.88,card:'1:N',domain:'Customer',lib:'Valentine+RapidFuzz'},
+  {a:'MARA',ca:'MATNR',b:'MBEW',cb:'MATNR',score:.87,card:'1:1',domain:'Inventory',lib:'Valentine+RapidFuzz'},
+  {a:'CSKT',ca:'KOSTL',b:'COEP',cb:'KOSTL',score:.86,card:'1:N',domain:'Finance',lib:'RapidFuzz'},
+  {a:'T001',ca:'BUKRS',b:'BKPF',cb:'BUKRS',score:.85,card:'1:N',domain:'Finance',lib:'Valentine+RapidFuzz'},
+  {a:'LIKP',ca:'VBELN',b:'LIPS',cb:'VBELN',score:.84,card:'1:N',domain:'Logistics',lib:'Valentine+RapidFuzz'},
+  {a:'VBAP',ca:'MATNR',b:'MARA',cb:'MATNR',score:.83,card:'N:1',domain:'Sales',lib:'Valentine+RapidFuzz'},
+  {a:'PA0001',ca:'ORGEH',b:'T527X',cb:'ORGEH',score:.82,card:'N:1',domain:'HR',lib:'Valentine+RapidFuzz'},
+  {a:'EKPO',ca:'MATNR',b:'MARA',cb:'MATNR',score:.81,card:'N:1',domain:'Procurement',lib:'Valentine+RapidFuzz'},
+  {a:'KNB1',ca:'KUNNR',b:'KNA1',cb:'KUNNR',score:.80,card:'N:1',domain:'Customer',lib:'Valentine+RapidFuzz'},
+  {a:'AUFK',ca:'AUFNR',b:'AFKO',cb:'AUFNR',score:.78,card:'1:1',domain:'Production',lib:'RapidFuzz'},
+  {a:'VBAK',ca:'KUNNR',b:'KNA1',cb:'KUNNR',score:.77,card:'N:1',domain:'Sales',lib:'RapidFuzz'},
+  {a:'BSEG',ca:'HKONT',b:'SKA1',cb:'SAKNR',score:.76,card:'N:1',domain:'Finance',lib:'RapidFuzz+spaCy'},
+  {a:'MARC',ca:'WERKS',b:'T001W',cb:'WERKS',score:.75,card:'N:1',domain:'Inventory',lib:'Valentine+RapidFuzz'},
+  {a:'EKPO',ca:'WERKS',b:'T001W',cb:'WERKS',score:.74,card:'N:1',domain:'Procurement',lib:'RapidFuzz'},
+  {a:'LIPS',ca:'MATNR',b:'MARA',cb:'MATNR',score:.73,card:'N:1',domain:'Logistics',lib:'Valentine+RapidFuzz'},
+  {a:'COEP',ca:'OBJNR',b:'AUFK',cb:'OBJNR',score:.72,card:'N:1',domain:'Finance',lib:'RapidFuzz+spaCy'},
+  {a:'T527X',ca:'MANDT',b:'PA0001',cb:'MANDT',score:.70,card:'1:N',domain:'HR',lib:'RapidFuzz'},
+  {a:'VBFA',ca:'VBELV',b:'VBAK',cb:'VBELN',score:.69,card:'N:1',domain:'Sales',lib:'spaCy'},
+  {a:'AFKO',ca:'PLNNR',b:'MAPL',cb:'PLNNR',score:.67,card:'N:1',domain:'Production',lib:'RapidFuzz'},
+  {a:'KONV',ca:'KNUMV',b:'VBAK',cb:'KNUMV',score:.65,card:'N:1',domain:'Sales',lib:'RapidFuzz'},
+  {a:'BSAK',ca:'LIFNR',b:'LFA1',cb:'LIFNR',score:.63,card:'N:1',domain:'Finance',lib:'spaCy'},
+  {a:'MAKT',ca:'MATNR',b:'MARA',cb:'MATNR',score:.62,card:'N:1',domain:'Inventory',lib:'spaCy'},
+  {a:'JEST',ca:'OBJNR',b:'AFKO',cb:'OBJNR',score:.61,card:'N:1',domain:'Production',lib:'spaCy'},
+];
+
+const domainColors = {
+  Customer:'var(--color-text-info)',Sales:'var(--color-text-success)',
+  Finance:'var(--color-text-warning)',Inventory:'var(--color-text-secondary)',
+  Procurement:'var(--color-text-danger)',HR:'#8b5cf6',
+  Logistics:'var(--color-text-secondary)',Production:'#0891b2'
+};
+const domainBg = {
+  Customer:'var(--color-background-info)',Sales:'var(--color-background-success)',
+  Finance:'var(--color-background-warning)',Inventory:'var(--color-background-secondary)',
+  Procurement:'var(--color-background-danger)',HR:'rgba(139,92,246,.12)',
+  Logistics:'var(--color-background-secondary)',Production:'rgba(8,145,178,.12)'
+};
+
+let activeFilter='all', openRow=-1, sortKey='score', sortDir=-1;
+
+function scoreColor(s){
+  if(s>=0.80)return'var(--color-text-success)';
+  if(s>=0.60)return'var(--color-text-warning)';
+  return'var(--color-text-secondary)';
+}
+function confTag(s){
+  if(s>=0.80)return['tag-high','High'];
+  if(s>=0.60)return['tag-med','Medium'];
+  return['tag-low','Low'];
+}
+
+function getFiltered(){
+  const q=(document.getElementById('search-box')||{}).value?.toLowerCase()||'';
+  return rels.filter(r=>{
+    const txt=(r.a+r.ca+r.b+r.cb).toLowerCase();
+    if(q && !txt.includes(q))return false;
+    if(activeFilter==='high') return r.score>=0.80;
+    if(activeFilter==='med') return r.score>=0.60&&r.score<0.80;
+    if(activeFilter==='1:N') return r.card==='1:N';
+    if(activeFilter==='N:1') return r.card==='N:1';
+    if(activeFilter==='1:1') return r.card==='1:1';
+    return true;
+  }).sort((a,b)=>{
+    if(sortKey==='score')return sortDir*(a.score-b.score);
+    if(sortKey==='pair')return sortDir*(a.a+a.b).localeCompare(b.a+b.b);
+    if(sortKey==='card')return sortDir*a.card.localeCompare(b.card);
+    return 0;
+  });
+}
+
+function render(){
+  const data=getFiltered();
+  document.getElementById('count-badge').textContent=data.length+' results';
+  document.getElementById('footer-info').textContent='Showing '+data.length+' of 31 · Job #48 · SAP ERP';
+  const list=document.getElementById('rel-list');
+  list.innerHTML='';
+  data.forEach((r,i)=>{
+    const globalIdx=rels.indexOf(r);
+    const pct=Math.round(r.score*100);
+    const [tc,tl]=confTag(r.score);
+    const sc=scoreColor(r.score);
+    const dc=domainColors[r.domain]||'var(--color-text-secondary)';
+    const db=domainBg[r.domain]||'var(--color-background-secondary)';
+    const wrap=document.createElement('div');
+    wrap.style.cssText='display:contents';
+    const row=document.createElement('div');
+    row.className='rel-row';
+    row.id='row-'+globalIdx;
+    row.innerHTML=`
+      <span class="rank">${i+1}</span>
+      <div class="pair-cell">
+        <span class="tbl">${r.a}</span>
+        <span class="col-chip">${r.ca}</span>
+        <span class="arr">&#8594;</span>
+        <span class="tbl">${r.b}</span>
+        <span class="col-chip">${r.cb}</span>
+      </div>
+      <div class="score-cell">
+        <div class="sbar-w"><div class="sbar" style="width:${pct}%;background:${sc}"></div></div>
+        <span class="sval" style="color:${sc}">${r.score.toFixed(2)}</span>
+      </div>
+      <span class="card-cell">${r.card}</span>
+      <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:${db};color:${dc};font-weight:500;white-space:nowrap">${r.domain}</span>
+      <span class="card-tag ${tc}">${tl}</span>
+    `;
+    row.onclick=()=>toggleDetail(globalIdx,r);
+    list.appendChild(row);
+    const det=document.createElement('div');
+    det.className='detail-panel';
+    det.id='det-'+globalIdx;
+    det.innerHTML=`
+      <div class="detail-grid">
+        <div class="dcard"><div class="dlabel">Match library</div><div class="dval" style="font-size:12px;font-family:var(--font-mono,monospace)">${r.lib}</div></div>
+        <div class="dcard"><div class="dlabel">Raw score</div><div class="dval">${r.score.toFixed(3)}</div></div>
+        <div class="dcard"><div class="dlabel">Cardinality</div><div class="dval">${r.card}</div></div>
+      </div>
+      <div class="detail-btns">
+        <button onclick="sendPrompt('Show me sample data for the join: ${r.a}.${r.ca} → ${r.b}.${r.cb}')">Sample join ↗</button>
+        <button onclick="sendPrompt('Explain why ${r.a}.${r.ca} → ${r.b}.${r.cb} was matched by ${r.lib}')">Why matched? ↗</button>
+        <button onclick="sendPrompt('Show ERD subgraph for ${r.domain} domain tables in SAP ERP')">Domain ERD ↗</button>
+      </div>
+    `;
+    list.appendChild(det);
+  });
+}
+
+function toggleDetail(idx,r){
+  const det=document.getElementById('det-'+idx);
+  const row=document.getElementById('row-'+idx);
+  if(!det)return;
+  const isOpen=det.classList.contains('open');
+  document.querySelectorAll('.detail-panel.open').forEach(d=>d.classList.remove('open'));
+  document.querySelectorAll('.rel-row.expanded').forEach(r=>r.classList.remove('expanded'));
+  if(!isOpen){det.classList.add('open');row.classList.add('expanded');}
+}
+
+function setFilter(f,el){
+  activeFilter=f;
+  document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  applyFilters();
+}
+
+function applyFilters(){render();}
+
+function sortBy(k){
+  if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=-1;}
+  render();
+}
+
+render();
+</script>

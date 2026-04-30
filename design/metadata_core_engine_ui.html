@@ -1,0 +1,626 @@
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy: #0f1623;
+    --navy2: #182030;
+    --navy3: #1e2a3d;
+    --slate: #2a3a56;
+    --accent: #4f8ef7;
+    --accent2: #38d9a9;
+    --accent3: #f6a623;
+    --accent4: #e05c5c;
+    --muted: #6b7fa8;
+    --text: #c8d6f0;
+    --text2: #8ba0c8;
+    --border: rgba(79,142,247,0.15);
+    --card: rgba(30,42,61,0.7);
+    --radius: 10px;
+  }
+  body, html { background: transparent; color: var(--text); font-family: var(--font-sans, sans-serif); }
+  .root { padding: 0 0 24px; }
+
+  /* TOP BAR */
+  .topbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 20px; border-bottom: 0.5px solid var(--border);
+    background: rgba(15,22,35,0.6);
+  }
+  .logo-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+  .logo-text { font-size: 14px; font-weight: 500; color: var(--text); letter-spacing: .5px; }
+  .logo-sub { font-size: 11px; color: var(--muted); margin-left: 2px; }
+  .topbar-tabs { display: flex; gap: 2px; margin-left: auto; }
+  .ttab {
+    font-size: 12px; padding: 5px 14px; border-radius: 6px; cursor: pointer;
+    color: var(--muted); border: none; background: transparent; transition: all .18s;
+  }
+  .ttab.active { background: var(--accent); color: #fff; }
+  .ttab:hover:not(.active) { background: var(--slate); color: var(--text); }
+  .topbar-status { display: flex; align-items: center; gap: 6px; margin-left: 14px; font-size: 11px; color: var(--accent2); }
+  .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+
+  /* LAYOUT */
+  .main-layout { display: grid; grid-template-columns: 220px 1fr; gap: 0; min-height: 480px; }
+  .sidebar { border-right: 0.5px solid var(--border); padding: 16px 0; background: rgba(15,22,35,0.3); }
+  .sidebar-section { padding: 6px 16px; margin-bottom: 2px; }
+  .sidebar-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+  .nav-item {
+    display: flex; align-items: center; gap: 9px; padding: 8px 12px;
+    border-radius: 7px; cursor: pointer; font-size: 13px; color: var(--text2);
+    transition: all .15s; margin-bottom: 1px;
+  }
+  .nav-item.active { background: rgba(79,142,247,0.15); color: var(--accent); }
+  .nav-item:hover:not(.active) { background: var(--slate); color: var(--text); }
+  .nav-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .nav-badge { margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 10px; background: var(--slate); color: var(--muted); }
+  .nav-badge.hot { background: rgba(230,92,92,0.2); color: var(--accent4); }
+
+  /* CONTENT */
+  .content { padding: 20px 22px; overflow: auto; }
+
+  /* STAT CARDS */
+  .stat-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+  .stat-card {
+    background: var(--card); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+  }
+  .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .stat-val { font-size: 22px; font-weight: 500; }
+  .stat-sub { font-size: 11px; margin-top: 4px; }
+  .c-blue { color: var(--accent); }
+  .c-green { color: var(--accent2); }
+  .c-amber { color: var(--accent3); }
+  .c-red { color: var(--accent4); }
+
+  /* STAGE PIPELINE */
+  .pipeline-row {
+    display: flex; gap: 8px; margin-bottom: 20px;
+    background: var(--card); border: 0.5px solid var(--border);
+    border-radius: var(--radius); padding: 14px 18px; align-items: center;
+  }
+  .stage {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    flex: 1; cursor: pointer;
+  }
+  .stage-icon {
+    width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; position: relative;
+  }
+  .stage-icon.done { background: rgba(56,217,169,0.15); }
+  .stage-icon.running { background: rgba(79,142,247,0.2); animation: shimmer 1.2s ease-in-out infinite; }
+  .stage-icon.pending { background: rgba(107,127,168,0.1); }
+  @keyframes shimmer { 0%,100%{opacity:1} 50%{opacity:.55} }
+  .stage-name { font-size: 10px; color: var(--muted); text-align: center; }
+  .stage-status { font-size: 10px; font-weight: 500; }
+  .stage-status.done { color: var(--accent2); }
+  .stage-status.running { color: var(--accent); }
+  .stage-status.pending { color: var(--muted); }
+  .pipe-arrow { color: var(--muted); font-size: 16px; flex-shrink: 0; }
+
+  /* TWO-COLUMN GRID */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+
+  /* RELATIONSHIP TABLE */
+  .panel {
+    background: var(--card); border: 0.5px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 16px; border-bottom: 0.5px solid var(--border);
+  }
+  .panel-title { font-size: 13px; font-weight: 500; }
+  .panel-action { font-size: 11px; color: var(--accent); cursor: pointer; }
+  .rel-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px; border-bottom: 0.5px solid rgba(79,142,247,0.07);
+    font-size: 12px; cursor: pointer; transition: background .12s;
+  }
+  .rel-row:last-child { border-bottom: none; }
+  .rel-row:hover { background: rgba(79,142,247,0.06); }
+  .tname { font-weight: 500; font-size: 12px; color: var(--text); min-width: 70px; }
+  .col-chip { font-size: 10px; padding: 2px 7px; border-radius: 4px; background: rgba(79,142,247,0.12); color: var(--accent); font-family: var(--font-mono, monospace); }
+  .arrow-icon { color: var(--muted); font-size: 13px; }
+  .card-tag { font-size: 10px; padding: 2px 7px; border-radius: 4px; margin-left: auto; }
+  .card-tag.high { background: rgba(56,217,169,0.15); color: var(--accent2); }
+  .card-tag.med { background: rgba(246,166,35,0.15); color: var(--accent3); }
+  .card-tag.low { background: rgba(107,127,168,0.12); color: var(--muted); }
+  .score-bar-wrap { width: 42px; height: 5px; border-radius: 3px; background: rgba(107,127,168,0.2); overflow: hidden; }
+  .score-bar { height: 100%; border-radius: 3px; }
+
+  /* DOMAIN CLUSTERS */
+  .cluster-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px; }
+  .cluster-card {
+    border: 0.5px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; cursor: pointer; transition: border-color .15s;
+  }
+  .cluster-card:hover { border-color: var(--accent); }
+  .cluster-name { font-size: 12px; font-weight: 500; margin-bottom: 6px; }
+  .cluster-tables { display: flex; flex-wrap: wrap; gap: 4px; }
+  .tbl-pill { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: rgba(107,127,168,0.15); color: var(--text2); }
+
+  /* SENSITIVE */
+  .sens-row {
+    display: flex; align-items: center; gap: 10px; padding: 9px 16px;
+    border-bottom: 0.5px solid rgba(79,142,247,0.07); font-size: 12px; cursor: pointer;
+    transition: background .12s;
+  }
+  .sens-row:hover { background: rgba(230,92,92,0.04); }
+  .sens-row:last-child { border-bottom: none; }
+  .sens-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; }
+  .sens-icon.pii { background: rgba(230,92,92,0.15); }
+  .sens-icon.fin { background: rgba(246,166,35,0.15); }
+  .sens-icon.hc { background: rgba(79,142,247,0.15); }
+  .sens-cat { font-size: 10px; padding: 2px 7px; border-radius: 4px; margin-left: auto; }
+  .sens-cat.PII { background: rgba(230,92,92,0.15); color: var(--accent4); }
+  .sens-cat.FIN { background: rgba(246,166,35,0.15); color: var(--accent3); }
+  .sens-cat.PHI { background: rgba(79,142,247,0.15); color: var(--accent); }
+
+  /* ERD MINI GRAPH */
+  .erd-wrap { padding: 14px; }
+  .erd-svg { width: 100%; }
+
+  /* JOB LOG */
+  .log-area { padding: 10px 16px; font-size: 11px; font-family: var(--font-mono, monospace); }
+  .log-line { padding: 3px 0; border-bottom: 0.5px solid rgba(79,142,247,0.05); display: flex; gap: 10px; }
+  .log-time { color: var(--muted); flex-shrink: 0; }
+  .log-stage { color: var(--accent); flex-shrink: 0; min-width: 80px; }
+  .log-msg { color: var(--text2); }
+  .log-ok { color: var(--accent2); }
+  .log-warn { color: var(--accent3); }
+
+  /* BOTTOM ACTION BAR */
+  .action-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 20px; border-top: 0.5px solid var(--border);
+    background: rgba(15,22,35,0.4);
+  }
+  .btn {
+    font-size: 12px; padding: 7px 16px; border-radius: 7px; cursor: pointer; border: none;
+    font-weight: 500; transition: all .15s;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #3a7ce0; }
+  .btn-ghost { background: transparent; border: 0.5px solid var(--border); color: var(--text2); }
+  .btn-ghost:hover { background: var(--slate); color: var(--text); }
+  .action-info { font-size: 11px; color: var(--muted); margin-left: auto; }
+</style>
+
+<div class="root">
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="logo-dot"></div>
+    <span class="logo-text">MetaCatalog</span>
+    <span class="logo-sub">Core Engine</span>
+    <div class="topbar-tabs">
+      <button class="ttab active" onclick="setView('dashboard')">Dashboard</button>
+      <button class="ttab" onclick="setView('jobs')">Jobs</button>
+      <button class="ttab" onclick="setView('profiles')">Profiles</button>
+    </div>
+    <div class="topbar-status"><div class="pulse"></div>Engine active</div>
+  </div>
+
+  <!-- SIDEBAR + CONTENT -->
+  <div class="main-layout">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Analysis</div>
+        <div class="nav-item active" onclick="switchTab('relationships')">
+          <div class="nav-dot" style="background:var(--accent)"></div>Relationships
+          <span class="nav-badge">24</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('domains')">
+          <div class="nav-dot" style="background:var(--accent2)"></div>Domain Groups
+          <span class="nav-badge">6</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('sensitive')">
+          <div class="nav-dot" style="background:var(--accent4)"></div>Sensitive Data
+          <span class="nav-badge hot">12</span>
+        </div>
+        <div class="nav-item" onclick="switchTab('erd')">
+          <div class="nav-dot" style="background:var(--accent3)"></div>ERD View
+        </div>
+      </div>
+      <div class="sidebar-section" style="margin-top:12px">
+        <div class="sidebar-label">Sources</div>
+        <div class="nav-item" onclick="sendPrompt('Show me more about the SAP source connection')">
+          <div class="nav-dot" style="background:var(--accent2)"></div>SAP ERP
+          <span class="nav-badge">148 tbls</span>
+        </div>
+        <div class="nav-item" onclick="sendPrompt('Show me more about the Sales DB source')">
+          <div class="nav-dot" style="background:var(--accent3)"></div>Sales DB
+          <span class="nav-badge">62 tbls</span>
+        </div>
+        <div class="nav-item" onclick="sendPrompt('Show me more about the Finance source connection')">
+          <div class="nav-dot" style="background:var(--muted)"></div>Finance DW
+          <span class="nav-badge">94 tbls</span>
+        </div>
+      </div>
+      <div class="sidebar-section" style="margin-top:12px">
+        <div class="sidebar-label">Library</div>
+        <div class="nav-item" style="cursor:default;font-size:11px;gap:6px">
+          <span style="color:var(--accent2);font-size:10px">●</span>Valentine
+        </div>
+        <div class="nav-item" style="cursor:default;font-size:11px;gap:6px">
+          <span style="color:var(--accent2);font-size:10px">●</span>RapidFuzz
+        </div>
+        <div class="nav-item" style="cursor:default;font-size:11px;gap:6px">
+          <span style="color:var(--accent2);font-size:10px">●</span>spaCy NLP
+        </div>
+        <div class="nav-item" style="cursor:default;font-size:11px;gap:6px">
+          <span style="color:var(--accent3);font-size:10px">◑</span>scikit-learn
+        </div>
+        <div class="nav-item" style="cursor:default;font-size:11px;gap:6px">
+          <span style="color:var(--muted);font-size:10px">○</span>NetworkX
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTENT AREA -->
+    <div class="content" id="content-area">
+
+      <!-- STAT CARDS -->
+      <div class="stat-row">
+        <div class="stat-card">
+          <div class="stat-label">Tables Crawled</div>
+          <div class="stat-val c-blue">304</div>
+          <div class="stat-sub" style="color:var(--accent2)">+12 since last run</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Relationships Found</div>
+          <div class="stat-val c-green">24</div>
+          <div class="stat-sub" style="color:var(--muted)">Avg score 0.84</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Sensitive Columns</div>
+          <div class="stat-val c-red">12</div>
+          <div class="stat-sub" style="color:var(--accent4)">3 HIGH risk</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Domain Clusters</div>
+          <div class="stat-val c-amber">6</div>
+          <div class="stat-sub" style="color:var(--muted)">DBSCAN auto-grouped</div>
+        </div>
+      </div>
+
+      <!-- PIPELINE STAGES -->
+      <div class="pipeline-row">
+        <div class="stage" onclick="sendPrompt('Tell me about the Schema Crawling stage using SchemaCrawler and SQLAlchemy')">
+          <div class="stage-icon done">🗂</div>
+          <div class="stage-name">Schema Crawl</div>
+          <div class="stage-status done">Done</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="stage" onclick="sendPrompt('Tell me about Valentine column matching and RapidFuzz scoring stage')">
+          <div class="stage-icon done">🔗</div>
+          <div class="stage-name">Matching</div>
+          <div class="stage-status done">Done</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="stage" onclick="sendPrompt('Tell me about the Cardinality detection stage using COUNT queries')">
+          <div class="stage-icon done">📊</div>
+          <div class="stage-name">Cardinality</div>
+          <div class="stage-status done">Done</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="stage" onclick="sendPrompt('Tell me about sensitive data detection using Presidio and spaCy')">
+          <div class="stage-icon running">🔐</div>
+          <div class="stage-name">PII Detect</div>
+          <div class="stage-status running">Running…</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="stage" onclick="sendPrompt('Tell me about domain clustering using sentence-transformers and DBSCAN')">
+          <div class="stage-icon pending">🧠</div>
+          <div class="stage-name">Clustering</div>
+          <div class="stage-status pending">Pending</div>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="stage" onclick="sendPrompt('Tell me about NetworkX graph building for ERD context')">
+          <div class="stage-icon pending">🕸</div>
+          <div class="stage-name">Graph Build</div>
+          <div class="stage-status pending">Pending</div>
+        </div>
+      </div>
+
+      <!-- MAIN PANELS (tabs) -->
+      <div id="tab-relationships">
+        <div class="two-col">
+          <!-- RELATIONSHIP TABLE -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Top Relationships</span>
+              <span class="panel-action" onclick="sendPrompt('Show me all 24 detected relationships with scores and cardinality')">View all →</span>
+            </div>
+            <div class="rel-row" onclick="sendPrompt('Explain the customer → orders relationship, how cardinality was detected')">
+              <span class="tname">customer</span>
+              <span class="col-chip">cust_id</span>
+              <span class="arrow-icon">→</span>
+              <span class="tname">orders</span>
+              <span class="col-chip">customer_id</span>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:92%;background:var(--accent2)"></div></div>
+              <span class="card-tag high">0.92 · 1:N</span>
+            </div>
+            <div class="rel-row" onclick="sendPrompt('Explain the orders → order_items relationship')">
+              <span class="tname">orders</span>
+              <span class="col-chip">order_id</span>
+              <span class="arrow-icon">→</span>
+              <span class="tname">order_items</span>
+              <span class="col-chip">order_id</span>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:89%;background:var(--accent2)"></div></div>
+              <span class="card-tag high">0.89 · 1:N</span>
+            </div>
+            <div class="rel-row" onclick="sendPrompt('Explain the employee → department relationship')">
+              <span class="tname">employee</span>
+              <span class="col-chip">dept_id</span>
+              <span class="arrow-icon">→</span>
+              <span class="tname">department</span>
+              <span class="col-chip">dept_id</span>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:78%;background:var(--accent3)"></div></div>
+              <span class="card-tag med">0.78 · N:1</span>
+            </div>
+            <div class="rel-row" onclick="sendPrompt('Explain the product → category relationship')">
+              <span class="tname">product</span>
+              <span class="col-chip">cat_id</span>
+              <span class="arrow-icon">→</span>
+              <span class="tname">category</span>
+              <span class="col-chip">category_id</span>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:71%;background:var(--accent3)"></div></div>
+              <span class="card-tag med">0.71 · N:1</span>
+            </div>
+            <div class="rel-row" onclick="sendPrompt('Explain the payment → invoice relationship')">
+              <span class="tname">payment</span>
+              <span class="col-chip">inv_no</span>
+              <span class="arrow-icon">→</span>
+              <span class="tname">invoice</span>
+              <span class="col-chip">invoice_num</span>
+              <div class="score-bar-wrap"><div class="score-bar" style="width:62%;background:var(--muted)"></div></div>
+              <span class="card-tag low">0.62 · 1:1</span>
+            </div>
+          </div>
+
+          <!-- SENSITIVE DATA -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Sensitive Columns</span>
+              <span class="panel-action" onclick="switchTab('sensitive')">All 12 →</span>
+            </div>
+            <div class="sens-row" onclick="sendPrompt('Tell me more about the employee SSN column — what detection method flagged it?')">
+              <div class="sens-icon pii">🔒</div>
+              <div>
+                <div style="font-size:12px;font-weight:500">employee.ssn</div>
+                <div style="font-size:10px;color:var(--muted)">Presidio · regex + NER</div>
+              </div>
+              <span class="sens-cat PII">PII</span>
+            </div>
+            <div class="sens-row" onclick="sendPrompt('Tell me about customer.email detection')">
+              <div class="sens-icon pii">🔒</div>
+              <div>
+                <div style="font-size:12px;font-weight:500">customer.email</div>
+                <div style="font-size:10px;color:var(--muted)">Presidio · pattern match</div>
+              </div>
+              <span class="sens-cat PII">PII</span>
+            </div>
+            <div class="sens-row" onclick="sendPrompt('Tell me about employee.salary detection')">
+              <div class="sens-icon fin">💰</div>
+              <div>
+                <div style="font-size:12px;font-weight:500">employee.salary</div>
+                <div style="font-size:10px;color:var(--muted)">spaCy · NLP classification</div>
+              </div>
+              <span class="sens-cat FIN">FINANCIAL</span>
+            </div>
+            <div class="sens-row" onclick="sendPrompt('Tell me about patient.diagnosis detection')">
+              <div class="sens-icon hc">🏥</div>
+              <div>
+                <div style="font-size:12px;font-weight:500">patient.diagnosis</div>
+                <div style="font-size:10px;color:var(--muted)">spaCy · medical NER</div>
+              </div>
+              <span class="sens-cat PHI">PHI</span>
+            </div>
+            <div class="sens-row" onclick="sendPrompt('Tell me about account.credit_card detection')">
+              <div class="sens-icon fin">💰</div>
+              <div>
+                <div style="font-size:12px;font-weight:500">account.credit_card</div>
+                <div style="font-size:10px;color:var(--muted)">Presidio · Luhn pattern</div>
+              </div>
+              <span class="sens-cat FIN">FINANCIAL</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- DOMAIN CLUSTERS + LOG -->
+        <div class="two-col">
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Domain Clusters</span>
+              <span class="panel-action" onclick="sendPrompt('Show me the full domain clustering results with all 6 clusters and embedding scores')">View all →</span>
+            </div>
+            <div class="cluster-grid">
+              <div class="cluster-card" onclick="sendPrompt('Tell me about the Customer domain cluster tables and how they were grouped')">
+                <div class="cluster-name c-blue">Customer</div>
+                <div class="cluster-tables">
+                  <span class="tbl-pill">customer</span>
+                  <span class="tbl-pill">orders</span>
+                  <span class="tbl-pill">addresses</span>
+                  <span class="tbl-pill">loyalty</span>
+                </div>
+              </div>
+              <div class="cluster-card" onclick="sendPrompt('Tell me about the Finance domain cluster')">
+                <div class="cluster-name c-amber">Finance</div>
+                <div class="cluster-tables">
+                  <span class="tbl-pill">payment</span>
+                  <span class="tbl-pill">invoice</span>
+                  <span class="tbl-pill">ledger</span>
+                </div>
+              </div>
+              <div class="cluster-card" onclick="sendPrompt('Tell me about the HR domain cluster')">
+                <div class="cluster-name c-green">HR</div>
+                <div class="cluster-tables">
+                  <span class="tbl-pill">employee</span>
+                  <span class="tbl-pill">department</span>
+                  <span class="tbl-pill">payroll</span>
+                </div>
+              </div>
+              <div class="cluster-card" onclick="sendPrompt('Tell me about the Inventory domain cluster')">
+                <div class="cluster-name" style="color:var(--accent2)">Inventory</div>
+                <div class="cluster-tables">
+                  <span class="tbl-pill">product</span>
+                  <span class="tbl-pill">category</span>
+                  <span class="tbl-pill">warehouse</span>
+                  <span class="tbl-pill">stock</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- JOB LOG -->
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">Job Log</span>
+              <span class="panel-action" onclick="sendPrompt('Give me the full job execution log with timings and errors')">Export →</span>
+            </div>
+            <div class="log-area">
+              <div class="log-line"><span class="log-time">09:14:02</span><span class="log-stage">[CRAWL]</span><span class="log-ok">Schema extracted · 304 tables</span></div>
+              <div class="log-line"><span class="log-time">09:14:18</span><span class="log-stage">[MATCH]</span><span class="log-ok">Valentine · 1,847 candidates</span></div>
+              <div class="log-line"><span class="log-time">09:14:29</span><span class="log-stage">[FUZZY]</span><span class="log-ok">RapidFuzz scored · 24 accepted</span></div>
+              <div class="log-line"><span class="log-time">09:14:45</span><span class="log-stage">[CARD]</span><span class="log-ok">COUNT queries · 24 pairs done</span></div>
+              <div class="log-line"><span class="log-time">09:15:01</span><span class="log-stage">[PII]</span><span class="log-msg" style="color:var(--accent)">Presidio scanning… 210/304</span></div>
+              <div class="log-line"><span class="log-time">09:15:01</span><span class="log-stage">[EMBED]</span><span class="log-msg">Waiting for PII stage…</span></div>
+              <div class="log-line"><span class="log-time">09:14:38</span><span class="log-stage">[WARN]</span><span class="log-warn">finance.acct_no — low confidence 0.51</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-domains" style="display:none">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Domain Clusters — DBSCAN auto-grouping</span></div>
+          <div class="cluster-grid" style="grid-template-columns:repeat(3,1fr);padding:16px">
+            <div class="cluster-card" onclick="sendPrompt('Explain how the Customer domain cluster was formed using embeddings')">
+              <div class="cluster-name c-blue" style="font-size:14px;margin-bottom:8px">Customer</div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:6px">4 tables · eps=0.31</div>
+              <div class="cluster-tables"><span class="tbl-pill">customer</span><span class="tbl-pill">orders</span><span class="tbl-pill">addresses</span><span class="tbl-pill">loyalty</span></div>
+            </div>
+            <div class="cluster-card" onclick="sendPrompt('Explain the Finance domain cluster')">
+              <div class="cluster-name c-amber" style="font-size:14px;margin-bottom:8px">Finance</div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:6px">3 tables · eps=0.28</div>
+              <div class="cluster-tables"><span class="tbl-pill">payment</span><span class="tbl-pill">invoice</span><span class="tbl-pill">ledger</span></div>
+            </div>
+            <div class="cluster-card" onclick="sendPrompt('Explain the HR domain cluster')">
+              <div class="cluster-name c-green" style="font-size:14px;margin-bottom:8px">HR</div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:6px">3 tables · eps=0.33</div>
+              <div class="cluster-tables"><span class="tbl-pill">employee</span><span class="tbl-pill">department</span><span class="tbl-pill">payroll</span></div>
+            </div>
+            <div class="cluster-card" onclick="sendPrompt('Explain the Inventory domain cluster')">
+              <div class="cluster-name" style="color:var(--accent2);font-size:14px;margin-bottom:8px">Inventory</div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:6px">4 tables · eps=0.29</div>
+              <div class="cluster-tables"><span class="tbl-pill">product</span><span class="tbl-pill">category</span><span class="tbl-pill">warehouse</span><span class="tbl-pill">stock</span></div>
+            </div>
+            <div class="cluster-card" onclick="sendPrompt('Explain the Logistics domain cluster')">
+              <div class="cluster-name" style="color:var(--accent4);font-size:14px;margin-bottom:8px">Logistics</div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:6px">2 tables · eps=0.35</div>
+              <div class="cluster-tables"><span class="tbl-pill">shipment</span><span class="tbl-pill">carrier</span></div>
+            </div>
+            <div class="cluster-card" onclick="sendPrompt('Explain the Auth domain cluster')">
+              <div class="cluster-name" style="color:var(--muted);font-size:14px;margin-bottom:8px">Auth</div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:6px">2 tables · eps=0.41</div>
+              <div class="cluster-tables"><span class="tbl-pill">users</span><span class="tbl-pill">roles</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-sensitive" style="display:none">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">All Sensitive Columns (12)</span></div>
+          <div class="sens-row" onclick="sendPrompt('Details on employee.ssn detection')"><div class="sens-icon pii">🔒</div><div><div style="font-size:12px;font-weight:500">employee.ssn</div><div style="font-size:10px;color:var(--muted)">Presidio · regex + NER · confidence 0.99</div></div><span class="sens-cat PII">PII</span></div>
+          <div class="sens-row" onclick="sendPrompt('Details on customer.email detection')"><div class="sens-icon pii">🔒</div><div><div style="font-size:12px;font-weight:500">customer.email</div><div style="font-size:10px;color:var(--muted)">Presidio · pattern match · confidence 0.97</div></div><span class="sens-cat PII">PII</span></div>
+          <div class="sens-row" onclick="sendPrompt('Details on customer.phone detection')"><div class="sens-icon pii">🔒</div><div><div style="font-size:12px;font-weight:500">customer.phone</div><div style="font-size:10px;color:var(--muted)">Presidio · phone pattern · confidence 0.95</div></div><span class="sens-cat PII">PII</span></div>
+          <div class="sens-row" onclick="sendPrompt('Details on employee.salary detection')"><div class="sens-icon fin">💰</div><div><div style="font-size:12px;font-weight:500">employee.salary</div><div style="font-size:10px;color:var(--muted)">spaCy · NLP classification · confidence 0.91</div></div><span class="sens-cat FIN">FINANCIAL</span></div>
+          <div class="sens-row" onclick="sendPrompt('Details on account.credit_card detection')"><div class="sens-icon fin">💰</div><div><div style="font-size:12px;font-weight:500">account.credit_card</div><div style="font-size:10px;color:var(--muted)">Presidio · Luhn check · confidence 0.99</div></div><span class="sens-cat FIN">FINANCIAL</span></div>
+          <div class="sens-row" onclick="sendPrompt('Details on patient.diagnosis detection')"><div class="sens-icon hc">🏥</div><div><div style="font-size:12px;font-weight:500">patient.diagnosis</div><div style="font-size:10px;color:var(--muted)">spaCy · medical NER · confidence 0.88</div></div><span class="sens-cat PHI">PHI</span></div>
+          <div class="sens-row" onclick="sendPrompt('Details on patient.dob detection')"><div class="sens-icon pii">🔒</div><div><div style="font-size:12px;font-weight:500">patient.dob</div><div style="font-size:10px;color:var(--muted)">Presidio · date pattern · confidence 0.96</div></div><span class="sens-cat PII">PII</span></div>
+          <div class="sens-row" onclick="sendPrompt('Details on finance.acct_no detection — it had a low confidence warning')"><div class="sens-icon fin">💰</div><div><div style="font-size:12px;font-weight:500">finance.acct_no</div><div style="font-size:10px;color:var(--accent3)">spaCy · low confidence 0.51 — review needed</div></div><span class="sens-cat FIN">FINANCIAL</span></div>
+        </div>
+      </div>
+
+      <div id="tab-erd" style="display:none">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">ERD — NetworkX graph view</span><span class="panel-action" onclick="sendPrompt('Generate the full Cytoscape.js ERD code for all 24 relationships')">Export Cytoscape →</span></div>
+          <div class="erd-wrap">
+            <svg class="erd-svg" viewBox="0 0 580 320">
+              <defs>
+                <marker id="earrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                  <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </marker>
+              </defs>
+              <!-- Customer domain -->
+              <rect x="20" y="120" width="100" height="40" rx="8" fill="rgba(79,142,247,0.15)" stroke="rgba(79,142,247,0.5)" stroke-width="0.5"/>
+              <text x="70" y="144" text-anchor="middle" font-size="12" fill="var(--color-text-primary,#c8d6f0)" font-family="var(--font-sans,sans-serif)">customer</text>
+              <rect x="160" y="60" width="100" height="40" rx="8" fill="rgba(79,142,247,0.1)" stroke="rgba(79,142,247,0.4)" stroke-width="0.5"/>
+              <text x="210" y="84" text-anchor="middle" font-size="12" fill="var(--color-text-primary,#c8d6f0)" font-family="var(--font-sans,sans-serif)">orders</text>
+              <rect x="300" y="20" width="110" height="40" rx="8" fill="rgba(79,142,247,0.08)" stroke="rgba(79,142,247,0.3)" stroke-width="0.5"/>
+              <text x="355" y="44" text-anchor="middle" font-size="12" fill="var(--color-text-primary,#c8d6f0)" font-family="var(--font-sans,sans-serif)">order_items</text>
+              <!-- HR domain -->
+              <rect x="20" y="230" width="100" height="40" rx="8" fill="rgba(56,217,169,0.12)" stroke="rgba(56,217,169,0.45)" stroke-width="0.5"/>
+              <text x="70" y="254" text-anchor="middle" font-size="12" fill="var(--color-text-primary,#c8d6f0)" font-family="var(--font-sans,sans-serif)">employee</text>
+              <rect x="160" y="200" width="110" height="40" rx="8" fill="rgba(56,217,169,0.08)" stroke="rgba(56,217,169,0.3)" stroke-width="0.5"/>
+              <text x="215" y="224" text-anchor="middle" font-size="12" fill="var(--color-text-primary,#c8d6f0)" font-family="var(--font-sans,sans-serif)">department</text>
+              <!-- Finance domain -->
+              <rect x="300" y="160" width="100" height="40" rx="8" fill="rgba(246,166,35,0.12)" stroke="rgba(246,166,35,0.45)" stroke-width="0.5"/>
+              <text x="350" y="184" text-anchor="middle" font-size="12" fill="var(--color-text-primary,#c8d6f0)" font-family="var(--font-sans,sans-serif)">payment</text>
+              <rect x="440" y="120" width="100" height="40" rx="8" fill="rgba(246,166,35,0.08)" stroke="rgba(246,166,35,0.3)" stroke-width="0.5"/>
+              <text x="490" y="144" text-anchor="middle" font-size="12" fill="var(--color-text-primary,#c8d6f0)" font-family="var(--font-sans,sans-serif)">invoice</text>
+              <!-- Inventory -->
+              <rect x="440" y="240" width="100" height="40" rx="8" fill="rgba(107,127,168,0.1)" stroke="rgba(107,127,168,0.3)" stroke-width="0.5"/>
+              <text x="490" y="264" text-anchor="middle" font-size="12" fill="var(--color-text-primary,#c8d6f0)" font-family="var(--font-sans,sans-serif)">product</text>
+              <rect x="300" y="270" width="100" height="40" rx="8" fill="rgba(107,127,168,0.08)" stroke="rgba(107,127,168,0.25)" stroke-width="0.5"/>
+              <text x="350" y="294" text-anchor="middle" font-size="12" fill="var(--color-text-primary,#c8d6f0)" font-family="var(--font-sans,sans-serif)">category</text>
+              <!-- EDGES -->
+              <line x1="120" y1="140" x2="158" y2="108" stroke="rgba(79,142,247,0.6)" stroke-width="1.5" marker-end="url(#earrow)"/>
+              <line x1="260" y1="80" x2="298" y2="50" stroke="rgba(79,142,247,0.5)" stroke-width="1.2" marker-end="url(#earrow)"/>
+              <line x1="120" y1="248" x2="158" y2="232" stroke="rgba(56,217,169,0.6)" stroke-width="1.5" marker-end="url(#earrow)"/>
+              <line x1="350" y1="200" x2="442" y2="164" stroke="rgba(246,166,35,0.6)" stroke-width="1.5" marker-end="url(#earrow)"/>
+              <line x1="490" y1="260" x2="402" y2="296" stroke="rgba(107,127,168,0.5)" stroke-width="1.2" marker-end="url(#earrow)"/>
+              <!-- LEGEND -->
+              <rect x="20" y="285" width="10" height="10" rx="2" fill="rgba(79,142,247,0.4)"/>
+              <text x="34" y="294" font-size="10" fill="var(--color-text-secondary,#8ba0c8)" font-family="var(--font-sans,sans-serif)">Customer</text>
+              <rect x="100" y="285" width="10" height="10" rx="2" fill="rgba(56,217,169,0.4)"/>
+              <text x="114" y="294" font-size="10" fill="var(--color-text-secondary,#8ba0c8)" font-family="var(--font-sans,sans-serif)">HR</text>
+              <rect x="140" y="285" width="10" height="10" rx="2" fill="rgba(246,166,35,0.4)"/>
+              <text x="154" y="294" font-size="10" fill="var(--color-text-secondary,#8ba0c8)" font-family="var(--font-sans,sans-serif)">Finance</text>
+              <rect x="204" y="285" width="10" height="10" rx="2" fill="rgba(107,127,168,0.35)"/>
+              <text x="218" y="294" font-size="10" fill="var(--color-text-secondary,#8ba0c8)" font-family="var(--font-sans,sans-serif)">Inventory</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ACTION BAR -->
+  <div class="action-bar">
+    <button class="btn btn-primary" onclick="sendPrompt('Give me the full starter code for Spring Boot + Python FastAPI + Angular for the metadata core engine')">Get Starter Code ↗</button>
+    <button class="btn btn-ghost" onclick="sendPrompt('Add a new database source profile to the metadata engine')">+ Add Source</button>
+    <button class="btn btn-ghost" onclick="sendPrompt('Re-run all 6 analysis stages for the SAP ERP source')">Run Analysis</button>
+    <span class="action-info">Last run: 09:14:02 · Job #47 · 304 tables · 6 stages</span>
+  </div>
+</div>
+
+<script>
+function switchTab(tab) {
+  ['relationships','domains','sensitive','erd'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===tab ? 'block' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  event.target.closest('.nav-item')?.classList.add('active');
+}
+function setView(v) {
+  document.querySelectorAll('.ttab').forEach(t=>t.classList.remove('active'));
+  event.target.classList.add('active');
+  if(v==='jobs') sendPrompt('Show me the Job Management view — list all jobs with status, stages, and logs');
+  if(v==='profiles') sendPrompt('Show me the Profile Management view for adding and testing database connections');
+}
+</script>

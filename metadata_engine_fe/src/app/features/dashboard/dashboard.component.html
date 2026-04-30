@@ -1,0 +1,44 @@
+<!-- STAT CARDS -->
+<div class="stat-row">
+  <div class="stat-card"><div class="stat-label">Tables Crawled</div><div class="stat-val c-blue">{{ clusters.length ? 148 : 0 }}</div><div class="stat-sub" style="color:var(--accent2)">Since last job</div></div>
+  <div class="stat-card"><div class="stat-label">Relationships Found</div><div class="stat-val c-green">{{ relationships.length }}</div><div class="stat-sub" style="color:var(--muted)">Avg score {{ relationships.length ? '0.84' : 'N/A' }}</div></div>
+  <div class="stat-card"><div class="stat-label">Sensitive Columns</div><div class="stat-val c-red">{{ sensitive.length }}</div><div class="stat-sub" style="color:var(--accent4)">From Presidio engine</div></div>
+  <div class="stat-card"><div class="stat-label">Domain Clusters</div><div class="stat-val c-amber">{{ clusters.length }}</div><div class="stat-sub" style="color:var(--muted)">DBSCAN auto-grouped</div></div>
+</div>
+
+
+<div class="two-col">
+  <!-- RELATIONSHIPS -->
+  <div class="panel">
+    <div class="panel-header"><span class="panel-title">Top Relationships</span><a class="panel-action" routerLink="/relationships">View all →</a></div>
+    <div class="rel-row" *ngFor="let r of relationships">
+      <span class="tname">{{ r.a }}</span><span class="col-chip">{{ r.ca }}</span><span class="arrow-icon">→</span>
+      <span class="tname">{{ r.b }}</span><span class="col-chip">{{ r.cb }}</span>
+      <div class="score-bar-wrap"><div class="score-bar" [style.width.%]="r.score*100" [style.background]="r.color"></div></div>
+      <span class="card-tag {{ r.tagClass }}">{{ r.score }} · {{ r.card }}</span>
+    </div>
+  </div>
+
+  <!-- SENSITIVE -->
+  <div class="panel">
+    <div class="panel-header"><span class="panel-title">Sensitive Columns</span><a class="panel-action" routerLink="/sensitive">All 12 →</a></div>
+    <div class="sens-row" *ngFor="let s of sensitive">
+      <div class="sens-icon {{ s.iconCls }}">{{ s.icon }}</div>
+      <div><div style="font-size:12px;font-weight:500">{{ s.name }}</div><div style="font-size:10px;color:var(--muted)">{{ s.meta }}</div></div>
+      <span class="sens-cat {{ 'cat-' + s.cat }}">{{ s.tag || s.cat }}</span>
+    </div>
+  </div>
+</div>
+
+<div class="one-col" style="margin-top: 14px;">
+  <!-- DOMAINS -->
+  <div class="panel">
+    <div class="panel-header"><span class="panel-title">Active Domain Clusters (Global)</span><a class="panel-action" routerLink="/domains">Explore Map →</a></div>
+    <div class="cluster-grid">
+      <div class="cluster-card" *ngFor="let c of clusters">
+        <div class="cluster-name {{ c.color }}">{{ c.name }}</div>
+        <div class="cluster-tables"><span class="tbl-pill" *ngFor="let t of c.tables">{{ t }}</span></div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,11 @@
+fastapi==0.109.2
+uvicorn==0.27.0.post1
+rapidfuzz==3.6.1
+valentine==0.1.7
+SQLAlchemy==2.0.25
+spacy==3.7.2
+scikit-learn==1.4.0
+networkx==3.2.1
+presidio-analyzer==2.2.35
+sentence-transformers==2.3.1
+requests==2.31.0

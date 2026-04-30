@@ -1,0 +1,108 @@
+/* Global Styles from Design Library */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* metadata_core_engine_ui.html variables */
+  --navy: #0f1623;
+  --navy2: #182030;
+  --navy3: #1e2a3d;
+  --slate: #2a3a56;
+  --primary-color: #4f8ef7;
+  --menu-bg: #182030;
+  --menu-text: #c8d6f0;
+  --menu-text2: #8ba0c8;
+  --menu-muted: #6b7fa8;
+  --menu-border: rgba(79,142,247,0.15);
+  --card-bg: rgba(30,42,61,0.7);
+  --accent: #4f8ef7;
+  --accent2: #38d9a9;
+  --accent3: #f6a623;
+  --accent4: #e05c5c;
+  --muted: #6b7fa8;
+  --text: #c8d6f0;
+  --text2: #8ba0c8;
+  --border: rgba(79,142,247,0.15);
+  --card: rgba(30,42,61,0.7);
+  --radius: 10px;
+
+  /* SAP ERP relationships & rerun variables */
+  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  --color-border-tertiary: rgba(79,142,247,0.15);
+  --color-border-secondary: rgba(79,142,247,0.3);
+  --color-border-info: var(--accent);
+  --color-background-primary: var(--navy);
+  --color-background-secondary: var(--navy2);
+  --color-background-info: rgba(79,142,247,0.15);
+  --color-background-success: rgba(56,217,169,0.15);
+  --color-background-warning: rgba(246,166,35,0.15);
+  --color-background-danger: rgba(230,92,92,0.15);
+  --color-text-primary: var(--text);
+  --color-text-secondary: var(--text2);
+  --color-text-tertiary: var(--muted);
+  --color-text-info: var(--accent);
+  --color-text-success: var(--accent2);
+  --color-text-warning: var(--accent3);
+  --color-text-danger: var(--accent4);
+  --border-radius-md: 6px;
+  --border-radius-lg: 10px;
+}
+
+[data-theme="light"] {
+  --navy: #f4f6f8;
+  --navy2: #ffffff;
+  --navy3: #e8ebf0;
+  --slate: #d1d9e6;
+  --primary-color: #1565c0;
+  --menu-bg: #1565c0;
+  --menu-text: #ffffff;
+  --menu-text2: rgba(255,255,255,0.85);
+  --menu-muted: rgba(255,255,255,0.6);
+  --menu-border: rgba(255,255,255,0.1);
+  --card-bg: #ffffff;
+  --accent: #1565c0;
+  --accent2: #169e71;
+  --accent3: #d18404;
+  --accent4: #d63838;
+  --muted: #73829e;
+  --text: #2a3342;
+  --text2: #4a566b;
+  --border: rgba(0,0,0,0.1);
+  --card: rgba(255,255,255,0.85);
+  
+  --color-border-tertiary: rgba(0,0,0,0.1);
+  --color-border-secondary: rgba(0,0,0,0.15);
+  --color-border-info: var(--accent);
+  --color-background-primary: var(--navy);
+  --color-background-secondary: var(--navy2);
+  --color-background-info: rgba(44,107,224,0.1);
+  --color-background-success: rgba(22,158,113,0.1);
+  --color-background-warning: rgba(209,132,4,0.1);
+  --color-background-danger: rgba(214,56,56,0.1);
+  
+  --color-text-primary: var(--text);
+  --color-text-secondary: var(--text2);
+  --color-text-tertiary: var(--muted);
+  --color-text-info: var(--accent);
+  --color-text-success: var(--accent2);
+  --color-text-warning: var(--accent3);
+  --color-text-danger: var(--accent4);
+}
+
+body, html { 
+  background: var(--navy); 
+  color: var(--text); 
+  font-family: var(--font-sans); 
+  min-height: 100vh;
+}
+
+/* Custom Scrollbar for sleekness */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--slate); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+/* Reuse standard UI structural helpers */
+a { text-decoration: none; }
+button { font-family: inherit; }

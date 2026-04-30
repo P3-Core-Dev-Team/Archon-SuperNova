@@ -1,0 +1,122 @@
+<style>
+  /* TOP BAR */
+  .topbar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 20px; border-bottom: 0.5px solid var(--menu-border);
+    background: var(--menu-bg);
+  }
+  .logo-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent2); }
+  .logo-text { font-size: 14px; font-weight: 500; color: var(--menu-text); letter-spacing: .5px; }
+  .logo-sub { font-size: 11px; color: var(--menu-muted); margin-left: 2px; }
+  .topbar-tabs { display: flex; gap: 2px; margin-left: auto; }
+  .ttab {
+    font-size: 12px; padding: 5px 14px; border-radius: 6px; cursor: pointer;
+    color: var(--menu-muted); border: none; background: transparent; transition: all .18s;
+  }
+  .ttab.active-tab { background: rgba(255,255,255,0.15); color: #fff; }
+  .ttab:hover:not(.active-tab) { background: rgba(0,0,0,0.1); color: var(--menu-text); }
+  .topbar-status { display: flex; align-items: center; gap: 6px; margin-left: 14px; font-size: 11px; color: var(--accent2); }
+  .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); animation: pulse 1.8s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+
+  /* LAYOUT */
+  .main-layout { display: grid; grid-template-columns: 220px 1fr; gap: 0; min-height: calc(100vh - 108px); }
+  .sidebar { border-right: 0.5px solid var(--menu-border); padding: 16px 0; background: var(--menu-bg); }
+  .sidebar-section { padding: 6px 16px; margin-bottom: 2px; }
+  .sidebar-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--menu-muted); margin-bottom: 8px; font-weight: 500; }
+  .nav-item {
+    display: flex; align-items: center; gap: 9px; padding: 8px 12px;
+    border-radius: 7px; cursor: pointer; font-size: 13px; color: var(--menu-text2);
+    transition: all .15s; margin-bottom: 1px; text-decoration: none;
+  }
+  .nav-item.active-nav { background: rgba(255,255,255,0.15); color: #fff; }
+  .nav-item:hover:not(.active-nav) { background: rgba(0,0,0,0.1); color: var(--menu-text); }
+  .nav-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .nav-badge { margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 10px; background: var(--slate); color: var(--muted); }
+  .nav-badge.hot { background: rgba(230,92,92,0.2); color: var(--accent4); }
+
+  /* CONTENT */
+  .content { padding: 20px 22px; }
+
+  /* BOTTOM ACTION BAR */
+  .action-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 20px; border-top: 0.5px solid var(--menu-border);
+    background: var(--menu-bg);
+    height: 52px;
+  }
+  .btn {
+    font-size: 12px; padding: 7px 16px; border-radius: 7px; cursor: pointer; border: none;
+    font-weight: 500; transition: all .15s;
+  }
+  .btn-primary { background: var(--accent2); color: #fff; }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-ghost { background: transparent; border: 0.5px solid var(--menu-border); color: var(--menu-text2); }
+  .btn-ghost:hover { background: rgba(0,0,0,0.1); color: var(--menu-text); }
+  .action-info { font-size: 11px; color: var(--menu-muted); margin-left: auto; }
+</style>
+
+<div class="root">
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="logo-dot"></div>
+    <span class="logo-text">MetaCatalog</span>
+    <span class="logo-sub">Core Engine</span>
+    <div class="topbar-tabs">
+      <a routerLink="/dashboard" routerLinkActive="active-tab" class="ttab" style="text-decoration:none; display: inline-flex; align-items:center;">Dashboard</a>
+      <a routerLink="/job" routerLinkActive="active-tab" class="ttab" style="text-decoration:none; display: inline-flex; align-items:center;">Jobs</a>
+      <a routerLink="/connection" routerLinkActive="active-tab" class="ttab" style="text-decoration:none; display: inline-flex; align-items:center;">Profiles</a>
+      <button class="ttab" (click)="toggleTheme()" style="margin-left: 10px; cursor: pointer; display: inline-flex; align-items:center;">{{ isLightMode ? '🌙 Dark' : '☀️ Light' }}</button>
+    </div>
+    <div class="topbar-status"><div class="pulse"></div>Engine active</div>
+  </div>
+
+  <!-- SIDEBAR + CONTENT -->
+  <div class="main-layout">
+    <div class="sidebar">
+      <div class="sidebar-section">
+        <div class="sidebar-label">Global Access</div>
+        <a routerLink="/dashboard" routerLinkActive="active-nav" class="nav-item">
+          <div class="nav-dot" style="background:var(--color-text-info)"></div>Dashboard
+        </a>
+        <a routerLink="/job" class="nav-item" routerLinkActive="active-nav">
+          <div class="nav-dot" style="background:var(--color-text-warning)"></div>Executions Array
+        </a>
+        <a routerLink="/connect" class="nav-item" routerLinkActive="active-nav">
+          <div class="nav-dot" style="background:var(--color-text-success)"></div>Profiles Config
+        </a>
+      </div>
+      <div class="sidebar-section" style="margin-top:12px">
+        <div class="sidebar-label">Library</div>
+        <div class="nav-item" style="cursor:default;font-size:11px;gap:6px">
+          <span style="color:var(--accent2);font-size:10px">●</span>Valentine
+        </div>
+        <div class="nav-item" style="cursor:default;font-size:11px;gap:6px">
+          <span style="color:var(--accent2);font-size:10px">●</span>RapidFuzz
+        </div>
+        <div class="nav-item" style="cursor:default;font-size:11px;gap:6px">
+          <span style="color:var(--accent2);font-size:10px">●</span>spaCy NLP
+        </div>
+        <div class="nav-item" style="cursor:default;font-size:11px;gap:6px">
+          <span style="color:var(--accent3);font-size:10px">◑</span>scikit-learn
+        </div>
+        <div class="nav-item" style="cursor:default;font-size:11px;gap:6px">
+          <span style="color:var(--muted);font-size:10px">○</span>NetworkX
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTENT AREA -->
+    <div class="content" id="content-area">
+      <router-outlet></router-outlet>
+    </div>
+  </div>
+
+  <!-- ACTION BAR -->
+  <div class="action-bar">
+    <button class="btn btn-primary">Get Starter Code ↗</button>
+    <button class="btn btn-ghost" routerLink="/connection">+ Add Source</button>
+    <button class="btn btn-ghost" routerLink="/job">Run Analysis</button>
+    <span class="action-info">Last run: 09:14:02 · Job #47 · 148 tables · 6 stages</span>
+  </div>
+</div>
