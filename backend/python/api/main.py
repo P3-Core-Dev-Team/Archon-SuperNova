@@ -906,8 +906,15 @@ def _reset_pipeline_state_for_schema(schema_name: str) -> None:
         ("pii_leaks",
          f"DELETE FROM discovery.pii_leaks "
          f"WHERE source_col_id IN {cols_for_schema} OR target_col_id IN {cols_for_schema}", 2),
+        # pii_findings has TWO row shapes: column-level (column_id set,
+        # table_id NULL) and table-level (column_id NULL, table_id set —
+        # used by IDENTITY_BUNDLE).  Both must be deleted before
+        # col_inventory / tbl_inventory or the FK constraint fires and
+        # the whole reset transaction rolls back, leaving the schema in
+        # a state where a re-run scans against stale parquets.
         ("pii_findings",
-         f"DELETE FROM discovery.pii_findings WHERE table_id IN {tids_for_schema}", 1),
+         f"DELETE FROM discovery.pii_findings "
+         f"WHERE column_id IN {cols_for_schema} OR table_id IN {tids_for_schema}", 2),
         ("composite_relationships",
          f"DELETE FROM discovery.composite_relationships "
          f"WHERE child_table_id IN {tids_for_schema} OR parent_table_id IN {tids_for_schema}", 2),
@@ -1270,7 +1277,8 @@ def get_pii_findings(job_id: str) -> dict[str, Any]:
                        p.pii_type, p.detector,
                        p.match_count, p.sample_count, p.match_rate,
                        p.validated, COALESCE(p.name_prior, false) AS name_prior,
-                       p.score, p.redacted_examples
+                       p.score, p.redacted_examples,
+                       p.provider_breakdown
                 FROM pii_findings p
                 JOIN col_inventory c ON c.column_id = p.column_id
                 JOIN tbl_inventory t ON t.table_id = c.table_id
@@ -1290,6 +1298,9 @@ def get_pii_findings(job_id: str) -> dict[str, Any]:
             "validated": r[7], "name_prior": r[8],
             "score": float(r[9]) if r[9] is not None else None,
             "redacted_examples": r[10] or [],
+            # IIN/BIN provider breakdown — list of {brand, count, share}
+            # for CC_NUMBER findings, empty otherwise.  See pii_iin.py.
+            "provider_breakdown": r[11] or [],
         }
         for r in rows
     ]

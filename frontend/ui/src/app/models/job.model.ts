@@ -64,6 +64,9 @@ export interface PiiFinding {
   name_prior: boolean;
   score: number | null;
   redacted_examples: unknown[];
+  /** IIN/BIN-derived issuer breakdown for CC_NUMBER findings.  Empty
+   * (or absent) for every other PII type.  Sorted by descending count. */
+  provider_breakdown?: { brand: string; count: number; share: number }[];
 }
 
 export interface PiiTable {

@@ -60,6 +60,7 @@ from discovery.pii_priors import (
     name_prior,
     name_prior_strength,
 )
+from discovery.pii_iin import card_brand as _card_brand
 from discovery.pii_score import Match as _ScoreMatch
 from discovery.pii_score import column_pii_confidence, resolve_overlaps
 
@@ -385,6 +386,11 @@ class PIIFinding:
     regex_match_rate: float = 0.0
     score: float = 0.0
     specificity: int = 0
+    # IIN/BIN-derived provider breakdown for CC_NUMBER findings.  List of
+    # ``{"brand": str, "count": int, "share": float}`` entries, ordered
+    # by descending count.  Empty for non-CC_NUMBER findings (and for
+    # CC_NUMBER columns where no validated card matched a known brand).
+    provider_breakdown: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def match_rate(self) -> float:
@@ -549,6 +555,12 @@ def scan_column(
     regex_match_counts: dict[str, int] = {}
     validated_counts: dict[str, int] = {}
     examples: dict[str, list[str]] = {}
+    # Per-brand counts for CC_NUMBER findings — keyed by brand label
+    # (VISA / MASTERCARD / AMEX / …) and incremented once per validated
+    # cell.  Surfaced as a "provider_breakdown" on the finding so the
+    # UI can render brand chips alongside the CC_NUMBER tag.  Bucketed
+    # only when the Luhn validator passed — anything else is noise.
+    cc_brand_counts: dict[str, int] = {}
 
     # Optional NER accumulators (keyed by pii_type the entity maps to)
     ner_counts: dict[str, int] = {}
@@ -625,6 +637,14 @@ def scan_column(
                     bucket = examples.setdefault(m.name, [])
                     if len(bucket) < max_examples:
                         bucket.append(redact(m.value, m.name))
+                    # IIN/BIN provider tag — only meaningful for CC_NUMBER,
+                    # only counted when Luhn passed (m.validated above).
+                    if m.name == "CC_NUMBER":
+                        brand = _card_brand(m.value)
+                        if brand:
+                            cc_brand_counts[brand] = (
+                                cc_brand_counts.get(brand, 0) + 1
+                            )
 
             # NER pass — only on STRING_LONG values when configured
             if _NER_AVAILABLE and _ner_scan_text is not None:
@@ -689,6 +709,21 @@ def scan_column(
             free_text_column=is_free_text,
         )
         spec = SPECIFICITY.get(pii_type, 50)
+        # Build the IIN/BIN provider breakdown for CC_NUMBER findings.
+        # The dict was accumulated above per validated cell; project it
+        # to a sorted list of {brand, count, share} so the API and UI
+        # have a stable, ordered shape regardless of dict iteration.
+        if pii_type == "CC_NUMBER" and cc_brand_counts:
+            total = sum(cc_brand_counts.values()) or 1
+            provider_breakdown = [
+                {"brand": b, "count": c, "share": round(c / total, 4)}
+                for b, c in sorted(
+                    cc_brand_counts.items(),
+                    key=lambda kv: (-kv[1], kv[0]),
+                )
+            ]
+        else:
+            provider_breakdown = []
         findings.append(
             PIIFinding(
                 parquet_path=str(parquet_path),
@@ -703,6 +738,7 @@ def scan_column(
                 regex_match_rate=rate_regex,
                 score=score,
                 specificity=spec,
+                provider_breakdown=provider_breakdown,
             )
         )
         seen_types.add(pii_type)
@@ -844,6 +880,7 @@ def _pii_task(args: tuple) -> list[dict] | None:
                 "name_prior": f.name_prior,
                 "score": f.score,
                 "specificity": f.specificity,
+                "provider_breakdown": f.provider_breakdown,
             }
             for f in findings
         ]

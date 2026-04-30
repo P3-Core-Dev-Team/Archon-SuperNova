@@ -165,6 +165,9 @@ pii_findings_t = Table(
     Column("specificity", Integer),
     Column("validated", Boolean, nullable=False, server_default=text("false")),
     Column("redacted_examples", JSONB),
+    # IIN/BIN provider breakdown for CC_NUMBER findings — list of
+    # {"brand", "count", "share"} dicts.  NULL for non-CC findings.
+    Column("provider_breakdown", JSONB),
     Column("detected_at", TIMESTAMPTZ, server_default=text("now()")),
 )
 
@@ -802,7 +805,13 @@ class PiiFinding:
             "redacted_examples": stmt.excluded.redacted_examples,
             "detected_at": stmt.excluded.detected_at,
         }
-        for opt in ("regex_match_rate", "name_prior", "score", "specificity"):
+        for opt in (
+            "regex_match_rate",
+            "name_prior",
+            "score",
+            "specificity",
+            "provider_breakdown",
+        ):
             if opt in row:
                 update_cols[opt] = stmt.excluded[opt]
         # Table-level finding — column_id is NULL; conflict on the partial

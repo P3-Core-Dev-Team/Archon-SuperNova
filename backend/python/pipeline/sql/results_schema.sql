@@ -204,6 +204,11 @@ ALTER TABLE pii_findings
     ADD COLUMN IF NOT EXISTS score REAL;
 ALTER TABLE pii_findings
     ADD COLUMN IF NOT EXISTS specificity INTEGER;
+-- IIN/BIN provider breakdown — JSONB array of {brand, count, share}
+-- entries, populated only for CC_NUMBER findings.  Lets the UI render
+-- "VISA · 4123 / MASTERCARD · 877 / …" chips alongside the CC_NUMBER tag.
+ALTER TABLE pii_findings
+    ADD COLUMN IF NOT EXISTS provider_breakdown JSONB;
 
 CREATE TABLE IF NOT EXISTS run_log (
     log_id            BIGSERIAL PRIMARY KEY,
