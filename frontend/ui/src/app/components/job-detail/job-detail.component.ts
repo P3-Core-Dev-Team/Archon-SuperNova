@@ -353,10 +353,11 @@ export class JobDetailComponent implements OnInit, OnDestroy {
   private selSub?: Subscription;
   private qpSub?: Subscription;
   // toObservable() requires an injection context (ctor / class field init).
-  // Capture it here so the polling pipeline in ngOnInit can simply consume
-  // the result instead of calling toObservable() outside the context, which
-  // throws NG0203 at runtime and silently kills the Run-log tab.
+  // Capture both observables here so the subscriptions in ngOnInit can
+  // consume them — calling toObservable() inside ngOnInit throws NG0203
+  // at runtime and silently kills the dependent feature.
   private tab$ = toObservable(this.tab);
+  private selectedTable$ = toObservable(this.jobsSvc.selectedTable);
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -437,7 +438,7 @@ export class JobDetailComponent implements OnInit, OnDestroy {
     // The all-tables relationship-graph publishes node clicks via
     // JobService.selectedTable.  Catch them here: set the table and
     // switch the mode to 'map' (per the spec) without leaving the tab.
-    this.selSub = toObservable(this.jobsSvc.selectedTable).subscribe(t => {
+    this.selSub = this.selectedTable$.subscribe(t => {
       if (this.tab() !== 'relationships') return;
       if (t && t !== this.selectedTable()) {
         this.selectedTable.set(t);
