@@ -156,6 +156,10 @@ const SOURCE_DEFAULTS = {
     <p class="muted" *ngIf="recent().length === 0">No jobs yet.</p>
   `,
   styles: [`
+    /* Constrain prose-heavy routes to a comfortable reading width.
+       The global <main> is full-viewport so the job detail's graphs
+       can spread; pages like the dashboard cap their own width. */
+    :host { display: block; max-width: 1400px; margin: 0 auto; }
     .header {
       display: flex;
       justify-content: space-between;

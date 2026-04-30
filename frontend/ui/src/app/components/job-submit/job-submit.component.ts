@@ -99,6 +99,7 @@ const DEFAULT_PORTS: Record<SourceDbType, number> = {
     </form>
   `,
   styles: [`
+    :host { display: block; max-width: 1100px; margin: 0 auto; }
     h2 { margin: 0 0 6px; }
     .row {
       display: flex;

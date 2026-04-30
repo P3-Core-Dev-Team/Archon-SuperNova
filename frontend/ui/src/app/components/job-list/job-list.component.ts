@@ -62,6 +62,7 @@ import { JobService } from '../../services/job.service';
     </div>
   `,
   styles: [`
+    :host { display: block; max-width: 1400px; margin: 0 auto; }
     .header {
       display: flex;
       justify-content: space-between;

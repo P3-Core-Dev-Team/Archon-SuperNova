@@ -48,10 +48,13 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
     }
     nav a:hover { color: #e6edf3; text-decoration: none; }
     nav a.active { color: #e6edf3; background: #21262d; }
+    /* Page content fills the viewport.  Per-route components (Dashboard,
+       Submit, Jobs list) carry their own max-width via a host-level
+       class so wide screens don't stretch their text columns; the job
+       detail route deliberately stays unconstrained so graphs, ERDs,
+       and cluster cards can use the full width. */
     main {
-      padding: 24px 28px 60px;
-      max-width: 1400px;
-      margin: 0 auto;
+      padding: 24px 24px 60px;
     }
   `],
 })
