@@ -1,0 +1,78 @@
+<div class="wrap" style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;background:var(--navy)">
+  <div class="toolbar">
+    <span class="toolbar-title">Domain clusters</span>
+    <span class="new-badge">+{{ clusters.length }} new detected</span>
+    <div class="view-toggle">
+      <button class="vbtn" [class.on]="activeView === 'grid'" (click)="setView('grid')">Grid</button>
+      <button class="vbtn" [class.on]="activeView === 'list'" (click)="setView('list')">List</button>
+    </div>
+  </div>
+
+  <div class="summary-strip">
+    <div class="sum-cell"><div class="sum-label">Clusters</div><div class="sum-val" style="color:var(--color-text-info)">{{ clusters.length }}</div></div>
+    <div class="sum-cell"><div class="sum-label">Tables clustered</div><div class="sum-val" style="color:var(--color-text-primary)">{{ totalTables }}</div></div>
+    <div class="sum-cell"><div class="sum-label">Avg cluster size</div><div class="sum-val" style="color:var(--color-text-secondary)">{{ clusters.length > 0 ? (totalTables / clusters.length | number:'1.0-0') : 0 }}</div></div>
+    <div class="sum-cell"><div class="sum-label">Algorithm</div><div class="sum-val" style="font-size:13px;color:var(--color-text-secondary);margin-top:3px">DBSCAN</div></div>
+  </div>
+
+  <!-- GRID VIEW -->
+  <div *ngIf="activeView === 'grid'">
+    <div class="cluster-grid">
+      <div class="c-card" [class.active]="!c.prev" *ngFor="let c of clusters" [style.border-color]="c.prev ? 'var(--color-border-tertiary)' : c.color">
+        <div class="c-header">
+          <div class="c-dot" [style.background]="c.color"></div>
+          <span class="c-name">{{ c.name }}</span>
+          <span *ngIf="!c.prev" style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--color-background-success);color:var(--color-text-success);font-weight:500">new</span>
+          <span class="c-meta">{{ c.tables.length }} tables &middot; {{ c.rels }} joins</span>
+        </div>
+        <div class="c-body">
+          <div class="c-eps">eps={{ c.eps }} &middot; sentence-transformers + DBSCAN</div>
+          <div class="c-tables">
+            <span class="tpill" [class.sens]="c.sensTables.includes(t)" *ngFor="let t of c.tables">{{ t }}</span>
+          </div>
+          <div *ngIf="c.sensCount > 0" style="font-size:10px;color:var(--color-text-danger);margin-bottom:4px">{{ c.sensCount }} sensitive column{{ c.sensCount > 1 ? 's' : '' }} in this domain</div>
+          <div class="c-bar-wrap"><div class="c-bar" [style.width.%]="(c.tables.length / maxTables) * 100" [style.background]="c.color"></div></div>
+          <div class="c-footer">
+            <button style="font-size:11px" [routerLink]="['/results']" [queryParams]="jobId ? {job: jobId} : null">ERD &#8599;</button>
+            <button style="font-size:11px" [routerLink]="['/relationships']" [queryParams]="jobId ? {job: jobId} : null">Joins &#8599;</button>
+            <button style="font-size:11px" *ngIf="c.sensCount>0" [routerLink]="['/sensitive']" [queryParams]="jobId ? {job: jobId} : null">Sensitive &#8599;</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIST VIEW -->
+  <div class="list-view" *ngIf="activeView === 'list'">
+    <ng-container *ngFor="let c of clusters; let i = index">
+      <div class="l-row" [class.expanded]="expandedRow === i" (click)="toggleRow(i)">
+        <div class="l-dot" [style.background]="c.color"></div>
+        <span class="l-name">{{ c.name }}</span>
+        <span class="l-count">{{ c.tables.length }} tables</span>
+        <span class="l-eps">eps={{ c.eps }}</span>
+        <div class="l-bar-wrap"><div class="l-bar" [style.width.%]="(c.tables.length / maxTables) * 100" [style.background]="c.color"></div></div>
+        <span style="font-size:11px;color:var(--color-text-secondary);min-width:40px">{{ c.rels }} joins</span>
+        <span class="l-new" *ngIf="!c.prev">new</span><span *ngIf="c.prev" style="min-width:34px"></span>
+      </div>
+      <div class="det-panel" *ngIf="expandedRow === i">
+        <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px">{{ c.desc }}</div>
+        <div class="det-tables">
+            <span class="tpill" [class.sens]="c.sensTables.includes(t)" *ngFor="let t of c.tables">{{ t }}</span>
+        </div>
+        <div class="det-btns">
+          <button [routerLink]="['/results']" [queryParams]="jobId ? {job: jobId} : null">Domain ERD &#8599;</button>
+          <button [routerLink]="['/relationships']" [queryParams]="jobId ? {job: jobId} : null">View joins &#8599;</button>
+          <button *ngIf="c.sensCount > 0" [routerLink]="['/sensitive']" [queryParams]="jobId ? {job: jobId} : null">Sensitive cols &#8599;</button>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+
+  <div class="footer" style="justify-content: space-between; display: flex;">
+    <span class="footer-info">Page {{ currentPage + 1 }} of {{ totalPages }} &middot; Job #{{ jobId || 'N/A' }}</span>
+    <div style="display: flex; gap: 8px;">
+      <button class="export-btn" (click)="prevPage()" [disabled]="currentPage === 0">&larr; Prev</button>
+      <button class="export-btn" (click)="nextPage()" [disabled]="currentPage >= totalPages - 1">Next &rarr;</button>
+    </div>
+  </div>
+</div>

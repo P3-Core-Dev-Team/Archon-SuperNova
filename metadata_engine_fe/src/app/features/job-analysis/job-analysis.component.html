@@ -1,0 +1,184 @@
+<div class="wrap">
+
+  <!-- Job Configuration Card Panel -->
+  <div *ngIf="!showOrchestrator" class="job-dashboard-container">
+    
+    <!-- Active Target Executed Injection Block -->
+    <div class="job-card-grid active-target-grid">
+      <div class="job-card new-target-card" style="box-shadow: 0 4px 20px rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.3);">
+        <div class="job-card-header" style="background: linear-gradient(180deg, rgba(56, 189, 248, 0.05) 0%, rgba(255,255,255,0) 100%);">
+          <div class="job-card-icon">⚡</div>
+          <div style="flex:1">
+            <h3 style="margin:0; font-size: 16px; font-weight: 500;">Ready for Execution</h3>
+            <span style="font-size: 12px; color: var(--color-text-secondary);">Metadata Profiling Target</span>
+          </div>
+          <button class="run-btn-card" (click)="triggerJob()">
+            Start Analysis &#9654;
+          </button>
+        </div>
+        
+        <div class="job-card-body">
+          <div class="info-row" *ngIf="sourceSchema">
+            <span class="info-label">Target Schema:</span>
+            <span class="info-val schema-badge">{{ sourceSchema }}</span>
+          </div>
+          <div class="info-row" *ngIf="!sourceSchema">
+            <span class="info-label">Choose Target Profile:</span>
+            <select [(ngModel)]="selectedSchema" class="native-dropdown" style="width:160px;">
+              <option *ngFor="let conn of connections" [value]="conn.schemaName">{{ conn.schemaName }}</option>
+            </select>
+          </div>
+          <div class="info-row">
+            <span class="info-label">ML Profile:</span>
+            <span class="info-val">Full Deep-Scan (Stages 1-6)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Historical Jobs Dashboard -->
+    <div class="dashboard-section">
+      <div class="dashboard-header">
+        <h2 style="font-size: 18px; font-weight: 500; margin: 0;">Jobs Dashboard</h2>
+        
+        <div class="filter-controls">
+          <label style="font-size: 12px; color: var(--color-text-secondary);">Job Level Filter:</label>
+          <select [(ngModel)]="filterStatus" class="native-dropdown">
+            <option value="ALL">All Levels</option>
+            <option value="RUNNING">Running</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="ERROR">Failed</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="job-card-grid history-grid">
+        <div class="job-card" *ngFor="let job of filteredJobs()">
+          <div class="job-card-header">
+            <div class="job-card-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">⛁</div>
+            <div style="flex:1">
+              <h3 style="margin:0; font-size: 15px; font-weight: 500;">Job ID #{{ job.id }}</h3>
+              <span style="font-size: 11px; color: var(--color-text-secondary);">Launched: {{ job.startTime | date:'short' }}</span>
+            </div>
+            
+            <span class="schema-badge" 
+                  [ngStyle]="job.status === 'RUNNING' ? {'background':'rgba(56, 189, 248, 0.1)', 'color':'#38bdf8'} : (job.status === 'ERROR' ? {'background':'rgba(239, 68, 68, 0.1)', 'color': '#ef4444'} : {})">
+              {{ job.status }}
+            </span>
+          </div>
+          
+          <div class="job-card-body">
+            <div class="info-row" style="background: transparent; padding: 4px 0; border: none;">
+              <span class="info-label">Target Schema:</span>
+              <span class="info-val">{{ job.targetSchema }}</span>
+            </div>
+            <div class="info-row" style="background: transparent; padding: 4px 0; border: none;" *ngIf="job.endTime">
+              <span class="info-label">Ended At:</span>
+              <span class="info-val">{{ job.endTime | date:'shortTime' }}</span>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--color-border-tertiary);">
+               <button *ngIf="job.status === 'RUNNING'" (click)="reconnectJob(job.id)" class="btn-action" style="text-align: center; border: none; background: rgba(56, 189, 248, 0.1); color: #38bdf8; cursor: pointer;">Resume Live Console</button>
+               <a *ngIf="job.status !== 'RUNNING'" routerLink="/relationships" [queryParams]="{job: job.id}" class="btn-action" style="text-align: center;">View Relationships</a>
+               <a *ngIf="job.status !== 'RUNNING'" routerLink="/domains" [queryParams]="{job: job.id}" class="btn-action" style="text-align: center;">Domain Clusters</a>
+               <a *ngIf="job.status !== 'RUNNING'" routerLink="/sensitive" [queryParams]="{job: job.id}" class="btn-action" style="text-align: center;">Sensitive Intelligence</a>
+               <a *ngIf="job.status !== 'RUNNING'" routerLink="/results" [queryParams]="{job: job.id}" class="btn-action" style="text-align: center;">Explore ERD Graph</a>
+               <button (click)="deleteJob(job.id)" class="btn-action" style="text-align: center; border: none; background: rgba(239, 68, 68, 0.1); color: #ef4444; cursor: pointer; margin-top: 4px;">Delete Job</button>
+            </div>
+          </div>
+        </div>
+        
+        <div *ngIf="filteredJobs().length === 0" style="padding: 40px; text-align: center; color: var(--color-text-secondary); width: 100%;">
+          No historical executions found natively mapped.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Realtime Orchestrator Console -->
+  <div *ngIf="showOrchestrator" style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;background:var(--navy)">
+    
+    <div class="header">
+      <span style="font-size:14px;font-weight:500">Metadata Engine Orchestrator</span>
+      <span class="src-badge" [ngStyle]="isSocketConnected ? {'background':'rgba(34, 197, 94, 0.1)', 'color':'#22c55e'} : {'background':'rgba(239, 68, 68, 0.1)', 'color': '#ef4444'}">
+        <span class="spin" style="margin-right: 4px; display: inline-block;">{{ isSocketConnected ? '📡' : '⚠️' }}</span> 
+        {{ isSocketConnected ? 'SSE Connected' : 'Socket Disconnected' }}
+      </span>
+      <span class="src-badge" [ngStyle]="isJobRunning ? {'background':'var(--color-background-info)','color':'var(--color-text-info)'} : {}">
+        {{ isJobRunning ? 'Scanning Schema...' : (jobCompleted ? 'Data Pulled' : 'Target: public') }}
+      </span>
+      <span class="job-id">{{ jobStatus }}</span>
+    </div>
+    
+    <div class="overall-bar-wrap"><div class="overall-bar" [style.width.%]="overallPct"></div></div>
+
+    <div class="stages-grid">
+      <div class="stage-row" *ngFor="let stage of stages; let i = index" 
+           [ngClass]="{'active-row': stage.status === 'run', 'done-row': stage.status === 'done', 'error-row': stage.status === 'err'}">
+        <span class="stage-num">{{ stage.num }}</span>
+        <div class="stage-icon-wrap"><span style="font-size:14px">{{ stage.icon }}</span></div>
+        <div class="stage-info">
+          <div class="stage-name">{{ stage.name }}</div>
+          <div class="stage-lib">{{ stage.lib }}</div>
+        </div>
+        <div class="stage-bar-wrap"><div class="stage-bar" [style.width.%]="stage.pct" style="background:var(--color-text-info)"></div></div>
+        <span class="stage-pct">{{ stage.pct }}%</span>
+        
+        <span class="stage-status-chip" 
+              [ngClass]="{
+                'chip-wait': stage.status === 'waiting',
+                'chip-run': stage.status === 'run',
+                'chip-done': stage.status === 'done',
+                'chip-err': stage.status === 'err'
+              }">
+          <span *ngIf="stage.status === 'run'" class="spin">&#8635;</span> 
+          {{ stage.status === 'waiting' ? 'waiting' : (stage.status === 'run' ? 'running' : 'done') }}
+        </span>
+      </div>
+    </div>
+
+    <div class="console-panel">
+      <div class="console-header">
+        <span class="console-title">Live console engine stream</span>
+        <span style="font-size:10px;color:var(--color-text-tertiary)">{{ elapsed }}</span>
+      </div>
+      <div class="console-body" id="console-body">
+        <div class="log-line" *ngFor="let entry of logs">
+          <span class="lt">{{ entry.time }}</span>
+          <span class="ls">{{ entry.stage }}</span>
+          <span [class]="entry.cls">{{ entry.msg }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="summary-row" *ngIf="showSummary">
+      <div class="sum-card">
+        <div class="sum-label">Tables Crawled</div>
+        <div class="sum-val" style="color:var(--color-text-info)">148</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Relationships Detected</div>
+        <div class="sum-val" style="color:var(--color-text-success)">31</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Sensitive Columns</div>
+        <div class="sum-val" style="color:var(--color-text-danger)">14</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Domain Clusters</div>
+        <div class="sum-val" style="color:var(--color-text-warning)">7</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Total Duration</div>
+        <div class="sum-val" style="color:var(--color-text-secondary)">{{ elapsed }}</div>
+      </div>
+    </div>
+
+    <div class="action-row" *ngIf="showSummary" style="padding-bottom:14px">
+      <a routerLink="/relationships" class="btn-action">View relationships &#8599;</a>
+      <a routerLink="/sensitive" class="btn-action">View sensitive data &#8599;</a>
+      <a routerLink="/domains" class="btn-action">View clusters &#8599;</a>
+    </div>
+
+  </div>
+</div>

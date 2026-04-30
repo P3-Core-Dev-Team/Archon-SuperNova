@@ -1,0 +1,43 @@
+<div class="auth-container">
+  <div class="auth-title">Database Profile Connection</div>
+  <div class="auth-subtitle">Configure source schema for metadata analysis engine</div>
+  
+  <form (ngSubmit)="onConnect()">
+    <div class="input-group">
+      <label class="input-label">JDBC URI Endpoint</label>
+      <input type="text" class="input-field" [(ngModel)]="connection.url" name="url" placeholder="jdbc:postgresql://localhost:5432/db" required>
+    </div>
+    
+    <div class="input-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+      <div>
+        <label class="input-label">Username</label>
+        <input type="text" class="input-field" [(ngModel)]="connection.username" name="username" required>
+      </div>
+      <div>
+        <label class="input-label">Password</label>
+        <input type="password" class="input-field" [(ngModel)]="connection.password" name="password" required>
+      </div>
+    </div>
+    
+    <div class="input-group">
+      <label class="input-label">Target Schema</label>
+      <input type="text" class="input-field" [(ngModel)]="connection.schemaName" name="schemaName" required>
+    </div>
+    
+    <button type="submit" class="submit-btn" [class.success]="success" [disabled]="isConnecting">
+      <ng-container *ngIf="!isConnecting && !success">
+        <span>Connect to Resource</span> <span style="font-size:16px; margin-top:-2px">&#8594;</span>
+      </ng-container>
+      <ng-container *ngIf="isConnecting">
+        <span class="spin-icon">&#8635;</span> <span>Establishing...</span>
+      </ng-container>
+      <ng-container *ngIf="success">
+        <span>&#10003;</span> <span>Connected successfully</span>
+      </ng-container>
+    </button>
+
+    <div *ngIf="errorMessage" class="error-msg">
+      {{ errorMessage }}
+    </div>
+  </form>
+</div>

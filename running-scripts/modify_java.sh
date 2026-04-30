@@ -1,0 +1,1 @@
+sed -i '/private List<com.metadata.engine.be.metadata_engine_be.models.Relationship> schemaCrawlerRelationships;/a \    private List<com.metadata.engine.be.metadata_engine_be.models.Relationship> mlRelationships;' /home/adminp3s/IdeaProjects/metadata_engine/metadata_engine_be/src/main/java/com/metadata/engine/be/metadata_engine_be/models/dto/BulkSchemaRequest.java

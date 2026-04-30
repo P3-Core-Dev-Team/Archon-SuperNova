@@ -1,0 +1,192 @@
+<div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;background:var(--navy);display:flex;flex-direction:column;min-height:calc(100vh - 160px)">
+  <div class="toolbar" style="padding:16px; border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;">
+    <span style="font-size:18px;font-weight:500;">Entity Relationship Graph</span>
+    
+    <div style="position: relative; margin-left: 16px;">
+      <input type="text" [(ngModel)]="searchQuery" (input)="onSearchInput()" placeholder="Search exact table..." style="padding: 6px 10px; font-size: 14px; border: 1px solid var(--color-border-tertiary); background: var(--color-background-secondary); color: var(--text); border-radius: 6px; outline: none; width: 220px;">
+      
+      <ul *ngIf="suggestions.length > 0" style="position: absolute; top: 100%; left: 0; width: 100%; max-height: 200px; overflow-y: auto; background: var(--card-bg); border: 1px solid var(--color-border-tertiary); border-radius: 4px; list-style: none; padding: 0; margin: 4px 0 0 0; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <li *ngFor="let s of suggestions" (click)="selectSuggestion(s)" style="padding: 8px 12px; font-size: 14px; color: var(--text); cursor: pointer; border-bottom: 1px solid var(--color-border-tertiary);">
+          {{ s }}
+        </li>
+      </ul>
+    </div>
+
+    <div class="view-toggle" style="margin-left: 20px; display: flex; gap: 4px; background: var(--color-border-tertiary); padding: 4px; border-radius: 8px;">
+      <button (click)="setView('table')" [style.background]="activeView === 'table' ? 'var(--accent)' : 'transparent'" [style.color]="activeView === 'table' ? '#fff' : 'var(--text2)'" style="border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500;">Table View</button>
+      <button (click)="setView('graph')" [style.background]="activeView === 'graph' ? 'var(--accent)' : 'transparent'" [style.color]="activeView === 'graph' ? '#fff' : 'var(--text2)'" style="border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500;">Graph View</button>
+    </div>
+
+    <span style="margin-left:auto;font-size:11px;color:var(--text2)">NetworkX Directed Graph Representation</span>
+    <button (click)="refreshData()" style="padding: 4px 12px; font-size: 11px; margin-left: 10px; background: transparent; border: 0.5px solid var(--color-border-tertiary); color: var(--text); border-radius: 4px; cursor: pointer;">
+      ↻ Refresh
+    </button>
+  </div>
+  
+  <div style="display: flex; flex-direction: row; flex: 1;">
+       <!-- Table & Relationship View (Section 1) -->
+    <div *ngIf="activeView === 'table' && searchQuery" style="display: flex; flex-direction: row; flex: 1; background: var(--color-background-secondary);">
+       
+       <!-- Left Half: Fields Table -->
+       <div style="flex: 1; border-bottom: 1px solid var(--color-border-tertiary);">
+         <div style="padding: 16px; border-bottom: 1px solid var(--color-border-tertiary); position: sticky; top: 0; background: var(--color-background-secondary); z-index: 10; display: flex; align-items: center; gap: 12px;">
+            <h3 style="margin: 0; font-size: 14px; font-weight: 500; color: var(--color-text-primary);">fields <span style="color: var(--text2); font-weight: normal;">({{selectedTableColumns.length}})</span></h3>
+            <span *ngIf="selectedTableType" style="padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; background: rgba(56, 189, 248, 0.1); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.2);">
+              Table Type: {{ selectedTableType }}
+            </span>
+         </div>
+         <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead [style.background]="getHeaderColor()">
+               <tr>
+                 <th style="padding: 12px 16px; font-size: 11px; color: var(--text2); font-weight: 600; text-transform: uppercase;">Field</th>
+                 <th style="padding: 12px 16px; font-size: 11px; color: var(--text2); font-weight: 600; text-transform: uppercase;">Type</th>
+                 <th style="padding: 12px 16px; font-size: 11px; color: var(--text2); font-weight: 600; text-transform: uppercase;">Key</th>
+               </tr>
+            </thead>
+            <tbody>
+               <tr *ngFor="let col of paginatedColumns" style="border-bottom: 1px solid var(--color-border-tertiary);">
+                 <td style="padding: 12px 16px; font-size: 12px; font-weight: 500; color: var(--text);">{{col.columnName}}</td>
+                 <td style="padding: 12px 16px; font-size: 12px; color: var(--text2);">{{col.dataType}}</td>
+                 <td style="padding: 12px 16px;">
+                    <span *ngIf="col.isPrimaryKey" style="background: #10b981; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-right: 4px;">PK</span>
+                    <span *ngIf="col.isForeignKey" style="background: #3b82f6; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;">FK</span>
+                 </td>
+               </tr>
+            </tbody>
+         </table>
+         <!-- Field Pagination Controls -->
+         <div *ngIf="colTotalPages > 1" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--color-border-tertiary); background: var(--color-background-secondary); position: sticky; bottom: 0; z-index: 10;">
+            <button (click)="colPrevPage()" [disabled]="colCurrentPage === 0" [style.opacity]="colCurrentPage === 0 ? '0.5' : '1'" style="padding: 6px 12px; font-size: 11px; background: transparent; border: 1px solid var(--color-border-tertiary); color: var(--text); border-radius: 4px; cursor: pointer; transition: background 0.2s;">Previous</button>
+            <span style="font-size: 11px; color: var(--text2);">Page {{ colCurrentPage + 1 }} of {{ colTotalPages }}</span>
+            <button (click)="colNextPage()" [disabled]="colCurrentPage >= colTotalPages - 1" [style.opacity]="colCurrentPage >= colTotalPages - 1 ? '0.5' : '1'" style="padding: 6px 12px; font-size: 11px; background: transparent; border: 1px solid var(--color-border-tertiary); color: var(--text); border-radius: 4px; cursor: pointer; transition: background 0.2s;">Next</button>
+         </div>
+       </div>
+
+       <!-- Right Half: Relationships -->
+       <div style="flex: 1;">
+         <div style="padding: 16px; border-bottom: 1px solid var(--color-border-tertiary); position: sticky; top: 0; background: var(--color-background-secondary); z-index: 10; display: flex; align-items: center; justify-content: space-between;">
+            <h3 style="margin: 0; font-size: 14px; font-weight: 500; color: var(--color-text-primary);">relationships <span style="color: var(--text2); font-weight: normal;">({{selectedTableRelationships.length}})</span></h3>
+            <div style="position: relative;">
+               <input type="text" [(ngModel)]="relSearchQuery" (input)="filterRelationships()" placeholder="Filter relationships..." style="padding: 4px 8px; font-size: 11px; border: 1px solid var(--color-border-tertiary); background: rgba(0,0,0,0.1); color: var(--text); border-radius: 4px; outline: none; width: 140px;">
+               <ul *ngIf="relSuggestions && relSuggestions.length > 0" style="position: absolute; top: 100%; right: 0; width: 100%; max-height: 150px; overflow-y: auto; background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: 4px; list-style: none; padding: 0; margin: 4px 0 0 0; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                  <li *ngFor="let s of relSuggestions" (click)="selectRelSuggestion(s)" style="padding: 6px 12px; font-size: 11px; color: var(--text); cursor: pointer; border-bottom: 0.5px solid var(--color-border-tertiary);">
+                     {{ s }}
+                  </li>
+               </ul>
+            </div>
+         </div>
+         
+         <div style="padding: 16px;">
+            <div *ngIf="paginatedRelationshipGroups.length === 0" style="font-size: 13px; color: var(--text2); text-align: center; margin-top: 20px;">
+              No relationships found.
+            </div>
+            <div *ngFor="let group of paginatedRelationshipGroups" style="margin-bottom: 24px;">
+               <h4 style="margin: 0 0 4px 0; font-size: 13px; font-weight: 500; color: var(--text);">{{ group.target | titlecase }} Link</h4>
+               <div style="font-size: 11px; color: var(--text2); margin-bottom: 12px; display: flex; align-items: center; gap: 4px;">
+                  <span *ngIf="group.type === 'references'" style="color: var(--color-text-success); font-weight: bold;">&rarr;</span>
+                  <span *ngIf="group.type === 'referenced by'" style="color: var(--color-text-warning); font-weight: bold;">&larr;</span>
+                  {{ group.type }}
+               </div>
+
+               <div style="background: var(--card-bg); border: 1px solid var(--color-border-secondary); border-radius: 8px; padding: 16px; position: relative;">
+                  <div (click)="selectSuggestion(group.target)" title="Navigate" style="position: absolute; top: 16px; right: 16px; font-size: 14px; color: var(--text2); cursor: pointer; padding: 4px; border-radius: 4px; transition: background 0.2s;" onmouseover="this.style.background='var(--color-border-tertiary)'" onmouseout="this.style.background='transparent'">&rarr;</div>
+                  <div style="font-size: 13px; font-weight: 600; color: var(--color-text-success); margin-bottom: 12px;">{{ group.target }}</div>
+                  
+                  <div *ngFor="let rel of group.relations" style="display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 12px;">
+                     <div style="background: var(--color-border-tertiary); padding: 4px 8px; border-radius: 4px; color: var(--text); text-align: center;">{{ rel.columnA }}</div>
+                     <div style="color: var(--text2); font-size: 10px;">&rarr;</div>
+                     <div style="background: var(--color-border-tertiary); padding: 4px 8px; border-radius: 4px; color: var(--text); text-align: center;">{{ rel.columnB }}</div>
+                  </div>
+                  
+                  <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border-tertiary); font-size: 10px; color: var(--text2);">{{ group.relations[0]?.cardinality }}</div>
+               </div>
+            </div>
+         </div>
+          
+         <!-- Pagination Controls -->
+         <div *ngIf="relTotalPages > 1" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--color-border-tertiary); background: var(--color-background-secondary); position: sticky; bottom: 0; z-index: 10;">
+            <button (click)="relPrevPage()" [disabled]="relCurrentPage === 0" [style.opacity]="relCurrentPage === 0 ? '0.5' : '1'" style="padding: 6px 12px; font-size: 11px; background: transparent; border: 1px solid var(--color-border-tertiary); color: var(--text); border-radius: 4px; cursor: pointer; transition: background 0.2s;">Previous</button>
+            <span style="font-size: 11px; color: var(--text2);">Page {{ relCurrentPage + 1 }} of {{ relTotalPages }}</span>
+            <button (click)="relNextPage()" [disabled]="relCurrentPage >= relTotalPages - 1" [style.opacity]="relCurrentPage >= relTotalPages - 1 ? '0.5' : '1'" style="padding: 6px 12px; font-size: 11px; background: transparent; border: 1px solid var(--color-border-tertiary); color: var(--text); border-radius: 4px; cursor: pointer; transition: background 0.2s;">Next</button>
+         </div>
+       </div>
+    </div>
+
+    <!-- LEVEL 1: High-Level Group Cards -->
+    <div *ngIf="activeView === 'table' && !searchQuery && !selectedGroup" style="flex: 1; background: var(--color-background-primary); padding: 32px 40px; overflow-y: auto;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px;">
+         <h3 style="margin: 0; font-size: 18px; font-weight: 500; color: var(--color-text-primary);">Entity Categories <span style="color: var(--text2); font-weight: normal; font-size: 15px; margin-left: 6px;">({{groupedTables.length}} groups)</span></h3>
+         <span style="font-size: 12px; color: var(--text2);">Select a table category to view its entities.</span>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+         <div *ngFor="let group of groupedTables" (click)="selectGroup(group.type)" style="cursor:pointer; background: var(--color-background-secondary); padding: 24px; border-radius: 12px; border: 1px solid var(--color-border-secondary); transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);" onmouseover="this.style.borderColor='var(--accent2)'; this.style.transform='translateY(-2px)'; this.style.boxShadow='0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)';" onmouseout="this.style.borderColor='var(--color-border-secondary)'; this.style.transform='none'; this.style.boxShadow='0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)';">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
+               <span [style.background]="getTableColor(group.type)" style="padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px;">
+                  {{ group.type }}
+               </span>
+               <span style="font-size: 20px; font-weight: 300; color: var(--text2);">&rarr;</span>
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+               <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted);">Total Entities</span>
+               <span style="font-weight: 600; color: var(--color-text-primary); font-size: 24px;">{{group.tables.length}}</span>
+            </div>
+         </div>
+      </div>
+    </div>
+
+    <!-- LEVEL 2: Drilled-Down Entity Cards for Selected Group -->
+    <div *ngIf="activeView === 'table' && !searchQuery && selectedGroup" style="flex: 1; background: var(--color-background-primary); padding: 32px 40px; overflow-y: auto;">
+      <div style="margin-bottom: 32px;">
+         <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); margin-bottom: 12px; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text2)'" (click)="clearGroupSelection()">
+            <span>&larr;</span> <span>Back to Categories</span>
+         </div>
+         <div style="display: flex; align-items: center; gap: 12px;">
+            <h3 style="margin: 0; font-size: 22px; font-weight: 500; color: var(--color-text-primary);">{{ selectedGroup }}</h3>
+            <span style="padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--color-border-tertiary); color: var(--text);">{{selectedGroupTables.length}} tables</span>
+         </div>
+      </div>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px;">
+         <div *ngFor="let t of selectedGroupTables" (click)="selectSuggestion(t.tableName)" style="cursor:pointer; background: var(--color-background-secondary); padding: 20px; border-radius: 12px; border: 1px solid var(--color-border-secondary); transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);" onmouseover="this.style.borderColor='var(--accent)'; this.style.transform='translateY(-2px)';" onmouseout="this.style.borderColor='var(--color-border-secondary)'; this.style.transform='none';">
+            <h3 style="margin: 0 0 16px 0; color: var(--color-text-primary); font-size: 15px; font-weight: 600; line-height: 1.4; word-break: break-all;" [title]="t.tableName">{{t.tableName}}</h3>
+            
+            <div style="display: flex; gap: 24px; margin-top: auto; padding-top: 16px; border-top: 1px solid var(--color-border-tertiary); font-size: 12px; color: var(--text2);">
+               <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted);">Columns</span>
+                  <span style="font-weight: 600; color: var(--text); font-size: 14px;">{{t.columns?.length || 0}}</span>
+               </div>
+               <div style="display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted);">Relationships</span>
+                  <span style="font-weight: 600; color: var(--color-text-info); font-size: 14px;">{{getRelCount(t.tableName)}} edges</span>
+               </div>
+            </div>
+         </div>
+      </div>
+    </div>
+
+    <!-- Cytoscape Graph (Section 2) -->
+    <div id="cy" [style.display]="activeView === 'graph' ? 'block' : 'none'" style="flex: 1; background: var(--color-background-primary); position: relative;">
+      
+      <!-- Graph Legend Overlay -->
+      <div *ngIf="activeView === 'graph'" style="position: absolute; top: 20px; right: 20px; background: var(--card-bg); backdrop-filter: blur(8px); border: 1px solid var(--color-border-tertiary); border-radius: 8px; padding: 16px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+         <h4 style="margin: 0 0 12px 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text2);">Entity Types Legend</h4>
+         <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 10px; height: 10px; border-radius: 50%; background: #f59e0b;"></div><span style="font-size: 11px; color: var(--text);">Transaction (Header)</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 10px; height: 10px; border-radius: 50%; background: #fbbf24;"></div><span style="font-size: 11px; color: var(--text);">Transaction (Item)</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 10px; height: 10px; border-radius: 50%; background: #38bdf8;"></div><span style="font-size: 11px; color: var(--text);">Master Lookup</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 10px; height: 10px; border-radius: 50%; background: #10b981;"></div><span style="font-size: 11px; color: var(--text);">Configuration</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 10px; height: 10px; border-radius: 50%; background: #94a3b8;"></div><span style="font-size: 11px; color: var(--text);">History / Log</span></div>
+            <div style="display: flex; align-items: center; gap: 8px;"><div style="width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;"></div><span style="font-size: 11px; color: var(--text);">Standard Entity</span></div>
+         </div>
+      </div>
+      
+    </div>
+  </div>
+  
+  <div style="padding:10px 16px; border-top:0.5px solid var(--color-border-tertiary); background:var(--color-background-secondary); display:flex; align-items:center; justify-content:space-between; font-size:11px; color:var(--text2)">
+    <span>{{ relationships.length }} relationships &middot; {{ domains.length }} clusters</span>
+    <span>Powered by Cytoscape.js</span>
+  </div>
+</div>
