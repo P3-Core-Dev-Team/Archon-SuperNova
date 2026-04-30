@@ -1,6 +1,6 @@
 import {
-  AfterViewInit, Component, ElementRef, HostListener, OnInit,
-  ViewChild, computed, inject, signal,
+  AfterViewInit, Component, ElementRef, EventEmitter, HostListener,
+  Input, OnChanges, OnInit, Output, ViewChild, computed, inject, signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -41,8 +41,13 @@ interface FkRow {
   selector: 'app-table-card-page',
   standalone: true,
   imports: [CommonModule, RouterLink],
+  host: {
+    '[class.embedded]': 'embedded',
+  },
   template: `
-    <a [routerLink]="['/jobs', jobId]" class="back">← Back to job</a>
+    @if (!embedded) {
+      <a [routerLink]="['/jobs', jobId]" class="back">← Back to job</a>
+    }
 
     @if (loading()) {
       <p class="muted">Loading…</p>
@@ -54,7 +59,10 @@ interface FkRow {
 
     @if (!loading() && !error()) {
       <!-- Page header: table name + description on the left, table | map
-           toggle on the right.  Shared between both modes per the spec. -->
+           toggle on the right.  Shared between both modes per the spec.
+           Hidden when embedded — the parent (Relationships tab) provides
+           the header + a 3-state overview/map/table toggle. -->
+      @if (!embedded) {
       <div class="page-header">
         <div class="title-row">
           <h1 class="mono">{{ tableName() }}</h1>
@@ -74,7 +82,9 @@ interface FkRow {
                   (click)="setView('map')">map</button>
         </div>
       </div>
+      }
 
+      @if (!embedded) {
       <div class="header">
         <div class="badges">
           <span class="badge schema">{{ job()?.schema_name }}</span>
@@ -85,6 +95,7 @@ interface FkRow {
           }
         </div>
       </div>
+      }
 
       @if (view() === 'map') {
         <!-- MAP mode: focal-table at the centre, 1-hop neighbours arranged
@@ -122,9 +133,8 @@ interface FkRow {
               <div class="search-hits">
                 @for (h of searchHits(); track h) {
                   <a class="search-hit mono"
-                     [routerLink]="['/jobs', jobId, 'tables', h]"
-                     [queryParams]="{ view: 'map' }"
-                     (click)="searchQuery.set('')">{{ h }}</a>
+                     href="javascript:void(0)"
+                     (click)="onSearchHitClick(h)">{{ h }}</a>
                 }
               </div>
             }
@@ -439,6 +449,18 @@ interface FkRow {
          when the viewport is short (e.g. landscape phones). */
       height: calc(100vh - var(--map-top-offset, 196px));
       min-height: 480px;
+    }
+    /* Embedded mode: the parent (Relationships tab) constrains size.  Keep
+       width 100% inside its own column; use a fixed-but-comfortable height
+       since we no longer own the viewport. */
+    :host-context(.embedded) .map-wrap, .embedded .map-wrap {
+      width: 100%;
+      margin-left: 0;
+      margin-right: 0;
+      height: 720px;
+      min-height: 480px;
+      border-radius: 8px;
+      border: 1px solid #30363d;
       background: #0d1117;
       border-top: 1px solid #30363d;
       border-bottom: 1px solid #30363d;
@@ -946,7 +968,7 @@ interface FkRow {
     .error { color: #ffabab; background: #3a0d0d; border-color: #f85149; }
   `],
 })
-export class TableCardPageComponent implements OnInit, AfterViewInit {
+export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private jobsSvc = inject(JobService);
@@ -954,6 +976,29 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
   // Reference to the map's bordered canvas wrapper so fit-to-screen can
   // measure its real size after the viewport-bleed CSS settles.
   @ViewChild('mapWrap') private mapWrapEl?: ElementRef<HTMLDivElement>;
+
+  /**
+   * Embedded mode — set by a parent component (the Relationships tab on
+   * the job-detail page) when the page renders this component inline
+   * instead of as a top-level route.  In embedded mode we:
+   *   - hide our own "← Back to job" link and the top page-header
+   *     (the parent owns the page chrome)
+   *   - hide the "table | map" pill toggle (the parent provides a
+   *     three-state overview/map/table toggle)
+   *   - emit ``tableSelected`` instead of router-navigating when a
+   *     neighbour-card click or search-hit click would normally promote
+   *     a different table.
+   */
+  @Input({ alias: 'embedded' }) embedded = false;
+  @Input({ alias: 'jobId' })    inputJobId?: string;
+  @Input({ alias: 'tableName' }) inputTableName?: string;
+  @Input({ alias: 'view' })      inputView?: 'table' | 'map';
+
+  /** Fired when a neighbour-card click (map mode) or a search-hit click
+   * would have navigated to a different focal table.  The parent uses
+   * this to update its own ``?table=`` query param without us touching
+   * the router.  Only fires while ``embedded`` is true. */
+  @Output() tableSelected = new EventEmitter<{ table: string; view: 'table' | 'map' }>();
 
   jobId = '';
   /** Reactive focal-table name driven by the route's :table_name param.
@@ -979,6 +1024,16 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
   setView(v: 'table' | 'map'): void {
     if (this.view() === v) return;
     this.view.set(v);
+    if (this.embedded) {
+      // Parent (Relationships tab) owns the URL.  Tell it the user
+      // toggled view; the parent updates its query params.
+      this.tableSelected.emit({ table: this.tableName(), view: v });
+      if (v === 'map') {
+        requestAnimationFrame(() => this.fitMapToScreen());
+        setTimeout(() => this.fitMapToScreen(), 50);
+      }
+      return;
+    }
     // Update URL without reloading the component.  ``replaceUrl: true`` so
     // the browser back-button doesn't bounce between toggle states.
     this.router.navigate([], {
@@ -1022,6 +1077,40 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
     // load below will eventually populate mapCards(); kick off a fit on
     // the next frame after that completes.  ngOnInit's forkJoin schedules
     // the actual call; this hook just ensures mapWrapEl is bound first.
+  }
+
+  /**
+   * Called from the parent (when embedded) whenever the @Input table-name
+   * changes, OR from the paramMap subscriber in route-driven mode.  Resets
+   * transient state and refits the radial layout when MAP mode is active.
+   */
+  private onFocalChange(newTbl: string): void {
+    if (newTbl === this.tableName()) return;
+    this.tableName.set(newTbl);
+    this.searchQuery.set('');
+    this.hoveredCardId.set(null);
+    this.cardOffsets.set({});
+    if (this.view() === 'map') {
+      requestAnimationFrame(() => this.fitMapToScreen());
+      setTimeout(() => this.fitMapToScreen(), 50);
+    }
+  }
+
+  /** ngOnChanges fires whenever the parent rebinds an @Input.  In
+   * embedded mode this is how we pick up table-switch / view-switch
+   * commands from the Relationships tab. */
+  ngOnChanges(): void {
+    if (!this.embedded) return;
+    if (this.inputTableName && this.inputTableName !== this.tableName()) {
+      this.onFocalChange(this.inputTableName);
+    }
+    if (this.inputView && this.inputView !== this.view()) {
+      this.view.set(this.inputView);
+      if (this.inputView === 'map') {
+        requestAnimationFrame(() => this.fitMapToScreen());
+        setTimeout(() => this.fitMapToScreen(), 50);
+      }
+    }
   }
 
   /** Window-level resize keeps the focal map fit-to-screen as users
@@ -1619,7 +1708,13 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
 
   onMapCardClick(n: { id: string }): void {
     if (n.id === this.tableName()) return;
-    // Promote neighbour to focal — navigate to its map view.
+    if (this.embedded) {
+      // Parent owns navigation in embedded mode — emit and let the
+      // Relationships tab update its ?table= query param.
+      this.tableSelected.emit({ table: n.id, view: 'map' });
+      return;
+    }
+    // Standalone-route mode: promote neighbour to focal via URL change.
     this.router.navigate(['/jobs', this.jobId, 'tables', n.id], {
       queryParams: { view: 'map' },
     });
@@ -1627,6 +1722,20 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
 
   onSearchInput(ev: Event): void {
     this.searchQuery.set((ev.target as HTMLInputElement).value);
+  }
+
+  /** Click handler for the jump-to-table search dropdown.  Navigates
+   * (route-driven) or emits (embedded) — same branching as
+   * onMapCardClick. */
+  onSearchHitClick(table: string): void {
+    this.searchQuery.set('');
+    if (this.embedded) {
+      this.tableSelected.emit({ table, view: 'map' });
+      return;
+    }
+    this.router.navigate(['/jobs', this.jobId, 'tables', table], {
+      queryParams: { view: 'map' },
+    });
   }
 
   exportMap(): void {
@@ -1742,8 +1851,13 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
   }
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    const tbl = this.route.snapshot.paramMap.get('table_name');
+    // Two configuration paths: route-driven (top-level page) or input-
+    // driven (embedded inside the Relationships tab).  Inputs take
+    // precedence when present so the parent owns the source of truth.
+    const id = this.inputJobId
+      ?? this.route.snapshot.paramMap.get('id');
+    const tbl = this.inputTableName
+      ?? this.route.snapshot.paramMap.get('table_name');
     if (!id || !tbl) {
       this.error.set('Missing job id or table name in URL.');
       this.loading.set(false);
@@ -1751,36 +1865,24 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
     }
     this.jobId = id;
     this.tableName.set(tbl);
-    // Hydrate the view signal from the URL on first load.
-    const v0 = this.route.snapshot.queryParamMap.get('view');
+    const v0 = this.inputView
+      ?? this.route.snapshot.queryParamMap.get('view');
     this.view.set(v0 === 'map' ? 'map' : 'table');
-    // Stay in sync if the param changes via browser back/forward.
-    this.route.queryParamMap.subscribe(qp => {
-      const v = qp.get('view');
-      const next = v === 'map' ? 'map' : 'table';
-      if (next !== this.view()) this.view.set(next);
-    });
-    // Same component is reused on a sibling-route nav (Angular doesn't
-    // re-create the component when only :table_name changes), so we have
-    // to listen for paramMap updates ourselves and reload focal state.
-    this.route.paramMap.subscribe(pm => {
-      const newTbl = pm.get('table_name');
-      if (!newTbl || newTbl === this.tableName()) return;
-      this.tableName.set(newTbl);
-      // Reset transient interaction state so the new focal lands fresh.
-      this.searchQuery.set('');
-      this.hoveredCardId.set(null);
-      // Clear user-applied drag offsets — the new focal has a different
-      // neighbour set, so old positions don't apply.
-      this.cardOffsets.set({});
-      // Re-fit the new radial layout to the canvas (mapCards is computed
-      // off tableName + allEdges, so it'll have the new neighbours by
-      // the next paint).
-      if (this.view() === 'map') {
-        requestAnimationFrame(() => this.fitMapToScreen());
-        setTimeout(() => this.fitMapToScreen(), 50);
-      }
-    });
+
+    if (!this.embedded) {
+      // Route-driven mode: subscribe to URL param changes so browser
+      // back/forward + sibling-route navigation update focal state.
+      this.route.queryParamMap.subscribe(qp => {
+        const v = qp.get('view');
+        const next = v === 'map' ? 'map' : 'table';
+        if (next !== this.view()) this.view.set(next);
+      });
+      this.route.paramMap.subscribe(pm => {
+        const newTbl = pm.get('table_name');
+        if (!newTbl || newTbl === this.tableName()) return;
+        this.onFocalChange(newTbl);
+      });
+    }
 
     forkJoin({
       job: this.jobsSvc.get(id),

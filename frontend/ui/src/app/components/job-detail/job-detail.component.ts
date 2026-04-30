@@ -1,7 +1,7 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule, DatePipe } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { EMPTY, Subscription, combineLatest, interval, of, switchMap, timer } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { Job } from '../../models/job.model';
@@ -9,7 +9,7 @@ import { JobService, RunLogEntry } from '../../services/job.service';
 import { RelationshipGraphComponent } from '../relationship-graph/relationship-graph.component';
 import { PiiTableComponent } from '../pii-table/pii-table.component';
 import { ExportBarComponent } from '../export-bar/export-bar.component';
-import { TableDetailComponent } from '../table-detail/table-detail.component';
+import { TableCardPageComponent } from '../table-card/table-card-page.component';
 import { ClusterOverviewComponent } from '../cluster-overview/cluster-overview.component';
 
 type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
@@ -20,7 +20,7 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
   imports: [
     CommonModule, DatePipe, RouterLink,
     RelationshipGraphComponent, PiiTableComponent,
-    ExportBarComponent, TableDetailComponent,
+    ExportBarComponent, TableCardPageComponent,
     ClusterOverviewComponent,
   ],
   template: `
@@ -66,16 +66,16 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
       }
 
       <div class="tabs">
-        <button [class.active]="tab() === 'clusters'" (click)="tab.set('clusters')">
+        <button [class.active]="tab() === 'clusters'" (click)="setTab('clusters')">
           Clusters
         </button>
-        <button [class.active]="tab() === 'relationships'" (click)="tab.set('relationships')">
+        <button [class.active]="tab() === 'relationships'" (click)="setTab('relationships')">
           Relationships graph
         </button>
-        <button [class.active]="tab() === 'pii'" (click)="tab.set('pii')">
+        <button [class.active]="tab() === 'pii'" (click)="setTab('pii')">
           PII findings
         </button>
-        <button [class.active]="tab() === 'log'" (click)="tab.set('log')">
+        <button [class.active]="tab() === 'log'" (click)="setTab('log')">
           Run log
         </button>
       </div>
@@ -85,10 +85,59 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
           <app-cluster-overview [jobId]="j.job_id" />
         }
         @if (tab() === 'relationships') {
-          <app-relationship-graph [jobId]="j.job_id" />
-          <!-- Detail panel sits BELOW the graph and renders when a node is clicked.
-               relationship-graph publishes the selection on JobService.selectedTable. -->
-          <app-table-detail [jobId]="j.job_id" />
+          <!-- Inline three-state mode toggle: overview (global hairball) /
+               map (focal-table 1-hop) / table (per-table detail).  All
+               three modes render in this same tab — no navigation away. -->
+          <div class="rel-mode-row">
+            <div class="rel-mode-toggle" role="tablist" aria-label="Relationships view mode">
+              <button type="button" role="tab"
+                      [class.active]="relMode() === 'overview'"
+                      (click)="setRelMode('overview')">overview</button>
+              <span class="sep">|</span>
+              <button type="button" role="tab"
+                      [class.active]="relMode() === 'map'"
+                      [disabled]="!selectedTable()"
+                      [title]="selectedTable() ? '' : 'Select a table from the overview first'"
+                      (click)="setRelMode('map')">map</button>
+              <span class="sep">|</span>
+              <button type="button" role="tab"
+                      [class.active]="relMode() === 'table'"
+                      [disabled]="!selectedTable()"
+                      [title]="selectedTable() ? '' : 'Select a table from the overview first'"
+                      (click)="setRelMode('table')">table</button>
+            </div>
+            @if (relMode() !== 'overview') {
+              <div class="rel-table-picker">
+                <span class="muted small">Selected table:</span>
+                <code class="mono">{{ selectedTable() }}</code>
+                <button type="button" class="link-btn"
+                        (click)="setRelMode('overview')"
+                        title="Return to the all-tables overview">
+                  back to overview ↺
+                </button>
+              </div>
+            }
+          </div>
+
+          @if (relMode() === 'overview') {
+            <app-relationship-graph [jobId]="j.job_id" />
+          }
+          @if (relMode() === 'map' && selectedTable()) {
+            <app-table-card-page
+              [embedded]="true"
+              [jobId]="j.job_id"
+              [tableName]="selectedTable()!"
+              [view]="'map'"
+              (tableSelected)="onRelTableSelected($event)" />
+          }
+          @if (relMode() === 'table' && selectedTable()) {
+            <app-table-card-page
+              [embedded]="true"
+              [jobId]="j.job_id"
+              [tableName]="selectedTable()!"
+              [view]="'table'"
+              (tableSelected)="onRelTableSelected($event)" />
+          }
         }
         @if (tab() === 'pii') {
           <app-pii-table [jobId]="j.job_id" />
@@ -190,6 +239,65 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
       white-space: pre-wrap;
       background: #0d1117;
     }
+    /* Relationships-tab inline mode toggle (overview | map | table). */
+    .rel-mode-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .rel-mode-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 999px;
+    }
+    .rel-mode-toggle button {
+      background: transparent;
+      border: none;
+      color: #8b949e;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      letter-spacing: 0;
+      text-transform: lowercase;
+      cursor: pointer;
+    }
+    .rel-mode-toggle button.active {
+      background: #1f6feb;
+      color: #fff;
+    }
+    .rel-mode-toggle button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .rel-mode-toggle .sep {
+      color: #30363d;
+      font-size: 12px;
+      user-select: none;
+    }
+    .rel-table-picker {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .rel-table-picker .link-btn {
+      background: transparent;
+      border: 1px solid #30363d;
+      color: #58a6ff;
+      padding: 3px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .rel-table-picker .link-btn:hover { border-color: #58a6ff; }
+
     .runlog-card { margin-bottom: 16px; }
     .runlog-title { margin: 0 0 12px 0; font-size: 14px; color: #c9d1d9; }
     .runlog-table {
@@ -223,6 +331,7 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
 })
 export class JobDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private jobsSvc = inject(JobService);
 
   job = signal<Job | null>(null);
@@ -230,8 +339,19 @@ export class JobDetailComponent implements OnInit, OnDestroy {
   tab = signal<Tab>('clusters');
   logText = signal<string>('');
   runLog = signal<RunLogEntry[]>([]);
+
+  /** Three-state mode for the Relationships tab.  Default 'overview'
+   * (global hairball graph); switches to 'map' when a node is clicked
+   * or the user picks the toggle; 'table' shows per-table detail.
+   * Synced with the URL: ?tab=relationships → overview,
+   * ?tab=relationships&table=X → map, &view=table → table. */
+  relMode = signal<'overview' | 'map' | 'table'>('overview');
+  selectedTable = signal<string | null>(null);
+
   private sub?: Subscription;
   private logSub?: Subscription;
+  private selSub?: Subscription;
+  private qpSub?: Subscription;
   // toObservable() requires an injection context (ctor / class field init).
   // Capture it here so the polling pipeline in ngOnInit can simply consume
   // the result instead of calling toObservable() outside the context, which
@@ -292,11 +412,90 @@ export class JobDetailComponent implements OnInit, OnDestroy {
         this.logText.set(logResp.log);
         this.runLog.set(runLogResp.entries);
       });
+
+    // --- Relationships-tab URL sync ---------------------------------
+    // Hydrate from ?tab + ?table + ?view, then write back on changes
+    // (browser back/forward stays consistent with the on-screen toggle).
+    this.qpSub = this.route.queryParamMap.subscribe(qp => {
+      const t = qp.get('tab');
+      if (t === 'relationships' || t === 'clusters' || t === 'pii' || t === 'log') {
+        this.tab.set(t);
+      }
+      const tbl = qp.get('table');
+      const view = qp.get('view');
+      this.selectedTable.set(tbl || null);
+      if (this.tab() === 'relationships') {
+        if (!tbl) {
+          this.relMode.set('overview');
+        } else {
+          this.relMode.set(view === 'table' ? 'table' : 'map');
+        }
+      }
+    });
+
+    // --- Node-click bridge ------------------------------------------
+    // The all-tables relationship-graph publishes node clicks via
+    // JobService.selectedTable.  Catch them here: set the table and
+    // switch the mode to 'map' (per the spec) without leaving the tab.
+    this.selSub = toObservable(this.jobsSvc.selectedTable).subscribe(t => {
+      if (this.tab() !== 'relationships') return;
+      if (t && t !== this.selectedTable()) {
+        this.selectedTable.set(t);
+        this.relMode.set('map');
+        this.pushQueryParams();
+      }
+    });
+  }
+
+  /** Update the URL to reflect (tab, selectedTable, relMode) without
+   * triggering a re-navigation cycle.  Uses replaceUrl so toggle clicks
+   * don't pollute browser history. */
+  private pushQueryParams(): void {
+    const params: Record<string, string | null> = { tab: this.tab() };
+    if (this.tab() === 'relationships' && this.relMode() !== 'overview' && this.selectedTable()) {
+      params['table'] = this.selectedTable()!;
+      params['view'] = this.relMode() === 'table' ? 'table' : 'map';
+    } else {
+      params['table'] = null;
+      params['view'] = null;
+    }
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: params,
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  /** Tab-button click handler — keeps the URL in sync. */
+  setTab(t: Tab): void {
+    if (t === this.tab()) return;
+    this.tab.set(t);
+    this.pushQueryParams();
+  }
+
+  /** Three-state Relationships-mode toggle handler. */
+  setRelMode(mode: 'overview' | 'map' | 'table'): void {
+    if (mode === this.relMode()) return;
+    if (mode !== 'overview' && !this.selectedTable()) return; // disabled
+    this.relMode.set(mode);
+    if (mode === 'overview') this.selectedTable.set(null);
+    this.pushQueryParams();
+  }
+
+  /** Embedded TableCardPageComponent emits this when its internal
+   * neighbour-card click or search-hit click would normally navigate. */
+  onRelTableSelected(ev: { table: string; view: 'table' | 'map' }): void {
+    this.selectedTable.set(ev.table);
+    this.relMode.set(ev.view);
+    this.pushQueryParams();
   }
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
     this.logSub?.unsubscribe();
+    this.selSub?.unsubscribe();
+    this.qpSub?.unsubscribe();
   }
 
   duration(j: Job): string {

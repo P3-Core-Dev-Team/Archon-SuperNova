@@ -31,10 +31,13 @@ export const routes: Routes = [
       ),
   },
   {
+    // Legacy deep-link: redirects to /jobs/:id?tab=relationships&table=...&view=...
+    // The TABLE / MAP per-table views now live as embedded modes inside
+    // the Relationships tab; see commit consolidating the two-mode flow.
     path: 'jobs/:id/tables/:table_name',
     loadComponent: () =>
-      import('./components/table-card/table-card-page.component').then(
-        m => m.TableCardPageComponent,
+      import('./components/legacy-redirect/legacy-table-redirect.component').then(
+        m => m.LegacyTableRedirectComponent,
       ),
   },
   {
