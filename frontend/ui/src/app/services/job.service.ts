@@ -30,6 +30,18 @@ export interface RunLogEntry {
   sub_failed?: number;
 }
 
+/**
+ * Discriminated union for SSE frames pushed by GET /api/jobs/{id}/events.
+ * The backend emits exactly five event names; this type pairs each name
+ * with its payload shape so consumers get exhaustive narrowing.
+ */
+export type JobEvent =
+  | { type: 'snapshot'; data: { status: Job; run_log: { entries: RunLogEntry[] }; log: string } }
+  | { type: 'status'; data: Job }
+  | { type: 'run_log'; data: { entries: RunLogEntry[] } }
+  | { type: 'log'; data: { log: string } }
+  | { type: 'done'; data: { status?: string; reason?: string } };
+
 export interface ConnectionTestRequest {
   db_type: SourceDbType;
   host: string;
@@ -117,6 +129,64 @@ export class JobService {
     return this.http.get<{ entries: RunLogEntry[] }>(
       `${this.base}/jobs/${jobId}/run_log`,
     );
+  }
+
+  /**
+   * Subscribe to a Server-Sent Events stream for one job.  Replaces the
+   * legacy polling pattern of GET /jobs/:id + /log + /run_log every
+   * 2-3 s with a single push connection.  Backend cadence: 750 ms diff
+   * loop; emits ``snapshot`` once on open, then ``status`` / ``run_log``
+   * / ``log`` deltas as state changes, and ``done`` on terminal status.
+   *
+   * Each emission carries an event ``type`` and the parsed JSON payload.
+   * Unsubscribing closes the underlying EventSource — call sites should
+   * always store the Subscription and unsubscribe in ``ngOnDestroy``.
+   *
+   * Failure handling: EventSource auto-reconnects on transient drops
+   * (the spec says so), so we don't surface those as errors.  Only a
+   * 404 from the initial open propagates as Observable error.
+   */
+  events(jobId: string): Observable<JobEvent> {
+    return new Observable<JobEvent>(subscriber => {
+      const url = `${this.base}/jobs/${jobId}/events`;
+      const es = new EventSource(url);
+
+      const onMessage = (kind: JobEvent['type']) =>
+        (ev: MessageEvent) => {
+          try {
+            subscriber.next({ type: kind, data: JSON.parse(ev.data) });
+          } catch (err) {
+            // Don't tear down the stream on a single malformed frame —
+            // it's almost always a proxy buffering glitch.
+            console.warn(`[JobService.events] malformed ${kind} frame`, err);
+          }
+        };
+
+      es.addEventListener('snapshot', onMessage('snapshot'));
+      es.addEventListener('status', onMessage('status'));
+      es.addEventListener('run_log', onMessage('run_log'));
+      es.addEventListener('log', onMessage('log'));
+      es.addEventListener('done', (ev: MessageEvent) => {
+        try {
+          subscriber.next({ type: 'done', data: JSON.parse(ev.data) });
+        } catch { /* ignore */ }
+        subscriber.complete();
+        es.close();
+      });
+
+      es.onerror = () => {
+        // EventSource auto-reconnects (readyState 0 = CONNECTING) on its
+        // own; only surface a hard error if it's permanently CLOSED.
+        if (es.readyState === EventSource.CLOSED) {
+          subscriber.error(new Error('EventSource closed'));
+        }
+      };
+
+      // Teardown — fires on subscription.unsubscribe().
+      return () => {
+        es.close();
+      };
+    });
   }
 
   relationships(jobId: string, limit = 500): Observable<RelationshipGraph> {

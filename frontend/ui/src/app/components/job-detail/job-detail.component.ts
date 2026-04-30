@@ -2,8 +2,7 @@ import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '
 import { toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule, DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { EMPTY, Subscription, combineLatest, interval, of, switchMap, timer } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { Subscription } from 'rxjs';
 import { Job } from '../../models/job.model';
 import { JobService, RunLogEntry } from '../../services/job.service';
 import { RelationshipGraphComponent } from '../relationship-graph/relationship-graph.component';
@@ -348,15 +347,13 @@ export class JobDetailComponent implements OnInit, OnDestroy {
   relMode = signal<'overview' | 'map' | 'table'>('overview');
   selectedTable = signal<string | null>(null);
 
+  /** SSE event stream — replaces the legacy 3s/2s polling pipelines. */
   private sub?: Subscription;
-  private logSub?: Subscription;
   private selSub?: Subscription;
   private qpSub?: Subscription;
   // toObservable() requires an injection context (ctor / class field init).
-  // Capture both observables here so the subscriptions in ngOnInit can
-  // consume them — calling toObservable() inside ngOnInit throws NG0203
-  // at runtime and silently kills the dependent feature.
-  private tab$ = toObservable(this.tab);
+  // Capture as a field so the subscription inside ngOnInit doesn't throw
+  // NG0203 (which silently killed the feature in a previous regression).
   private selectedTable$ = toObservable(this.jobsSvc.selectedTable);
 
   ngOnInit(): void {
@@ -366,53 +363,45 @@ export class JobDetailComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.jobsSvc.get(id).subscribe({
-      next: j => this.job.set(j),
-      error: err => this.loadError.set(
-        err?.error?.detail ?? err?.message ?? 'Failed to load job.',
-      ),
+    // SSE replaces the legacy polling pattern (interval(3000) on /jobs/:id
+    // + tab-driven 2s polling on /log + /run_log).  One push connection
+    // delivers every state change in <750ms; status / run_log / log are
+    // applied to the same signals the template already reads.  Backend
+    // closes the stream on terminal status, which fires the 'done'
+    // event and completes the Observable — Angular will unsubscribe on
+    // ngOnDestroy regardless, so no explicit cleanup is needed past
+    // storing the Subscription.
+    this.sub = this.jobsSvc.events(id).subscribe({
+      next: ev => {
+        switch (ev.type) {
+          case 'snapshot':
+            this.job.set(ev.data.status);
+            this.logText.set(ev.data.log);
+            this.runLog.set(ev.data.run_log.entries);
+            break;
+          case 'status':
+            this.job.set(ev.data);
+            break;
+          case 'log':
+            this.logText.set(ev.data.log);
+            break;
+          case 'run_log':
+            this.runLog.set(ev.data.entries);
+            break;
+          case 'done':
+            // Terminal frame.  The Observable will complete next tick;
+            // no explicit teardown required.
+            break;
+        }
+      },
+      error: err => {
+        // EventSource auto-reconnects on transient drops; this only
+        // fires when readyState is permanently CLOSED (404 on open,
+        // connection refused, etc.).  Surface as a soft error so the
+        // page doesn't lose the snapshot it already has.
+        console.warn('[job-detail] SSE stream closed:', err);
+      },
     });
-
-    // Poll every 3s while not terminal
-    this.sub = interval(3000)
-      .pipe(switchMap(() => this.jobsSvc.get(id)))
-      .subscribe({
-        next: j => {
-          this.job.set(j);
-          if (j.status === 'succeeded' || j.status === 'failed') {
-            this.sub?.unsubscribe();
-            // Once the job is terminal there's no reason to keep polling logs.
-            this.logSub?.unsubscribe();
-          }
-        },
-        // Swallow transient poll errors — the user already has prior data.
-        error: () => {},
-      });
-
-    // Log polling — only fetches while the log tab is open.  Driven by tab
-    // changes so switching TO the log tab triggers an immediate fetch (t=0)
-    // followed by a 2s poll; switching AWAY cancels both the in-flight
-    // request and the pending timer via the outer switchMap.
-    // combineLatest waits for both single-emit HttpClient observables to
-    // complete before emitting — that's fine; they always complete.
-    // catchError on each inner observable returns stale state so a transient
-    // network hiccup doesn't wipe the display.
-    this.logSub = this.tab$
-      .pipe(
-        switchMap(t => t === 'log' ? timer(0, 2000) : EMPTY),
-        switchMap(() => combineLatest([
-          this.jobsSvc.log(id, 200).pipe(
-            catchError(() => of({ log: this.logText() })),
-          ),
-          this.jobsSvc.runLog(id).pipe(
-            catchError(() => of({ entries: this.runLog() })),
-          ),
-        ])),
-      )
-      .subscribe(([logResp, runLogResp]) => {
-        this.logText.set(logResp.log);
-        this.runLog.set(runLogResp.entries);
-      });
 
     // --- Relationships-tab URL sync ---------------------------------
     // Hydrate from ?tab + ?table + ?view, then write back on changes
@@ -494,7 +483,6 @@ export class JobDetailComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
-    this.logSub?.unsubscribe();
     this.selSub?.unsubscribe();
     this.qpSub?.unsubscribe();
   }

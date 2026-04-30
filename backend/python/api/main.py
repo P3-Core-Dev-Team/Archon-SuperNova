@@ -16,6 +16,8 @@ shared `discovery_results` Postgres DB; the API queries it on demand.
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 import re
 import shutil
@@ -27,12 +29,13 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, AsyncGenerator, Literal, Optional
 
 import psycopg2
 import yaml
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 # Pipeline source directory. start.sh exports ARCHON_PIPELINE_SRC pointing at
@@ -970,21 +973,114 @@ def get_job(job_id: str) -> JobStatus:
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
-@app.get("/api/jobs/{job_id}/log")
-def get_job_log(job_id: str, tail: int = 200) -> dict[str, str]:
-    job = _jobs.get(job_id)
-    if not job:
-        raise HTTPException(404, "job not found")
-    log_path = job["log_path"]
+def _log_tail_text(log_path: Path, tail: int = 200) -> str:
+    """Read the last ``tail`` lines of a log file and strip ANSI escapes.
+
+    Factored out of ``get_job_log`` so the SSE event stream can reuse it
+    without re-implementing the read + ANSI-strip logic.  Returns ``""``
+    when the file doesn't exist yet (job just queued, pipeline hasn't
+    written anything).
+    """
     if not log_path.exists():
-        return {"log": ""}
+        return ""
     with log_path.open() as f:
         lines = f.readlines()[-tail:]
     # The pipeline uses structlog + rich for coloured console output, so the
     # log file is full of ANSI escape sequences. Browsers render them as
     # invisible control characters, which makes the Run-log tab appear blank.
     # Strip them server-side so the UI shows plain text.
-    return {"log": _ANSI_ESCAPE_RE.sub("", "".join(lines))}
+    return _ANSI_ESCAPE_RE.sub("", "".join(lines))
+
+
+@app.get("/api/jobs/{job_id}/log")
+def get_job_log(job_id: str, tail: int = 200) -> dict[str, str]:
+    job = _jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "job not found")
+    return {"log": _log_tail_text(job["log_path"], tail=tail)}
+
+
+def _query_run_log_raw() -> list[tuple]:
+    """Read every row from the ``discovery.run_log`` table, ordered.
+
+    Returns a list of `(phase, scope_type, scope_id, status, started_at,
+    ended_at, error_message)` tuples.  Caller decides whether to roll
+    up or expose row-by-row.
+
+    The pipeline truncates ``run_log`` per job (see
+    ``_reset_pipeline_state_for_schema``), so a single-process API
+    process generally only has the current job's rows visible.  The
+    SSE handler tolerates an empty result during the brief window
+    between submit and the first phase write.
+    """
+    conn = psycopg2.connect(**RESULTS_DB_DSN, options="-c search_path=discovery")
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT phase, scope_type, scope_id, status,
+                   started_at, ended_at, error_message
+            FROM run_log
+            ORDER BY started_at ASC NULLS LAST, log_id ASC
+            """
+        )
+        return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def _row_to_dict(r: tuple) -> dict[str, Any]:
+    return {
+        "phase": r[0],
+        "scope_type": r[1],
+        "scope_id": r[2],
+        "status": r[3],
+        "started_at": r[4].isoformat() if r[4] else None,
+        "ended_at": r[5].isoformat() if r[5] else None,
+        "error_message": r[6],
+    }
+
+
+def _rollup_run_log(raw: list[tuple]) -> list[dict[str, Any]]:
+    """Phase-level rollup of raw run_log rows.
+
+    One headline row per phase (global-scope row preferred; else
+    synthesised from the phase's sub-scopes); plus every failed
+    sub-scope row appended so the UI surfaces the failures the
+    headline summarises.  ~14-30 rows for a typical job.
+    """
+    phase_groups: dict[str, list[tuple]] = {}
+    for r in raw:
+        phase_groups.setdefault(r[0], []).append(r)
+
+    summary: list[dict[str, Any]] = []
+    for phase, rows in phase_groups.items():
+        global_row = next((r for r in rows if r[1] == "global"), None)
+        sub_total = sum(1 for r in rows if r[1] != "global")
+        sub_failed = sum(1 for r in rows if r[1] != "global" and r[3] == "failed")
+        if global_row is not None:
+            entry = _row_to_dict(global_row)
+        else:
+            started = min((r[4] for r in rows if r[4]), default=None)
+            ended = max((r[5] for r in rows if r[5]), default=None)
+            any_fail = any(r[3] == "failed" for r in rows)
+            entry = {
+                "phase": phase,
+                "scope_type": "phase",
+                "scope_id": 0,
+                "status": "failed" if any_fail else "succeeded",
+                "started_at": started.isoformat() if started else None,
+                "ended_at": ended.isoformat() if ended else None,
+                "error_message": None,
+            }
+        if sub_total:
+            entry["sub_total"] = sub_total
+            entry["sub_failed"] = sub_failed
+        summary.append(entry)
+
+    failures = [_row_to_dict(r) for r in raw if r[1] != "global" and r[3] == "failed"]
+    summary.sort(key=lambda e: e.get("started_at") or "")
+    return summary + failures
 
 
 @app.get("/api/jobs/{job_id}/run_log")
@@ -1006,72 +1102,134 @@ def get_job_run_log(job_id: str, detail: str = "rollup") -> dict[str, Any]:
     """
     if job_id not in _jobs:
         raise HTTPException(404, "job not found")
-    conn = psycopg2.connect(**RESULTS_DB_DSN, options="-c search_path=discovery")
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT phase, scope_type, scope_id, status,
-                   started_at, ended_at, error_message
-            FROM run_log
-            ORDER BY started_at ASC NULLS LAST, log_id ASC
-            """
-        )
-        raw = cur.fetchall()
-    finally:
-        conn.close()
+    raw = _query_run_log_raw()
+    if detail == "full":
+        return {"entries": [_row_to_dict(r) for r in raw]}
+    return {"entries": _rollup_run_log(raw)}
 
-    def _row(r: tuple) -> dict[str, Any]:
+
+# ---------------------------------------------------------------------------
+# Server-Sent Events stream — replaces the frontend's 2-3s polling on
+# /api/jobs/{id}, /log, and /run_log with a single push connection.
+#
+# Internal cadence: 750ms self-poll inside the generator.  All clients
+# watching the same job converge on the same loop because the upstream
+# data is global (run_log is TRUNCATEd per submit).  Future upgrade
+# path: replace the internal poll with Postgres LISTEN/NOTIFY triggered
+# from RunLog.start/succeed/fail/skip in
+# pipeline/src/discovery/run_log.py.  TODO when the load justifies it.
+# ---------------------------------------------------------------------------
+
+
+def _sse_frame(event: str, data: dict[str, Any]) -> str:
+    """Serialise one SSE frame.  Each frame is ``event: <name>\\n
+    data: <json>\\n\\n`` per the EventSource spec; multi-line data is
+    avoided by using compact JSON."""
+    return f"event: {event}\ndata: {json.dumps(data, separators=(',', ':'))}\n\n"
+
+
+async def _job_event_stream(job_id: str) -> AsyncGenerator[str, None]:
+    """Async generator yielding SSE frames for one job page.
+
+    Emits exactly four event kinds:
+
+    * ``snapshot`` — once at connection time; carries the full
+      JobStatus, log tail, and rolled-up run_log so the client can
+      hydrate without a second round-trip.
+    * ``status`` — when the in-memory job status field changes
+      (queued -> running -> succeeded/failed).
+    * ``run_log`` — when the rolled-up run_log entry list changes
+      (new phase started, status changed, error_message filled).
+    * ``log`` — when the log file's tail differs from what we last
+      sent (new pipeline stdout lines).
+    * ``done`` — final frame when the job reaches a terminal status;
+      the generator returns immediately after, closing the stream.
+
+    The DB / file reads happen synchronously inside the async loop —
+    each call blocks the event loop briefly (≤10ms typical).  At the
+    750ms cadence that's <1.5% of wall time; acceptable for the MVP.
+    """
+    job = _jobs[job_id]
+
+    def _build_snapshot() -> dict[str, Any]:
+        try:
+            run_log = _rollup_run_log(_query_run_log_raw())
+        except Exception:
+            run_log = []
         return {
-            "phase": r[0],
-            "scope_type": r[1],
-            "scope_id": r[2],
-            "status": r[3],
-            "started_at": r[4].isoformat() if r[4] else None,
-            "ended_at": r[5].isoformat() if r[5] else None,
-            "error_message": r[6],
+            "status": _job_status(job).model_dump(mode="json"),
+            "run_log": {"entries": run_log},
+            "log": _log_tail_text(job["log_path"]),
         }
 
-    if detail == "full":
-        return {"entries": [_row(r) for r in raw]}
+    snapshot = _build_snapshot()
+    yield _sse_frame("snapshot", snapshot)
 
-    # Rollup mode: one summary row per phase plus every non-succeeded sub-scope.
-    phase_groups: dict[str, list[tuple]] = {}
-    for r in raw:
-        phase_groups.setdefault(r[0], []).append(r)
+    last_status = snapshot["status"]["status"]
+    last_run_log_sig = json.dumps(snapshot["run_log"], sort_keys=True)
+    last_log_text = snapshot["log"]
 
-    summary: list[dict[str, Any]] = []
-    for phase, rows in phase_groups.items():
-        # Prefer the global-scope row as the headline; otherwise aggregate.
-        global_row = next((r for r in rows if r[1] == "global"), None)
-        sub_total = sum(1 for r in rows if r[1] != "global")
-        sub_failed = sum(1 for r in rows if r[1] != "global" and r[3] == "failed")
-        if global_row is not None:
-            entry = _row(global_row)
-        else:
-            # Synthesise a phase-level entry from the sub-scopes.
-            started = min((r[4] for r in rows if r[4]), default=None)
-            ended = max((r[5] for r in rows if r[5]), default=None)
-            any_fail = any(r[3] == "failed" for r in rows)
-            entry = {
-                "phase": phase,
-                "scope_type": "phase",
-                "scope_id": 0,
-                "status": "failed" if any_fail else "succeeded",
-                "started_at": started.isoformat() if started else None,
-                "ended_at": ended.isoformat() if ended else None,
-                "error_message": None,
-            }
-        if sub_total:
-            entry["sub_total"] = sub_total
-            entry["sub_failed"] = sub_failed
-        summary.append(entry)
+    while True:
+        await asyncio.sleep(0.75)
 
-    # Append every failed sub-scope row so the UI still surfaces failures.
-    failures = [_row(r) for r in raw if r[1] != "global" and r[3] == "failed"]
+        job_now = _jobs.get(job_id)
+        if not job_now:
+            # Job vanished from the registry (process restart, etc.).
+            yield _sse_frame("done", {"reason": "job_gone"})
+            return
 
-    summary.sort(key=lambda e: e.get("started_at") or "")
-    return {"entries": summary + failures}
+        # Status diff
+        try:
+            status_obj = _job_status(job_now).model_dump(mode="json")
+        except Exception:
+            status_obj = None
+        if status_obj is not None and status_obj.get("status") != last_status:
+            yield _sse_frame("status", status_obj)
+            last_status = status_obj["status"]
+
+        # run_log diff — rolled up each tick.  Signature compare avoids
+        # re-emitting when nothing changed.
+        try:
+            run_log_entries = _rollup_run_log(_query_run_log_raw())
+            sig = json.dumps(run_log_entries, sort_keys=True)
+            if sig != last_run_log_sig:
+                yield _sse_frame("run_log", {"entries": run_log_entries})
+                last_run_log_sig = sig
+        except Exception:
+            # Don't kill the stream on a transient DB blip.
+            pass
+
+        # log tail diff — read file, compare to last sent.
+        try:
+            log_text = _log_tail_text(job_now["log_path"])
+            if log_text != last_log_text:
+                yield _sse_frame("log", {"log": log_text})
+                last_log_text = log_text
+        except Exception:
+            pass
+
+        # Terminal status: emit one final frame and close.
+        if last_status in ("succeeded", "failed"):
+            yield _sse_frame("done", {"status": last_status})
+            return
+
+
+@app.get("/api/jobs/{job_id}/events")
+async def get_job_events(job_id: str) -> StreamingResponse:
+    """Server-Sent Events stream for one job page.  Replaces polling."""
+    if job_id not in _jobs:
+        raise HTTPException(404, "job not found")
+    return StreamingResponse(
+        _job_event_stream(job_id),
+        media_type="text/event-stream",
+        headers={
+            # No proxy-side buffering (nginx, traefik, gcp lb).
+            "X-Accel-Buffering": "no",
+            # Browsers and proxies must not cache an event stream.
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
 
 
 _ROLE_SUFFIXES_API: frozenset[str] = frozenset({
