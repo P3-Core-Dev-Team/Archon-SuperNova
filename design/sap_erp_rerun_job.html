@@ -1,0 +1,515 @@
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0
+  }
+
+  .wrap {
+    font-family: var(--font-sans, sans-serif);
+    color: var(--color-text-primary);
+    padding: 0 0 20px
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+    background: var(--color-background-secondary);
+    border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0
+  }
+
+  .src-badge {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--color-background-warning);
+    color: var(--color-text-warning)
+  }
+
+  .job-id {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-left: auto
+  }
+
+  .overall-bar-wrap {
+    height: 4px;
+    background: var(--color-border-tertiary);
+    margin: 0;
+    overflow: hidden
+  }
+
+  .overall-bar {
+    height: 100%;
+    background: var(--color-text-info);
+    width: 0%;
+    transition: width .4s ease
+  }
+
+  .stages-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0
+  }
+
+  .stage-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+    transition: background .2s
+  }
+
+  .stage-row.active-row {
+    background: var(--color-background-info)
+  }
+
+  .stage-row.done-row {
+    background: var(--color-background-success)
+  }
+
+  .stage-row.error-row {
+    background: var(--color-background-danger)
+  }
+
+  .stage-num {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    min-width: 18px
+  }
+
+  .stage-icon-wrap {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 0.5px solid var(--color-border-tertiary);
+    background: var(--color-background-primary)
+  }
+
+  .stage-info {
+    flex: 1;
+    min-width: 0
+  }
+
+  .stage-name {
+    font-size: 13px;
+    font-weight: 500
+  }
+
+  .stage-lib {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    margin-top: 1px
+  }
+
+  .stage-bar-wrap {
+    width: 120px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--color-border-tertiary);
+    overflow: hidden;
+    flex-shrink: 0
+  }
+
+  .stage-bar {
+    height: 100%;
+    border-radius: 3px;
+    width: 0%;
+    transition: width .3s linear
+  }
+
+  .stage-pct {
+    font-size: 11px;
+    min-width: 34px;
+    text-align: right;
+    color: var(--color-text-secondary);
+    font-family: var(--font-mono, monospace)
+  }
+
+  .stage-status-chip {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    min-width: 64px;
+    text-align: center;
+    font-weight: 500
+  }
+
+  .chip-wait {
+    background: var(--color-background-secondary);
+    color: var(--color-text-secondary)
+  }
+
+  .chip-run {
+    background: var(--color-background-info);
+    color: var(--color-text-info)
+  }
+
+  .chip-done {
+    background: var(--color-background-success);
+    color: var(--color-text-success)
+  }
+
+  .chip-err {
+    background: var(--color-background-danger);
+    color: var(--color-text-danger)
+  }
+
+  .spin {
+    animation: spin .8s linear infinite;
+    display: inline-block
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg)
+    }
+  }
+
+  .console-panel {
+    margin: 0;
+    background: var(--color-background-secondary);
+    border-top: 0.5px solid var(--color-border-tertiary)
+  }
+
+  .console-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 18px;
+    border-bottom: 0.5px solid var(--color-border-tertiary)
+  }
+
+  .console-title {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-text-secondary)
+  }
+
+  .console-body {
+    padding: 10px 18px;
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    min-height: 120px;
+    max-height: 180px;
+    overflow: auto
+  }
+
+  .log-line {
+    padding: 2px 0;
+    border-bottom: 0.5px solid var(--color-border-tertiary);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start
+  }
+
+  .log-line:last-child {
+    border-bottom: none
+  }
+
+  .lt {
+    color: var(--color-text-tertiary);
+    flex-shrink: 0
+  }
+
+  .ls {
+    color: var(--color-text-info);
+    flex-shrink: 0;
+    min-width: 76px
+  }
+
+  .lm {
+    color: var(--color-text-secondary)
+  }
+
+  .lok {
+    color: var(--color-text-success)
+  }
+
+  .lwarn {
+    color: var(--color-text-warning)
+  }
+
+  .lerr {
+    color: var(--color-text-danger)
+  }
+
+  .summary-row {
+    display: flex;
+    gap: 10px;
+    padding: 14px 18px;
+    border-top: 0.5px solid var(--color-border-tertiary);
+    flex-wrap: wrap
+  }
+
+  .sum-card {
+    flex: 1;
+    min-width: 100px;
+    background: var(--color-background-secondary);
+    border-radius: var(--border-radius-md);
+    padding: 10px 12px
+  }
+
+  .sum-label {
+    font-size: 10px;
+    color: var(--color-text-secondary);
+    margin-bottom: 4px
+  }
+
+  .sum-val {
+    font-size: 18px;
+    font-weight: 500
+  }
+
+  .action-row {
+    display: flex;
+    gap: 8px;
+    padding: 0 18px;
+    margin-top: 14px
+  }
+</style>
+
+<div class="wrap">
+  <div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden">
+    <div class="header">
+      <span style="font-size:14px;font-weight:500">SAP ERP — Full Re-run</span>
+      <span class="src-badge">148 tables</span>
+      <span class="job-id" id="job-id">Job #48 · initialising…</span>
+    </div>
+    <div class="overall-bar-wrap">
+      <div class="overall-bar" id="overall-bar"></div>
+    </div>
+
+    <div class="stages-grid" id="stages-grid">
+      <div class="stage-row" id="row-0">
+        <span class="stage-num">1</span>
+        <div class="stage-icon-wrap" id="icon-0"><span style="font-size:14px">&#128194;</span></div>
+        <div class="stage-info">
+          <div class="stage-name">Schema crawl</div>
+          <div class="stage-lib">SchemaCrawler + SQLAlchemy</div>
+        </div>
+        <div class="stage-bar-wrap">
+          <div class="stage-bar" id="bar-0" style="background:var(--color-text-info)"></div>
+        </div>
+        <span class="stage-pct" id="pct-0">0%</span>
+        <span class="stage-status-chip chip-wait" id="chip-0">waiting</span>
+      </div>
+      <div class="stage-row" id="row-1">
+        <span class="stage-num">2</span>
+        <div class="stage-icon-wrap" id="icon-1"><span style="font-size:14px">&#128279;</span></div>
+        <div class="stage-info">
+          <div class="stage-name">Column matching</div>
+          <div class="stage-lib">Valentine + RapidFuzz</div>
+        </div>
+        <div class="stage-bar-wrap">
+          <div class="stage-bar" id="bar-1" style="background:var(--color-text-info)"></div>
+        </div>
+        <span class="stage-pct" id="pct-1">0%</span>
+        <span class="stage-status-chip chip-wait" id="chip-1">waiting</span>
+      </div>
+      <div class="stage-row" id="row-2">
+        <span class="stage-num">3</span>
+        <div class="stage-icon-wrap" id="icon-2"><span style="font-size:14px">&#128202;</span></div>
+        <div class="stage-info">
+          <div class="stage-name">Cardinality detection</div>
+          <div class="stage-lib">SQLAlchemy · COUNT queries</div>
+        </div>
+        <div class="stage-bar-wrap">
+          <div class="stage-bar" id="bar-2" style="background:var(--color-text-info)"></div>
+        </div>
+        <span class="stage-pct" id="pct-2">0%</span>
+        <span class="stage-status-chip chip-wait" id="chip-2">waiting</span>
+      </div>
+      <div class="stage-row" id="row-3">
+        <span class="stage-num">4</span>
+        <div class="stage-icon-wrap" id="icon-3"><span style="font-size:14px">&#128274;</span></div>
+        <div class="stage-info">
+          <div class="stage-name">PII &amp; sensitive detect</div>
+          <div class="stage-lib">Presidio + spaCy NER</div>
+        </div>
+        <div class="stage-bar-wrap">
+          <div class="stage-bar" id="bar-3" style="background:var(--color-text-info)"></div>
+        </div>
+        <span class="stage-pct" id="pct-3">0%</span>
+        <span class="stage-status-chip chip-wait" id="chip-3">waiting</span>
+      </div>
+      <div class="stage-row" id="row-4">
+        <span class="stage-num">5</span>
+        <div class="stage-icon-wrap" id="icon-4"><span style="font-size:14px">&#129504;</span></div>
+        <div class="stage-info">
+          <div class="stage-name">Domain clustering</div>
+          <div class="stage-lib">sentence-transformers · DBSCAN</div>
+        </div>
+        <div class="stage-bar-wrap">
+          <div class="stage-bar" id="bar-4" style="background:var(--color-text-info)"></div>
+        </div>
+        <span class="stage-pct" id="pct-4">0%</span>
+        <span class="stage-status-chip chip-wait" id="chip-4">waiting</span>
+      </div>
+      <div class="stage-row" id="row-5">
+        <span class="stage-num">6</span>
+        <div class="stage-icon-wrap" id="icon-5"><span style="font-size:14px">&#128376;</span></div>
+        <div class="stage-info">
+          <div class="stage-name">Graph build</div>
+          <div class="stage-lib">NetworkX · ERD context</div>
+        </div>
+        <div class="stage-bar-wrap">
+          <div class="stage-bar" id="bar-5" style="background:var(--color-text-info)"></div>
+        </div>
+        <span class="stage-pct" id="pct-5">0%</span>
+        <span class="stage-status-chip chip-wait" id="chip-5">waiting</span>
+      </div>
+    </div>
+
+    <div class="console-panel">
+      <div class="console-header">
+        <span class="console-title">Live console</span>
+        <span style="font-size:10px;color:var(--color-text-tertiary)" id="elapsed">00:00</span>
+      </div>
+      <div class="console-body" id="console-body"></div>
+    </div>
+
+    <div class="summary-row" id="summary-row" style="display:none">
+      <div class="sum-card">
+        <div class="sum-label">Tables</div>
+        <div class="sum-val" style="color:var(--color-text-info)" id="s-tables">148</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Relationships</div>
+        <div class="sum-val" style="color:var(--color-text-success)" id="s-rels">—</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Sensitive cols</div>
+        <div class="sum-val" style="color:var(--color-text-danger)" id="s-sens">—</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Clusters</div>
+        <div class="sum-val" style="color:var(--color-text-warning)" id="s-clust">—</div>
+      </div>
+      <div class="sum-card">
+        <div class="sum-label">Duration</div>
+        <div class="sum-val" style="color:var(--color-text-secondary)" id="s-dur">—</div>
+      </div>
+    </div>
+
+    <div class="action-row" id="action-row" style="display:none;padding-bottom:14px">
+      <button onclick="sendPrompt('Show me the full relationship results from the SAP ERP re-run job #48')">View
+        relationships ↗</button>
+      <button onclick="sendPrompt('Show me all sensitive columns detected in SAP ERP job #48')">View sensitive data
+        ↗</button>
+      <button onclick="sendPrompt('Show me the domain clusters from SAP ERP job #48')">View clusters ↗</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const ts = () => {
+    const d = new Date();
+    return [d.getHours(), d.getMinutes(), d.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
+  };
+
+  const logs = [
+  ];
+
+  const stageDurations = [4000, 5000, 4500, 6000, 5500, 3500];
+  const stageLogRanges = [[0, 3], [4, 7], [8, 10], [11, 13], [14, 16], [17, 19]];
+
+  let startTime = Date.now();
+  let elapsedInt = setInterval(() => {
+    const s = Math.floor((Date.now() - startTime) / 1000);
+    document.getElementById('elapsed').textContent =
+      String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  }, 500);
+
+  const cb = document.getElementById('console-body');
+  function addLog(entry) {
+    const d = document.createElement('div');
+    d.className = 'log-line';
+    d.innerHTML = `<span class="lt">${ts()}</span><span class="ls">${entry.stage}</span><span class="${entry.cls}">${entry.msg}</span>`;
+    cb.appendChild(d);
+    cb.scrollTop = cb.scrollHeight;
+  }
+
+  function setStage(i, state) {
+    const row = document.getElementById('row-' + i);
+    const chip = document.getElementById('chip-' + i);
+    row.className = 'stage-row';
+    if (state === 'run') { row.classList.add('active-row'); chip.className = 'stage-status-chip chip-run'; chip.innerHTML = '<span class="spin">&#8635;</span> running'; }
+    else if (state === 'done') { row.classList.add('done-row'); chip.className = 'stage-status-chip chip-done'; chip.textContent = 'done'; }
+    else if (state === 'err') { row.classList.add('error-row'); chip.className = 'stage-status-chip chip-err'; chip.textContent = 'error'; }
+  }
+
+  function animateBar(i, duration, cb2) {
+    const bar = document.getElementById('bar-' + i);
+    const pct = document.getElementById('pct-' + i);
+    const steps = 60, interval = duration / steps;
+    let cur = 0;
+    const iv = setInterval(() => {
+      cur++;
+      const p = Math.round((cur / steps) * 100);
+      bar.style.width = p + '%';
+      pct.textContent = p + '%';
+      if (cur >= steps) { clearInterval(iv); if (cb2) cb2(); }
+    }, interval);
+  }
+
+  document.getElementById('job-id').textContent = 'Job #48 · starting…';
+  document.getElementById('overall-bar').style.transition = 'width .4s ease';
+
+  let logIdx = 0;
+  function flushLogs(from, to, delay, cb2) {
+    let i = from;
+    const step = () => {
+      if (i > to) { if (cb2) cb2(); return; }
+      addLog(logs[i++]);
+      setTimeout(step, delay + (Math.random() * 200));
+    };
+    setTimeout(step, 300);
+  }
+
+  function runStage(i, done) {
+    setStage(i, 'run');
+    const overall = Math.round(((i) / 6) * 100);
+    document.getElementById('overall-bar').style.width = overall + '%';
+    const [lFrom, lTo] = stageLogRanges[i];
+    flushLogs(lFrom, lTo, 350, null);
+    animateBar(i, stageDurations[i], () => {
+      setStage(i, 'done');
+      document.getElementById('pct-' + i).textContent = '100%';
+      if (done) done();
+    });
+  }
+
+  function runAll() {
+    const seq = (idx) => {
+      if (idx >= 6) {
+        document.getElementById('overall-bar').style.width = '100%';
+        document.getElementById('job-id').textContent = 'Job #48 · completed';
+        clearInterval(elapsedInt);
+        const s = Math.floor((Date.now() - startTime) / 1000);
+        document.getElementById('s-rels').textContent = '31';
+        document.getElementById('s-sens').textContent = '14';
+        document.getElementById('s-clust').textContent = '7';
+        document.getElementById('s-dur').textContent =
+          String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+        document.getElementById('summary-row').style.display = 'flex';
+        document.getElementById('action-row').style.display = 'flex';
+        return;
+      }
+      runStage(idx, () => setTimeout(() => seq(idx + 1), 400));
+    };
+    seq(0);
+  }
+
+  setTimeout(runAll, 600);
+</script>

@@ -1,0 +1,222 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.wrap{font-family:var(--font-sans,sans-serif);color:var(--color-text-primary)}
+.toolbar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:0.5px solid var(--color-border-tertiary);flex-wrap:wrap}
+.toolbar-title{font-size:14px;font-weight:500}
+.count-badge{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--color-background-danger);color:var(--color-text-danger);font-weight:500}
+.filter-group{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.fchip{font-size:11px;padding:4px 10px;border-radius:16px;border:0.5px solid var(--color-border-tertiary);cursor:pointer;background:var(--color-background-primary);color:var(--color-text-secondary);transition:all .15s}
+.fchip.on{border-color:var(--color-border-danger);background:var(--color-background-danger);color:var(--color-text-danger)}
+.fchip.on-warn{border-color:var(--color-border-warning);background:var(--color-background-warning);color:var(--color-text-warning)}
+.fchip.on-info{border-color:var(--color-border-info);background:var(--color-background-info);color:var(--color-text-info)}
+.search-wrap{padding:10px 16px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.search-wrap input{width:100%;font-size:12px;padding:7px 12px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-primary)}
+.summary-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-bottom:0.5px solid var(--color-border-tertiary)}
+.sum-cell{padding:12px 16px;border-right:0.5px solid var(--color-border-tertiary)}
+.sum-cell:last-child{border-right:none}
+.sum-label{font-size:10px;color:var(--color-text-secondary);margin-bottom:4px}
+.sum-val{font-size:20px;font-weight:500}
+.col-header{display:grid;grid-template-columns:32px 1fr 110px 90px 80px 74px;gap:6px;align-items:center;padding:7px 16px;border-bottom:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary)}
+.ch{font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--color-text-secondary);font-weight:500;cursor:pointer;user-select:none}
+.ch:hover{color:var(--color-text-primary)}
+.s-row{display:grid;grid-template-columns:32px 1fr 110px 90px 80px 74px;gap:6px;align-items:center;padding:9px 16px;border-bottom:0.5px solid var(--color-border-tertiary);cursor:pointer;transition:background .12s;font-size:12px}
+.s-row:last-child{border-bottom:none}
+.s-row:hover{background:var(--color-background-secondary)}
+.s-row.expanded{background:var(--color-background-danger)}
+.risk-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin:auto}
+.col-cell{display:flex;align-items:center;gap:7px;min-width:0}
+.tbl-name{font-size:11px;color:var(--color-text-secondary);white-space:nowrap}
+.col-name{font-family:var(--font-mono,monospace);font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cat-tag{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500;white-space:nowrap;text-align:center}
+.cat-PII{background:var(--color-background-danger);color:var(--color-text-danger)}
+.cat-FIN{background:var(--color-background-warning);color:var(--color-text-warning)}
+.cat-PHI{background:var(--color-background-info);color:var(--color-text-info)}
+.conf-bar-w{width:52px;height:5px;border-radius:3px;background:var(--color-border-tertiary);overflow:hidden}
+.conf-bar{height:100%;border-radius:3px}
+.conf-val{font-size:11px;font-family:var(--font-mono,monospace);color:var(--color-text-secondary)}
+.risk-chip{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:500;text-align:center;white-space:nowrap}
+.risk-HIGH{background:var(--color-background-danger);color:var(--color-text-danger)}
+.risk-MED{background:var(--color-background-warning);color:var(--color-text-warning)}
+.risk-LOW{background:var(--color-background-secondary);color:var(--color-text-secondary)}
+.lib-cell{font-size:10px;color:var(--color-text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.det-panel{padding:12px 16px 12px 48px;background:var(--color-background-danger);border-bottom:0.5px solid var(--color-border-danger);display:none}
+.det-panel.open{display:block}
+.det-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px}
+.dcard{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:8px 12px}
+.dlabel{font-size:10px;color:var(--color-text-secondary);margin-bottom:3px}
+.dval{font-size:12px;font-weight:500}
+.det-btns{display:flex;gap:6px;flex-wrap:wrap}
+.warn-banner{display:flex;align-items:center;gap:10px;padding:9px 16px;background:var(--color-background-warning);border-bottom:0.5px solid var(--color-border-warning);font-size:12px;color:var(--color-text-warning)}
+.footer{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary)}
+.footer-info{font-size:11px;color:var(--color-text-secondary)}
+</style>
+
+<div class="wrap" style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden">
+
+  <div class="toolbar">
+    <span class="toolbar-title">Sensitive columns</span>
+    <span class="count-badge" id="count-badge">14 flagged</span>
+    <div class="filter-group">
+      <span class="fchip on" onclick="setFilter('all',this,'on')">All</span>
+      <span class="fchip" onclick="setFilter('PII',this,'on')">PII</span>
+      <span class="fchip" onclick="setFilter('FIN',this,'on-warn')">Financial</span>
+      <span class="fchip" onclick="setFilter('PHI',this,'on-info')">PHI</span>
+      <span class="fchip" onclick="setFilter('HIGH',this,'on')">High risk</span>
+      <span class="fchip" onclick="setFilter('REVIEW',this,'on-warn')">Needs review</span>
+    </div>
+  </div>
+
+  <div class="warn-banner">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><path d="M8 2L14.9 14H1.1L8 2Z" stroke="currentColor" stroke-width="1.2" fill="none"/><line x1="8" y1="7" x2="8" y2="10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="8" cy="12" r=".6" fill="currentColor"/></svg>
+    1 column requires manual review — <strong style="margin:0 3px">sap_hr.bank_acct</strong> confidence 0.53 (below threshold 0.60)
+    <button style="margin-left:auto;font-size:11px" onclick="sendPrompt('Explain why sap_hr.bank_acct was flagged with low confidence 0.53 in SAP ERP job 48 and what I should check manually')">Review ↗</button>
+  </div>
+
+  <div class="summary-strip">
+    <div class="sum-cell">
+      <div class="sum-label">Total flagged</div>
+      <div class="sum-val" style="color:var(--color-text-danger)" id="s-total">14</div>
+    </div>
+    <div class="sum-cell">
+      <div class="sum-label">PII</div>
+      <div class="sum-val" style="color:var(--color-text-danger)" id="s-pii">7</div>
+    </div>
+    <div class="sum-cell">
+      <div class="sum-label">Financial</div>
+      <div class="sum-val" style="color:var(--color-text-warning)" id="s-fin">4</div>
+    </div>
+    <div class="sum-cell">
+      <div class="sum-label">PHI</div>
+      <div class="sum-val" style="color:var(--color-text-info)" id="s-phi">3</div>
+    </div>
+  </div>
+
+  <div class="search-wrap">
+    <input type="text" id="search-box" placeholder="Search table or column…" oninput="render()">
+  </div>
+
+  <div class="col-header">
+    <span class="ch"></span>
+    <span class="ch">Column</span>
+    <span class="ch">Category</span>
+    <span class="ch">Detection</span>
+    <span class="ch">Confidence</span>
+    <span class="ch">Risk</span>
+  </div>
+
+  <div id="sens-list"></div>
+
+  <div class="footer">
+    <span class="footer-info" id="footer-info">Showing 14 of 14 · Job #48 · SAP ERP · Presidio + spaCy</span>
+    <button onclick="sendPrompt('Generate a data masking plan for all 14 sensitive columns in SAP ERP job 48')">Masking plan ↗</button>
+  </div>
+</div>
+
+<script>
+const cols=[
+  {tbl:'KNA1',col:'STCD1',cat:'PII',det:'Presidio · tax ID regex',conf:.99,risk:'HIGH',review:false,desc:'Customer tax number — national ID pattern detected',method:'Regex + Luhn variant'},
+  {tbl:'PA0002',col:'PERID',cat:'PII',det:'Presidio · national ID',conf:.98,risk:'HIGH',review:false,desc:'Employee personal identity number',method:'Regex pattern match'},
+  {tbl:'PA0006',col:'STRAS',cat:'PII',det:'spaCy · address NER',conf:.96,risk:'HIGH',review:false,desc:'Employee street address — location entity recognised',method:'NER (GPE/LOC)'},
+  {tbl:'KNA1',col:'TELF1',cat:'PII',det:'Presidio · phone pattern',conf:.96,risk:'HIGH',review:false,desc:'Customer primary telephone number',method:'PhoneRecognizer'},
+  {tbl:'PA0002',col:'GBDAT',cat:'PII',det:'Presidio · date of birth',conf:.95,risk:'HIGH',review:false,desc:'Employee date of birth field',method:'DateRecognizer'},
+  {tbl:'KNA1',col:'SMTP_ADDR',cat:'PII',det:'Presidio · email pattern',conf:.97,risk:'HIGH',review:false,desc:'Customer email address',method:'EmailRecognizer'},
+  {tbl:'PA0002',col:'FAMST',cat:'PII',det:'spaCy · NLP classifier',conf:.82,risk:'MED',review:false,desc:'Employee marital status — sensitive personal attribute',method:'Text classification'},
+  {tbl:'PA0008',col:'ANSAL',cat:'FIN',det:'spaCy · NLP classifier',conf:.93,risk:'HIGH',review:false,desc:'Employee annual salary — financial compensation data',method:'Text classification'},
+  {tbl:'BSEG',col:'WRBTR',cat:'FIN',det:'spaCy · amount pattern',conf:.88,risk:'MED',review:false,desc:'Document transaction amount in foreign currency',method:'AmountRecognizer'},
+  {tbl:'KNBK',col:'BANKN',cat:'FIN',det:'Presidio · IBAN pattern',conf:.97,risk:'HIGH',review:false,desc:'Customer bank account number — IBAN detected',method:'IbanRecognizer'},
+  {tbl:'sap_hr',col:'bank_acct',cat:'FIN',det:'spaCy · low confidence',conf:.53,risk:'MED',review:true,desc:'Possible bank account ref — below threshold, manual review required',method:'Text classification'},
+  {tbl:'PA0002',col:'KRZKK',cat:'PHI',det:'spaCy · medical NER',conf:.87,risk:'HIGH',review:false,desc:'Employee health insurance indicator — health-related attribute',method:'NER (MEDICAL)'},
+  {tbl:'HRP1001',col:'PLANS',cat:'PHI',det:'spaCy · medical NER',conf:.84,risk:'MED',review:false,desc:'Healthcare plan assignment — PHI by association',method:'NER (MEDICAL)'},
+  {tbl:'PA0167',col:'BTEXT',cat:'PHI',det:'spaCy · medical NER',conf:.79,risk:'MED',review:false,desc:'Health benefit description text — free-text medical context',method:'NER (MEDICAL)'},
+];
+
+const catCls={PII:'cat-PII',FIN:'cat-FIN',PHI:'cat-PHI'};
+const catLabel={PII:'PII',FIN:'Financial',PHI:'PHI'};
+const riskColor={HIGH:'var(--color-text-danger)',MED:'var(--color-text-warning)',LOW:'var(--color-text-secondary)'};
+
+let activeFilter='all';
+
+function getFiltered(){
+  const q=(document.getElementById('search-box').value||'').toLowerCase();
+  return cols.filter(c=>{
+    const txt=(c.tbl+c.col+c.cat+c.det).toLowerCase();
+    if(q&&!txt.includes(q))return false;
+    if(activeFilter==='PII')return c.cat==='PII';
+    if(activeFilter==='FIN')return c.cat==='FIN';
+    if(activeFilter==='PHI')return c.cat==='PHI';
+    if(activeFilter==='HIGH')return c.risk==='HIGH';
+    if(activeFilter==='REVIEW')return c.review;
+    return true;
+  });
+}
+
+function render(){
+  const data=getFiltered();
+  document.getElementById('count-badge').textContent=data.length+' flagged';
+  document.getElementById('footer-info').textContent='Showing '+data.length+' of 14 · Job #48 · SAP ERP · Presidio + spaCy';
+  const list=document.getElementById('sens-list');
+  list.innerHTML='';
+  data.forEach((c,i)=>{
+    const gi=cols.indexOf(c);
+    const pct=Math.round(c.conf*100);
+    const bc=c.conf>=0.80?'var(--color-text-success)':c.conf>=0.60?'var(--color-text-warning)':'var(--color-text-danger)';
+    const rc=riskColor[c.risk];
+    const row=document.createElement('div');
+    row.className='s-row'+(c.review?' s-row-review':'');
+    row.id='srow-'+gi;
+    row.innerHTML=`
+      <div class="risk-dot" style="background:${rc}"></div>
+      <div class="col-cell">
+        <span class="tbl-name">${c.tbl}.</span><span class="col-name">${c.col}</span>
+        ${c.review?'<svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;color:var(--color-text-warning)"><path d="M8 2L14.9 14H1.1L8 2Z" stroke="currentColor" stroke-width="1.3" fill="none"/><line x1="8" y1="7" x2="8" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="12" r=".6" fill="currentColor"/></svg>':''}
+      </div>
+      <span class="cat-tag ${catCls[c.cat]}">${catLabel[c.cat]}</span>
+      <span class="lib-cell">${c.det}</span>
+      <div style="display:flex;align-items:center;gap:5px">
+        <div class="conf-bar-w"><div class="conf-bar" style="width:${pct}%;background:${bc}"></div></div>
+        <span class="conf-val">${c.conf.toFixed(2)}</span>
+      </div>
+      <span class="risk-chip risk-${c.risk}">${c.risk}</span>
+    `;
+    row.onclick=()=>toggleDet(gi,c);
+    list.appendChild(row);
+
+    const det=document.createElement('div');
+    det.className='det-panel';
+    det.id='det-'+gi;
+    det.innerHTML=`
+      <div class="det-grid">
+        <div class="dcard"><div class="dlabel">Description</div><div class="dval" style="font-size:11px;font-weight:400">${c.desc}</div></div>
+        <div class="dcard"><div class="dlabel">Detection method</div><div class="dval" style="font-family:var(--font-mono,monospace);font-size:11px">${c.method}</div></div>
+        <div class="dcard"><div class="dlabel">Confidence</div><div class="dval" style="color:${bc}">${(c.conf*100).toFixed(0)}% ${c.review?'⚠ review needed':''}</div></div>
+      </div>
+      <div class="det-btns">
+        <button onclick="sendPrompt('Show a sample masking strategy for ${c.tbl}.${c.col} (${catLabel[c.cat]})')">Masking strategy ↗</button>
+        <button onclick="sendPrompt('Which relationships in job 48 involve the table ${c.tbl}?')">Related joins ↗</button>
+        ${c.review?`<button onclick="sendPrompt('Manually review ${c.tbl}.${c.col} — explain detection logic and suggest confirm or dismiss')">Manual review ↗</button>`:''}
+      </div>
+    `;
+    list.appendChild(det);
+  });
+}
+
+function toggleDet(gi,c){
+  const det=document.getElementById('det-'+gi);
+  const row=document.getElementById('srow-'+gi);
+  if(!det)return;
+  const isOpen=det.classList.contains('open');
+  document.querySelectorAll('.det-panel.open').forEach(d=>d.classList.remove('open'));
+  document.querySelectorAll('.s-row.expanded').forEach(r=>r.classList.remove('expanded'));
+  if(!isOpen){det.classList.add('open');row.classList.add('expanded');}
+}
+
+function setFilter(f,el,cls){
+  activeFilter=f;
+  document.querySelectorAll('.fchip').forEach(c=>c.className='fchip');
+  el.classList.add(cls);
+  render();
+}
+
+render();
+</script>

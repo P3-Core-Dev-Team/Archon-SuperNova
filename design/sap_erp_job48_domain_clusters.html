@@ -1,0 +1,234 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.wrap{font-family:var(--font-sans,sans-serif);color:var(--color-text-primary)}
+.toolbar{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:0.5px solid var(--color-border-tertiary);flex-wrap:wrap}
+.toolbar-title{font-size:14px;font-weight:500}
+.new-badge{font-size:10px;padding:2px 8px;border-radius:10px;background:var(--color-background-success);color:var(--color-text-success);font-weight:500}
+.view-toggle{display:flex;gap:3px;margin-left:auto;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:3px}
+.vbtn{font-size:11px;padding:4px 12px;border-radius:6px;border:none;cursor:pointer;background:transparent;color:var(--color-text-secondary);transition:all .15s}
+.vbtn.on{background:var(--color-background-primary);color:var(--color-text-primary);border:0.5px solid var(--color-border-tertiary)}
+.summary-strip{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:0.5px solid var(--color-border-tertiary)}
+.sum-cell{padding:11px 16px;border-right:0.5px solid var(--color-border-tertiary)}
+.sum-cell:last-child{border-right:none}
+.sum-label{font-size:10px;color:var(--color-text-secondary);margin-bottom:3px}
+.sum-val{font-size:18px;font-weight:500}
+
+/* GRID VIEW */
+.cluster-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;padding:16px}
+.c-card{border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;cursor:pointer;transition:border-color .15s}
+.c-card:hover{border-color:var(--color-border-secondary)}
+.c-card.active{border-width:1.5px}
+.c-header{padding:12px 14px;display:flex;align-items:center;gap:10px}
+.c-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.c-name{font-size:13px;font-weight:500}
+.c-meta{font-size:11px;color:var(--color-text-secondary);margin-left:auto;white-space:nowrap}
+.c-body{padding:0 14px 12px}
+.c-eps{font-size:10px;color:var(--color-text-tertiary);margin-bottom:7px;font-family:var(--font-mono,monospace)}
+.c-tables{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+.tpill{font-size:10px;padding:2px 7px;border-radius:4px;border:0.5px solid var(--color-border-tertiary);font-family:var(--font-mono,monospace);color:var(--color-text-secondary);background:var(--color-background-secondary)}
+.tpill.sens{border-color:var(--color-border-danger);color:var(--color-text-danger);background:var(--color-background-danger)}
+.c-bar-wrap{height:4px;border-radius:2px;background:var(--color-border-tertiary);overflow:hidden;margin-top:6px}
+.c-bar{height:100%;border-radius:2px}
+.c-footer{display:flex;gap:6px;margin-top:8px}
+
+/* LIST VIEW */
+.list-view{display:none;padding:0}
+.l-row{display:flex;align-items:center;gap:10px;padding:11px 16px;border-bottom:0.5px solid var(--color-border-tertiary);cursor:pointer;transition:background .12s}
+.l-row:last-child{border-bottom:none}
+.l-row:hover{background:var(--color-background-secondary)}
+.l-row.expanded{background:var(--color-background-info)}
+.l-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.l-name{font-size:13px;font-weight:500;min-width:110px}
+.l-count{font-size:11px;color:var(--color-text-secondary);min-width:56px}
+.l-eps{font-size:10px;font-family:var(--font-mono,monospace);color:var(--color-text-tertiary);min-width:70px}
+.l-bar-wrap{flex:1;height:5px;border-radius:3px;background:var(--color-border-tertiary);overflow:hidden}
+.l-bar{height:100%;border-radius:3px}
+.l-new{font-size:10px;padding:2px 7px;border-radius:10px;background:var(--color-background-success);color:var(--color-text-success);font-weight:500}
+.det-panel{padding:12px 16px 14px 45px;background:var(--color-background-info);border-bottom:0.5px solid var(--color-border-info);display:none}
+.det-panel.open{display:block}
+.det-tables{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
+.det-btns{display:flex;gap:6px;flex-wrap:wrap}
+
+.new-banner{display:flex;align-items:center;gap:10px;padding:9px 16px;background:var(--color-background-success);border-bottom:0.5px solid var(--color-border-success);font-size:12px;color:var(--color-text-success)}
+.footer{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary)}
+.footer-info{font-size:11px;color:var(--color-text-secondary)}
+</style>
+
+<div class="wrap" style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden">
+
+  <div class="toolbar">
+    <span class="toolbar-title">Domain clusters</span>
+    <span class="new-badge">+1 new vs prev run</span>
+    <div class="view-toggle">
+      <button class="vbtn on" id="vbtn-grid" onclick="setView('grid')">Grid</button>
+      <button class="vbtn" id="vbtn-list" onclick="setView('list')">List</button>
+    </div>
+  </div>
+
+  <div class="new-banner">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="flex-shrink:0"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.2"/><line x1="8" y1="5" x2="8" y2="8.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="11" r=".65" fill="currentColor"/></svg>
+    New cluster discovered — <strong style="margin:0 3px">Procurement</strong> (7 tables) not present in previous job #47 run
+    <button style="margin-left:auto;font-size:11px" onclick="sendPrompt('Explain why the Procurement cluster is new in SAP ERP job 48 — what tables were added and why DBSCAN grouped them separately')">Explain ↗</button>
+  </div>
+
+  <div class="summary-strip">
+    <div class="sum-cell"><div class="sum-label">Clusters</div><div class="sum-val" style="color:var(--color-text-info)">7</div></div>
+    <div class="sum-cell"><div class="sum-label">Tables clustered</div><div class="sum-val" style="color:var(--color-text-primary)">148</div></div>
+    <div class="sum-cell"><div class="sum-label">Avg cluster size</div><div class="sum-val" style="color:var(--color-text-secondary)">21</div></div>
+    <div class="sum-cell"><div class="sum-label">Algorithm</div><div class="sum-val" style="font-size:13px;color:var(--color-text-secondary);margin-top:3px">DBSCAN</div></div>
+  </div>
+
+  <!-- GRID VIEW -->
+  <div id="grid-view">
+    <div class="cluster-grid" id="cluster-grid"></div>
+  </div>
+
+  <!-- LIST VIEW -->
+  <div class="list-view" id="list-view"></div>
+
+  <div class="footer">
+    <span class="footer-info">7 clusters · 148 tables · sentence-transformers + DBSCAN · Job #48</span>
+    <button onclick="sendPrompt('Show me the full ERD subgraph for all 7 domain clusters from SAP ERP job 48')">Full ERD ↗</button>
+  </div>
+</div>
+
+<script>
+const clusters=[
+  {
+    name:'Customer',color:'#378ADD',tables:['KNA1','KNB1','KNVV','KNBK','KNC1','KNVP','KNVK','KNB5','KNKA','KNVS'],
+    eps:.31,prev:true,sensTables:['KNA1','KNBK'],
+    desc:'Core customer master data — billing, sales area, partner functions and credit management tables.',
+    rels:9,sensCount:4
+  },
+  {
+    name:'Sales',color:'#1D9E75',tables:['VBAK','VBAP','VBFA','VBEP','VBKD','VBPA','VBUK','VBUP','KONV','LIPS'],
+    eps:.28,prev:true,sensTables:[],
+    desc:'Sales document headers, line items, flow, schedule lines, and pricing condition records.',
+    rels:6,sensCount:0
+  },
+  {
+    name:'Finance',color:'#BA7517',tables:['BKPF','BSEG','BSAK','BSAS','BSID','BSIS','SKA1','T001','COEP','CSKT'],
+    eps:.30,prev:true,sensTables:['BSEG'],
+    desc:'FI document headers and line items, G/L accounts, CO postings, and cost centres.',
+    rels:5,sensCount:2
+  },
+  {
+    name:'HR',color:'#8b5cf6',tables:['PA0001','PA0002','PA0006','PA0008','PA0167','T527X','HRP1001'],
+    eps:.33,prev:true,sensTables:['PA0002','PA0006','PA0008','PA0167','HRP1001'],
+    desc:'Personnel administration — org assignment, personal data, addresses, pay scale, health benefits.',
+    rels:4,sensCount:6
+  },
+  {
+    name:'Inventory',color:'#888780',tables:['MARA','MARC','MBEW','MAKT','MLAN','MVKE','MLGN','MARM'],
+    eps:.29,prev:true,sensTables:[],
+    desc:'Material master — general data, plant-level, valuation, descriptions, taxes, and warehouse views.',
+    rels:4,sensCount:0
+  },
+  {
+    name:'Procurement',color:'#E24B4A',tables:['LFA1','LFB1','EKKO','EKPO','EKET','EKES','EKBE'],
+    eps:.27,prev:false,sensTables:[],
+    desc:'New cluster — vendor master, purchasing documents, schedule lines, confirmations and history.',
+    rels:4,sensCount:0
+  },
+  {
+    name:'Production',color:'#0891b2',tables:['AUFK','AFKO','AFVC','AFVV','JEST','MAPL','PLAS','PLKO'],
+    eps:.35,prev:true,sensTables:[],
+    desc:'Production orders, operations, sequences, routing headers, and object statuses.',
+    rels:3,sensCount:0
+  },
+];
+
+const total=clusters.reduce((s,c)=>s+c.tables.length,0);
+const maxTables=Math.max(...clusters.map(c=>c.tables.length));
+
+function buildGrid(){
+  const g=document.getElementById('cluster-grid');
+  g.innerHTML='';
+  clusters.forEach((c,i)=>{
+    const pct=Math.round((c.tables.length/maxTables)*100);
+    const card=document.createElement('div');
+    card.className='c-card'+(c.prev?'':' active');
+    card.style.borderColor=c.prev?'var(--color-border-tertiary)':c.color;
+    card.innerHTML=`
+      <div class="c-header">
+        <div class="c-dot" style="background:${c.color}"></div>
+        <span class="c-name">${c.name}</span>
+        ${!c.prev?'<span style="font-size:10px;padding:1px 6px;border-radius:8px;background:var(--color-background-success);color:var(--color-text-success);font-weight:500">new</span>':''}
+        <span class="c-meta">${c.tables.length} tables · ${c.rels} joins</span>
+      </div>
+      <div class="c-body">
+        <div class="c-eps">eps=${c.eps} · sentence-transformers + DBSCAN</div>
+        <div class="c-tables">
+          ${c.tables.map(t=>`<span class="tpill${c.sensTables.includes(t)?' sens':''}">${t}</span>`).join('')}
+        </div>
+        ${c.sensCount>0?`<div style="font-size:10px;color:var(--color-text-danger);margin-bottom:4px">${c.sensCount} sensitive column${c.sensCount>1?'s':''} in this domain</div>`:''}
+        <div class="c-bar-wrap"><div class="c-bar" style="width:${pct}%;background:${c.color}"></div></div>
+        <div class="c-footer">
+          <button style="font-size:11px" onclick="sendPrompt('Show me the ERD subgraph for the ${c.name} domain cluster in SAP ERP job 48')">ERD ↗</button>
+          <button style="font-size:11px" onclick="sendPrompt('List all relationships within the ${c.name} cluster from job 48')">Joins ↗</button>
+          ${c.sensCount>0?`<button style="font-size:11px" onclick="sendPrompt('Show sensitive columns in the ${c.name} domain from job 48')">Sensitive ↗</button>`:''}
+        </div>
+      </div>
+    `;
+    g.appendChild(card);
+  });
+}
+
+function buildList(){
+  const l=document.getElementById('list-view');
+  l.innerHTML='';
+  clusters.forEach((c,i)=>{
+    const pct=Math.round((c.tables.length/maxTables)*100);
+    const row=document.createElement('div');
+    row.className='l-row';
+    row.id='lrow-'+i;
+    row.innerHTML=`
+      <div class="l-dot" style="background:${c.color}"></div>
+      <span class="l-name">${c.name}</span>
+      <span class="l-count">${c.tables.length} tables</span>
+      <span class="l-eps">eps=${c.eps}</span>
+      <div class="l-bar-wrap"><div class="l-bar" style="width:${pct}%;background:${c.color}"></div></div>
+      <span style="font-size:11px;color:var(--color-text-secondary);min-width:40px">${c.rels} joins</span>
+      ${!c.prev?'<span class="l-new">new</span>':'<span style="min-width:34px"></span>'}
+    `;
+    row.onclick=()=>toggleDet(i,c);
+    l.appendChild(row);
+    const det=document.createElement('div');
+    det.className='det-panel';
+    det.id='ldet-'+i;
+    det.innerHTML=`
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:8px">${c.desc}</div>
+      <div class="det-tables">
+        ${c.tables.map(t=>`<span class="tpill${c.sensTables.includes(t)?' sens':''}">${t}</span>`).join('')}
+      </div>
+      <div class="det-btns">
+        <button onclick="sendPrompt('Show me the ERD subgraph for the ${c.name} domain cluster in SAP ERP job 48')">Domain ERD ↗</button>
+        <button onclick="sendPrompt('List all relationships within the ${c.name} cluster from job 48')">View joins ↗</button>
+        ${c.sensCount>0?`<button onclick="sendPrompt('Show sensitive columns in the ${c.name} domain from SAP ERP job 48')">Sensitive cols ↗</button>`:''}
+      </div>
+    `;
+    l.appendChild(det);
+  });
+}
+
+function toggleDet(i,c){
+  const det=document.getElementById('ldet-'+i);
+  const row=document.getElementById('lrow-'+i);
+  if(!det)return;
+  const isOpen=det.classList.contains('open');
+  document.querySelectorAll('.det-panel.open').forEach(d=>d.classList.remove('open'));
+  document.querySelectorAll('.l-row.expanded').forEach(r=>r.classList.remove('expanded'));
+  if(!isOpen){det.classList.add('open');row.classList.add('expanded');}
+}
+
+function setView(v){
+  document.getElementById('grid-view').style.display=v==='grid'?'block':'none';
+  document.getElementById('list-view').style.display=v==='list'?'block':'none';
+  document.getElementById('vbtn-grid').className='vbtn'+(v==='grid'?' on':'');
+  document.getElementById('vbtn-list').className='vbtn'+(v==='list'?' on':'');
+}
+
+buildGrid();
+buildList();
+</script>
