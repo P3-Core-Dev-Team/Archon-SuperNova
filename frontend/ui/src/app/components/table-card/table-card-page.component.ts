@@ -186,13 +186,14 @@ interface FkRow {
             @for (n of mapCards(); track n.id) {
               <div class="map-card"
                    [class.focal]="n.id === tableName()"
+                   [class.dragging]="cardDrag?.cardId === n.id && cardDrag?.hasMoved"
                    [class.dim]="hoveredCardId() && hoveredCardId() !== n.id && !isCardAdjacentToHover(n.id)"
                    [style.left.px]="n.x"
                    [style.top.px]="n.y"
                    [style.width.px]="n.width"
                    (mouseenter)="hoveredCardId.set(n.id)"
                    (mouseleave)="hoveredCardId.set(null)"
-                   (click)="onMapCardClick(n)">
+                   (mousedown)="onCardMouseDown($event, n)">
                 <div class="card-head">
                   <span class="card-table mono">{{ n.label }}</span>
                   @if (n.module) { <span class="card-module">{{ n.module }}</span> }
@@ -505,9 +506,17 @@ interface FkRow {
     .map-card.focal {
       border: 2px solid #58a6ff;
       padding: 9px 11px;  /* compensate for thicker border */
-      cursor: default;
     }
     .map-card.dim { opacity: 0.35; }
+    /* Active-drag visuals: lift the card slightly and disable the smooth
+       transitions so the cursor follows position 1:1 without lag. */
+    .map-card.dragging {
+      cursor: grabbing;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4),
+                  0 8px 24px rgba(0, 0, 0, 0.42);
+      transition: none;
+      z-index: 4;
+    }
 
     /* Floating chrome.  Each control sits absolutely-positioned over the
        canvas; the canvas takes the wheel/drag handlers, chrome elements
@@ -1061,12 +1070,42 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
   private mapDragOriginX = 0;
   private mapDragOriginY = 0;
 
+  /**
+   * User-applied position offsets per card.  Layered ON TOP of the radial
+   * layout in mapCards() so dragging a card shifts only its position; the
+   * underlying layout output is unchanged so re-fits still work.  Cleared
+   * when the focal table changes (a new layout starts fresh).
+   */
+  cardOffsets = signal<Record<string, { dx: number; dy: number }>>({});
+
+  /**
+   * In-progress drag state.  ``hasMoved`` flips true when the cursor has
+   * travelled the threshold (5 px in screen-space) since the mousedown —
+   * below threshold the gesture is treated as a click (promote-to-focal),
+   * above it the gesture is a drag (move the card).  Captured on
+   * mousedown of any .map-card, finalised on the wrap's mouseup.
+   */
+  // Public so the template can read it for the [class.dragging] binding.
+  // Read-only from the template's perspective; only handlers below mutate it.
+  cardDrag: {
+    cardId: string;
+    startCursorX: number;
+    startCursorY: number;
+    startOffsetX: number;
+    startOffsetY: number;
+    hasMoved: boolean;
+  } | null = null;
+  private static readonly CARD_DRAG_THRESHOLD = 5;
+
   mapCanvasTransform = computed(
     () => `translate(${this.mapPanX()}px, ${this.mapPanY()}px) scale(${this.mapZoom()})`,
   );
 
-  /** Tables to render: focal + every distinct 1-hop neighbour. */
-  mapCards = computed<{ id: string; label: string; rows: number; fieldCount: number; relCount: number; module: string | null; width: number; height: number; x: number; y: number; }[]>(() => {
+  /** Pure auto-layout output (radial).  Doesn't include user drag-offsets;
+   * those are layered on in ``mapCards``.  Splitting the two so a re-fit
+   * after window resize keeps using the radial coordinates while the
+   * dragged-card overrides survive. */
+  private mapLayoutCards = computed<{ id: string; label: string; rows: number; fieldCount: number; relCount: number; module: string | null; width: number; height: number; x: number; y: number; }[]>(() => {
     const focal = this.tableName();
     const out = this.outFks();
     const inb = this.inFks();
@@ -1160,14 +1199,31 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
     return list;
   });
 
-  /** SVG bezier paths between focal and each neighbour. */
+  /** Render-time card list = auto-layout positions + per-card user
+   * drag-offsets.  Edges depend on this so they re-route the moment a
+   * drag updates ``cardOffsets``. */
+  mapCards = computed<{ id: string; label: string; rows: number; fieldCount: number; relCount: number; module: string | null; width: number; height: number; x: number; y: number; }[]>(() => {
+    const layout = this.mapLayoutCards();
+    const offsets = this.cardOffsets();
+    return layout.map(c => {
+      const off = offsets[c.id];
+      return off ? { ...c, x: c.x + off.dx, y: c.y + off.dy } : c;
+    });
+  });
+
+  /** SVG bezier paths between focal and each neighbour with anchor
+   * distribution (multiple edges leaving the same side spread along that
+   * side instead of stacking) + label-vs-card collision avoidance (a
+   * label whose midpoint falls on a card slides along the curve to clear
+   * space).  Recomputes any time the cards change — including drag. */
   mapEdges = computed(() => {
     const cards = this.mapCards();
-    const byId = new Map(cards.map(c => [c.id, c]));
+    const cardById = new Map(cards.map(c => [c.id, c]));
     const focal = this.tableName();
-    const focalCard = byId.get(focal);
+    const focalCard = cardById.get(focal);
     if (!focalCard) return [];
 
+    type Side = 'top' | 'right' | 'bottom' | 'left';
     interface MapEdge {
       id: string;
       color: string;
@@ -1184,63 +1240,263 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
       fromTable: string;
       toTable: string;
     }
-    const edges: MapEdge[] = [];
+    interface Proto {
+      id: string;
+      from: { id: string; x: number; y: number; width: number; height: number };
+      to:   { id: string; x: number; y: number; width: number; height: number };
+      fk: FkRow;
+      relType: RelType;
+    }
 
-    let i = 0;
+    const protos: Proto[] = [];
+    let pid = 0;
     for (const f of this.outFks()) {
-      const nb = byId.get(f.parentTable);
+      const nb = cardById.get(f.parentTable);
       if (!nb) continue;
-      const r = this.bezierBetween(focalCard, nb);
-      const t = this.classifyRelType(f);
-      const join = f.childCol === f.parentCol ? f.childCol : `${f.childCol} → ${f.parentCol}`;
-      const fromCard = f.cardinality;
-      const fromGlyph = (fromCard === 'MANY_TO_ONE' || fromCard === 'MANY_TO_MANY') ? '>' : '|';
-      const toGlyph = (fromCard === 'ONE_TO_MANY' || fromCard === 'MANY_TO_MANY') ? '<' : '|';
-      edges.push({
-        id: `mo${i++}`,
-        color: this.relTypeColor(t),
-        joinLabel: join,
-        path: r.path,
-        midX: r.midX,
-        midY: r.midY,
-        fromGlyph,
-        toGlyph,
-        fromGlyphX: r.fromX + (r.fromOnRight ? 4 : -10),
-        fromGlyphY: r.fromY + 4,
-        toGlyphX: r.toX + (r.toOnRight ? 4 : -10),
-        toGlyphY: r.toY + 4,
-        fromTable: focal,
-        toTable: f.parentTable,
+      protos.push({
+        id: `mo${pid++}`,
+        from: focalCard,
+        to: nb,
+        fk: f,
+        relType: this.classifyRelType(f),
       });
     }
     for (const f of this.inFks()) {
-      const nb = byId.get(f.childTable);
+      const nb = cardById.get(f.childTable);
       if (!nb) continue;
-      const r = this.bezierBetween(nb, focalCard);
-      const t = this.classifyRelType(f);
-      const join = f.childCol === f.parentCol ? f.childCol : `${f.childCol} → ${f.parentCol}`;
-      const fromCard = f.cardinality;
-      const fromGlyph = (fromCard === 'MANY_TO_ONE' || fromCard === 'MANY_TO_MANY') ? '>' : '|';
-      const toGlyph = (fromCard === 'ONE_TO_MANY' || fromCard === 'MANY_TO_MANY') ? '<' : '|';
+      protos.push({
+        id: `mi${pid++}`,
+        from: nb,
+        to: focalCard,
+        fk: f,
+        relType: this.classifyRelType(f),
+      });
+    }
+
+    if (protos.length === 0) return [];
+
+    // === Anchor distribution =========================================
+    // For each proto-edge we pick the side of each card that faces the
+    // other endpoint, then group all endpoints by (cardId, side) so we
+    // can spread them along the side instead of all attaching at the
+    // centre.
+    interface Endpoint {
+      protoId: string;
+      cardId: string;
+      side: Side;
+      otherCx: number; // centre of the OTHER card — used to sort within a side
+      otherCy: number;
+    }
+    const endpoints: Endpoint[] = [];
+    for (const p of protos) {
+      const aCx = p.from.x + p.from.width / 2;
+      const aCy = p.from.y + p.from.height / 2;
+      const bCx = p.to.x + p.to.width / 2;
+      const bCy = p.to.y + p.to.height / 2;
+      endpoints.push({
+        protoId: p.id, cardId: p.from.id,
+        side: this.sideFacing(p.from, bCx, bCy),
+        otherCx: bCx, otherCy: bCy,
+      });
+      endpoints.push({
+        protoId: p.id, cardId: p.to.id,
+        side: this.sideFacing(p.to, aCx, aCy),
+        otherCx: aCx, otherCy: aCy,
+      });
+    }
+
+    // Group by (cardId, side) and assign attachment points along the
+    // side at fractions (i + 1) / (N + 1) — 0.5 for one edge, 0.33 / 0.67
+    // for two, 0.25 / 0.5 / 0.75 for three, etc.
+    const groups = new Map<string, Endpoint[]>();
+    for (const e of endpoints) {
+      const k = `${e.cardId}|${e.side}`;
+      const arr = groups.get(k);
+      if (arr) arr.push(e); else groups.set(k, [e]);
+    }
+    const attach = new Map<string, { x: number; y: number; side: Side }>();
+    for (const [k, group] of groups) {
+      const card = cardById.get(group[0].cardId)!;
+      const side = group[0].side;
+      const horiz = side === 'top' || side === 'bottom';
+      // Sort by the position along the side that points toward the other
+      // card — gives stable, untangled ordering.
+      group.sort((a, b) =>
+        horiz ? a.otherCx - b.otherCx : a.otherCy - b.otherCy,
+      );
+      const N = group.length;
+      for (let i = 0; i < N; i++) {
+        const tt = (i + 1) / (N + 1);
+        const pt = this.pointOnSide(card, side, tt);
+        attach.set(`${group[i].protoId}:${group[i].cardId}`, { x: pt.x, y: pt.y, side });
+      }
+    }
+
+    // === Bezier construction =========================================
+    const edges: MapEdge[] = [];
+    for (const p of protos) {
+      const a = attach.get(`${p.id}:${p.from.id}`);
+      const b = attach.get(`${p.id}:${p.to.id}`);
+      if (!a || !b) continue;
+      const route = this.bezierFromAnchors(a, b);
+      // Label-vs-card collision: if the natural midpoint falls on any
+      // OTHER card (not the two endpoints), slide along the curve until
+      // it's clear.
+      let midX = route.midX;
+      let midY = route.midY;
+      const exclude = new Set([p.from.id, p.to.id]);
+      if (this.pointInAnyCard(midX, midY, cards, exclude)) {
+        for (const t of [0.4, 0.6, 0.3, 0.7, 0.25, 0.75, 0.2, 0.8]) {
+          const pt = this.bezierAt(route, t);
+          if (!this.pointInAnyCard(pt.x, pt.y, cards, exclude)) {
+            midX = pt.x; midY = pt.y; break;
+          }
+        }
+      }
+
+      const card = p.fk.cardinality;
+      const fromGlyph = (card === 'MANY_TO_ONE' || card === 'MANY_TO_MANY') ? '>' : '|';
+      const toGlyph   = (card === 'ONE_TO_MANY' || card === 'MANY_TO_MANY') ? '<' : '|';
+      const join = p.fk.childCol === p.fk.parentCol
+        ? p.fk.childCol
+        : `${p.fk.childCol} → ${p.fk.parentCol}`;
+
       edges.push({
-        id: `mi${i++}`,
-        color: this.relTypeColor(t),
+        id: p.id,
+        color: this.relTypeColor(p.relType),
         joinLabel: join,
-        path: r.path,
-        midX: r.midX,
-        midY: r.midY,
+        path: route.path,
+        midX, midY,
         fromGlyph,
         toGlyph,
-        fromGlyphX: r.fromX + (r.fromOnRight ? 4 : -10),
-        fromGlyphY: r.fromY + 4,
-        toGlyphX: r.toX + (r.toOnRight ? 4 : -10),
-        toGlyphY: r.toY + 4,
-        fromTable: f.childTable,
-        toTable: focal,
+        fromGlyphX: route.fromX + (a.side === 'right' ? 4 : a.side === 'left' ? -10 : -3),
+        fromGlyphY: route.fromY + (a.side === 'top' ? -4 : a.side === 'bottom' ? 12 : 4),
+        toGlyphX:   route.toX   + (b.side === 'right' ? 4 : b.side === 'left' ? -10 : -3),
+        toGlyphY:   route.toY   + (b.side === 'top' ? -4 : b.side === 'bottom' ? 12 : 4),
+        fromTable: p.from.id,
+        toTable:   p.to.id,
       });
     }
     return edges;
   });
+
+  /** Pick which side of ``card`` faces the point at (cx, cy).  Used for
+   * anchor distribution — the chosen side is whichever brings the
+   * connection point closest to the OTHER card. */
+  private sideFacing(
+    card: { x: number; y: number; width: number; height: number },
+    cx: number, cy: number,
+  ): 'top' | 'right' | 'bottom' | 'left' {
+    const ccx = card.x + card.width / 2;
+    const ccy = card.y + card.height / 2;
+    const dx = cx - ccx;
+    const dy = cy - ccy;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      return dx >= 0 ? 'right' : 'left';
+    } else {
+      return dy >= 0 ? 'bottom' : 'top';
+    }
+  }
+
+  /** Point on ``card``'s ``side`` border at fraction ``t`` (0..1) along
+   * the side.  ``t`` = 0.5 is centre-of-side; smaller spreads pull
+   * attachments toward the corners. */
+  private pointOnSide(
+    card: { x: number; y: number; width: number; height: number },
+    side: 'top' | 'right' | 'bottom' | 'left',
+    t: number,
+  ): { x: number; y: number } {
+    // Clamp t into [0.15, 0.85] so anchors don't sit right on the corners.
+    const ct = Math.max(0.15, Math.min(0.85, t));
+    switch (side) {
+      case 'top':    return { x: card.x + card.width * ct, y: card.y };
+      case 'bottom': return { x: card.x + card.width * ct, y: card.y + card.height };
+      case 'left':   return { x: card.x, y: card.y + card.height * ct };
+      case 'right':  return { x: card.x + card.width, y: card.y + card.height * ct };
+    }
+  }
+
+  /** Build a cubic bezier between two anchor points whose ``side`` tells
+   * us which way the curve should leave the card.  Returns the path
+   * string + the midpoint at t=0.5 + the endpoint coordinates so the
+   * caller can place cardinality glyphs. */
+  private bezierFromAnchors(
+    a: { x: number; y: number; side: 'top' | 'right' | 'bottom' | 'left' },
+    b: { x: number; y: number; side: 'top' | 'right' | 'bottom' | 'left' },
+  ): { path: string; midX: number; midY: number; fromX: number; fromY: number; toX: number; toY: number } {
+    const dist = Math.hypot(b.x - a.x, b.y - a.y);
+    const handle = Math.max(60, dist * 0.35);
+    const off = (side: 'top' | 'right' | 'bottom' | 'left') => {
+      switch (side) {
+        case 'top':    return { dx: 0, dy: -handle };
+        case 'bottom': return { dx: 0, dy: +handle };
+        case 'left':   return { dx: -handle, dy: 0 };
+        case 'right':  return { dx: +handle, dy: 0 };
+      }
+    };
+    const oa = off(a.side);
+    const ob = off(b.side);
+    const c0x = a.x + oa.dx, c0y = a.y + oa.dy;
+    const c1x = b.x + ob.dx, c1y = b.y + ob.dy;
+
+    const mid = this.bezierAt(
+      { fromX: a.x, fromY: a.y, c0x, c0y, c1x, c1y, toX: b.x, toY: b.y } as any,
+      0.5,
+    );
+    return {
+      path: `M ${a.x} ${a.y} C ${c0x} ${c0y}, ${c1x} ${c1y}, ${b.x} ${b.y}`,
+      midX: mid.x, midY: mid.y,
+      fromX: a.x, fromY: a.y, toX: b.x, toY: b.y,
+    };
+  }
+
+  /** Evaluate a cubic bezier at parameter ``t``.  ``route`` may carry
+   * either the bezierFromAnchors output OR the legacy bezierBetween
+   * output — both have the same control-point fields. */
+  private bezierAt(
+    route: { fromX?: number; fromY?: number; toX?: number; toY?: number;
+             c0x?: number; c0y?: number; c1x?: number; c1y?: number;
+             path?: string; },
+    t: number,
+  ): { x: number; y: number } {
+    // Parse from path when explicit fields aren't there (defensive).
+    let p0x = route.fromX ?? 0, p0y = route.fromY ?? 0;
+    let p1x = route.toX ?? 0,   p1y = route.toY ?? 0;
+    let c0x = route.c0x ?? p0x, c0y = route.c0y ?? p0y;
+    let c1x = route.c1x ?? p1x, c1y = route.c1y ?? p1y;
+    if ((route.c0x === undefined || route.c1x === undefined) && route.path) {
+      const m = /M ([\d.+-]+) ([\d.+-]+) C ([\d.+-]+) ([\d.+-]+), ([\d.+-]+) ([\d.+-]+), ([\d.+-]+) ([\d.+-]+)/.exec(route.path);
+      if (m) {
+        p0x = +m[1]; p0y = +m[2];
+        c0x = +m[3]; c0y = +m[4];
+        c1x = +m[5]; c1y = +m[6];
+        p1x = +m[7]; p1y = +m[8];
+      }
+    }
+    const omt = 1 - t;
+    return {
+      x: omt ** 3 * p0x + 3 * omt ** 2 * t * c0x + 3 * omt * t ** 2 * c1x + t ** 3 * p1x,
+      y: omt ** 3 * p0y + 3 * omt ** 2 * t * c0y + 3 * omt * t ** 2 * c1y + t ** 3 * p1y,
+    };
+  }
+
+  /** Returns true if (x, y) lies inside the AABB of any card except the
+   * ids in ``exclude``.  Used to slide labels off cards. */
+  private pointInAnyCard(
+    x: number, y: number,
+    cards: { id: string; x: number; y: number; width: number; height: number }[],
+    exclude: Set<string>,
+  ): boolean {
+    const PAD = 6;
+    for (const c of cards) {
+      if (exclude.has(c.id)) continue;
+      if (x >= c.x - PAD && x <= c.x + c.width + PAD &&
+          y >= c.y - PAD && y <= c.y + c.height + PAD) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   mapContentSize = computed(() => {
     let maxX = 0, maxY = 0;
@@ -1298,12 +1554,68 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
     this.mapDragOriginX = this.mapPanX();
     this.mapDragOriginY = this.mapPanY();
   }
+
+  /** Mousedown on a map-card.  Records the gesture origin; doesn't yet
+   * promote the card to focal — that decision is deferred to mouseup so
+   * we can distinguish click (no movement) from drag (>= 5 px). */
+  onCardMouseDown(ev: MouseEvent, n: { id: string }): void {
+    // Stop the wrap's pan handler from also firing on this event.
+    ev.stopPropagation();
+    // Suppress text selection drag-start while dragging the card.
+    ev.preventDefault();
+    const off = this.cardOffsets()[n.id] ?? { dx: 0, dy: 0 };
+    this.cardDrag = {
+      cardId: n.id,
+      startCursorX: ev.clientX,
+      startCursorY: ev.clientY,
+      startOffsetX: off.dx,
+      startOffsetY: off.dy,
+      hasMoved: false,
+    };
+  }
+
   onMapMouseMove(ev: MouseEvent): void {
+    // Card drag takes precedence over canvas pan.
+    if (this.cardDrag) {
+      const dxScreen = ev.clientX - this.cardDrag.startCursorX;
+      const dyScreen = ev.clientY - this.cardDrag.startCursorY;
+      if (!this.cardDrag.hasMoved) {
+        if (Math.hypot(dxScreen, dyScreen) < TableCardPageComponent.CARD_DRAG_THRESHOLD) {
+          return;
+        }
+        this.cardDrag.hasMoved = true;
+      }
+      // Convert screen-space delta to canvas-space (account for zoom).
+      const z = this.mapZoom() || 1;
+      const dx = dxScreen / z;
+      const dy = dyScreen / z;
+      const next = { ...this.cardOffsets() };
+      next[this.cardDrag.cardId] = {
+        dx: this.cardDrag.startOffsetX + dx,
+        dy: this.cardDrag.startOffsetY + dy,
+      };
+      this.cardOffsets.set(next);
+      return;
+    }
     if (!this.mapDragging) return;
     this.mapPanX.set(this.mapDragOriginX + (ev.clientX - this.mapDragStartX));
     this.mapPanY.set(this.mapDragOriginY + (ev.clientY - this.mapDragStartY));
   }
-  onMapMouseUp(_ev: MouseEvent): void { this.mapDragging = false; }
+
+  onMapMouseUp(_ev: MouseEvent): void {
+    if (this.cardDrag) {
+      // Click vs drag: if the gesture stayed inside the threshold, treat
+      // as a click → promote the card to focal (or no-op if it IS the
+      // focal).  Otherwise the drag commits the new position; nothing
+      // further to do — cardOffsets is already up to date.
+      if (!this.cardDrag.hasMoved) {
+        this.onMapCardClick({ id: this.cardDrag.cardId });
+      }
+      this.cardDrag = null;
+      return;
+    }
+    this.mapDragging = false;
+  }
 
   onMapCardClick(n: { id: string }): void {
     if (n.id === this.tableName()) return;
@@ -1458,6 +1770,9 @@ export class TableCardPageComponent implements OnInit, AfterViewInit {
       // Reset transient interaction state so the new focal lands fresh.
       this.searchQuery.set('');
       this.hoveredCardId.set(null);
+      // Clear user-applied drag offsets — the new focal has a different
+      // neighbour set, so old positions don't apply.
+      this.cardOffsets.set({});
       // Re-fit the new radial layout to the canvas (mapCards is computed
       // off tableName + allEdges, so it'll have the new neighbours by
       // the next paint).
