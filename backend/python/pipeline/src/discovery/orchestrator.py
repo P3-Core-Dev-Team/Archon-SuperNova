@@ -424,106 +424,86 @@ def _run_advanced_fk_phases(
     cheap and to avoid a hard dep when only some agents have landed code.
     """
     rel_cfg = getattr(config, "relationships", None)
+    pii_cfg = getattr(config, "pii", None)
+
+    # Stage-level fallback policy — when False, an exception in one of
+    # these optional phases re-raises and aborts the pipeline (fail-fast
+    # mode used for CI / debugging).  Default True keeps the pre-existing
+    # "log + continue" behaviour.
+    orch_cfg = getattr(config, "orchestration", None)
+    enable_fallbacks = bool(getattr(orch_cfg, "enable_phase_fallbacks", True))
+
+    def _run_optional(
+        gate_attr: str,
+        gate_owner: Any,
+        gate_default: bool,
+        phase_label: str,
+        phase_const: str,
+        module_name: str,
+        fn_attr: str,
+    ) -> None:
+        """Wrap one optional phase: gate -> import -> _run_phase, with
+        the canonical "phase_skipped" log on exception.  Honours
+        ``enable_phase_fallbacks`` — re-raises on False so callers fail
+        fast instead of silently degrading."""
+        if not bool(getattr(gate_owner, gate_attr, gate_default)):
+            return
+        try:
+            mod = __import__(f"discovery.{module_name}", fromlist=[fn_attr])
+            _run_phase(
+                phase_const,
+                run_log,
+                skip_phases,
+                getattr(mod, fn_attr),
+                engine,
+                config,
+            )
+        except Exception as exc:
+            log.warning(f"{phase_label}_phase_skipped", error=str(exc))
+            if not enable_fallbacks:
+                raise
 
     # Composite (Phase 4b).  ``composite_fk_enabled`` defaults True now
     # that composite_fk is folded into run-all.
-    if bool(getattr(rel_cfg, "composite_fk_enabled", True)):
-        try:
-            from discovery import composite_fk  # noqa: PLC0415
-
-            _run_phase(
-                PHASE_COMPOSITE_FK,
-                run_log,
-                skip_phases,
-                composite_fk.run_phase_4b_composite,
-                engine,
-                config,
-            )
-        except Exception as exc:
-            log.warning("composite_fk_phase_skipped", error=str(exc))
-
+    _run_optional(
+        "composite_fk_enabled", rel_cfg, True,
+        "composite_fk", PHASE_COMPOSITE_FK,
+        "composite_fk", "run_phase_4b_composite",
+    )
     # Polymorphic (Phase 4c).
-    if bool(getattr(rel_cfg, "polymorphic_fk_enabled", True)):
-        try:
-            from discovery import polymorphic_fk  # noqa: PLC0415
-
-            _run_phase(
-                PHASE_POLYMORPHIC_FK,
-                run_log,
-                skip_phases,
-                polymorphic_fk.run_phase_polymorphic_fk,
-                engine,
-                config,
-            )
-        except Exception as exc:
-            log.warning("polymorphic_fk_phase_skipped", error=str(exc))
-
+    _run_optional(
+        "polymorphic_fk_enabled", rel_cfg, True,
+        "polymorphic_fk", PHASE_POLYMORPHIC_FK,
+        "polymorphic_fk", "run_phase_polymorphic_fk",
+    )
     # JSONB (Phase 4d).
-    if bool(getattr(rel_cfg, "jsonb_fk_enabled", True)):
-        try:
-            from discovery import jsonb_fk  # noqa: PLC0415
-
-            _run_phase(
-                PHASE_JSONB_FK,
-                run_log,
-                skip_phases,
-                jsonb_fk.run_phase_jsonb_fk,
-                engine,
-                config,
-            )
-        except Exception as exc:
-            log.warning("jsonb_fk_phase_skipped", error=str(exc))
-
+    _run_optional(
+        "jsonb_fk_enabled", rel_cfg, True,
+        "jsonb_fk", PHASE_JSONB_FK,
+        "jsonb_fk", "run_phase_jsonb_fk",
+    )
     # Inheritance annotator (post-Phase-5 evidence merge).
-    if bool(getattr(rel_cfg, "inheritance_annotator_enabled", True)):
-        try:
-            from discovery import inheritance  # noqa: PLC0415
-
-            _run_phase(
-                PHASE_INHERITANCE,
-                run_log,
-                skip_phases,
-                inheritance.run_phase_inheritance,
-                engine,
-                config,
-            )
-        except Exception as exc:
-            log.warning("inheritance_phase_skipped", error=str(exc))
-
+    _run_optional(
+        "inheritance_annotator_enabled", rel_cfg, True,
+        "inheritance", PHASE_INHERITANCE,
+        "inheritance", "run_phase_inheritance",
+    )
     # Subject-rooted PII propagation (reverse-BFS over relationships).
-    pii_cfg = getattr(config, "pii", None)
-    if bool(getattr(pii_cfg, "propagation_enabled", True)):
-        try:
-            from discovery import pii_propagation  # noqa: PLC0415
-
-            _run_phase(
-                PHASE_PII_PROPAGATION,
-                run_log,
-                skip_phases,
-                pii_propagation.run_phase_pii_propagation,
-                engine,
-                config,
-            )
-        except Exception as exc:
-            log.warning("pii_propagation_phase_skipped", error=str(exc))
-
+    _run_optional(
+        "propagation_enabled", pii_cfg, True,
+        "pii_propagation", PHASE_PII_PROPAGATION,
+        "pii_propagation", "run_phase_pii_propagation",
+    )
     # Cross-cluster PII leak detector (sketch-based containment).
-    if bool(getattr(pii_cfg, "leak_scan_enabled", True)):
-        try:
-            from discovery import pii_leak  # noqa: PLC0415
-
-            _run_phase(
-                PHASE_PII_LEAK,
-                run_log,
-                skip_phases,
-                pii_leak.run_phase_pii_leak,
-                engine,
-                config,
-            )
-        except Exception as exc:
-            log.warning("pii_leak_phase_skipped", error=str(exc))
-
+    _run_optional(
+        "leak_scan_enabled", pii_cfg, True,
+        "pii_leak", PHASE_PII_LEAK,
+        "pii_leak", "run_phase_pii_leak",
+    )
     # Schema clustering (groups tables into cohesive clusters per schema).
+    # Special-case: clustering's runner is a local function in this
+    # module (run_phase_clustering), not an attribute of an external
+    # module — handle inline rather than via _run_optional.
     if bool(getattr(rel_cfg, "clustering_enabled", True)):
         try:
             from discovery import clustering, results_db  # noqa: PLC0415, F401
@@ -538,6 +518,8 @@ def _run_advanced_fk_phases(
             )
         except Exception as exc:
             log.warning("clustering_phase_skipped", error=str(exc))
+            if not enable_fallbacks:
+                raise
 
 
 # ---------------------------------------------------------------------------

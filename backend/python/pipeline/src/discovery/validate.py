@@ -947,12 +947,39 @@ def run_phase_5(
         avg_fanin=round(len(pending) / max(len(tasks), 1), 2),
     )
 
+    # Adaptive batching — submit parent-column groups in chunks of
+    # ``validate_batch_size`` so a 5000-table schema doesn't hold
+    # 5000 DuckDB connections + sketch buffers in worker memory at
+    # once.  <=0 disables batching for backwards-compatibility.
+    from discovery.fallbacks import chunked  # local import: avoid cycle
+    validate_batch_size: int = int(getattr(orch_cfg, "validate_batch_size", 100) or 0)
+    if validate_batch_size <= 0:
+        batches = [tasks]
+    else:
+        batches = chunked(tasks, validate_batch_size)
+
+    log.info(
+        "phase5_pool_start",
+        workers=num_workers,
+        groups=len(tasks),
+        batches=len(batches),
+        batch_size=validate_batch_size if validate_batch_size > 0 else "unlimited",
+    )
+
+    all_results_grouped: list = []
     with multiprocessing.Pool(
         processes=num_workers,
         initializer=_worker_init,
         initargs=(settings,),
     ) as pool:
-        all_results_grouped = pool.map(_validate_parent_group_task, tasks)
+        for idx, batch in enumerate(batches, start=1):
+            log.info(
+                "phase5_batch_start",
+                batch_index=idx,
+                batch_count=len(batches),
+                batch_size=len(batch),
+            )
+            all_results_grouped.extend(pool.map(_validate_parent_group_task, batch))
 
     # Flatten worker output back to a single sequence in the same order as
     # the children list inside each group.

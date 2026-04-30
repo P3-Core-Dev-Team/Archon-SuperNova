@@ -193,6 +193,40 @@ class OrchestrationConfig(BaseModel):
     workers: WorkersConfig = Field(default_factory=WorkersConfig)
     retry_max_attempts: int = 3
     retry_backoff_seconds: int = 5
+    # ----------------------------------------------------------------
+    # Adaptive batching knobs — how many tasks the worker pools submit
+    # to ``Pool.map()`` per generation.  Today's one-shot
+    # ``pool.map(_pii_task, tasks)`` materialises every parquet handle
+    # / regex matcher / DuckDB connection at once; on >1000-table
+    # schemas that's a memory cliff.  Chunking caps peak memory at
+    # ``chunk_size * per_worker_overhead``.
+    #
+    # Defaults match the reference project's pageSize values (50 / 100).
+    # Set to <=0 to disable batching (one-shot, original behaviour).
+    # ----------------------------------------------------------------
+    pii_batch_size: int = Field(
+        default=50,
+        description=(
+            "Columns per Pool.map generation in phase 3b (pii_scan). "
+            "<=0 disables batching."
+        ),
+    )
+    validate_batch_size: int = Field(
+        default=100,
+        description=(
+            "Parent-column groups per Pool.map generation in phase 5 "
+            "(validate). <=0 disables batching."
+        ),
+    )
+    # ----------------------------------------------------------------
+    # Stage-level fallback policy.  When True (default), phases that
+    # encounter an unhandled exception log ``phase_degraded`` at WARN
+    # and continue; subsequent phases see partial-or-empty inputs but
+    # still run.  When False, the original fail-fast behaviour applies
+    # — useful for CI / debugging.  Honoured by ``discovery.fallbacks
+    # .safe_phase`` and the orchestrator's per-phase wrappers.
+    # ----------------------------------------------------------------
+    enable_phase_fallbacks: bool = True
 
 
 class ExtractionConfig(BaseModel):

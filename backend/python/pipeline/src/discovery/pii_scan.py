@@ -1046,19 +1046,40 @@ def run_phase_3b(engine: "Engine", config: "AppConfig") -> None:
     orch_cfg = getattr(config, "orchestration", None)
     workers_cfg = getattr(orch_cfg, "workers", None)
     num_workers: int = getattr(workers_cfg, "pii_scan", 16)
+    # Adaptive batching — submit columns to the pool in chunks of
+    # ``pii_batch_size`` instead of one shot.  Caps peak memory
+    # (per-worker parquet handles + regex matchers) at
+    # ``batch_size * per_worker_overhead`` regardless of schema size.
+    # <=0 disables batching for backwards-compatibility.
+    from discovery.fallbacks import chunked  # local import: avoid cycle
+    pii_batch_size: int = int(getattr(orch_cfg, "pii_batch_size", 50) or 0)
+    if pii_batch_size <= 0:
+        batches = [tasks]
+    else:
+        batches = chunked(tasks, pii_batch_size)
 
     log.info(
         "pii_scan_pool_start",
         workers=num_workers,
         tasks=len(tasks),
+        batches=len(batches),
+        batch_size=pii_batch_size if pii_batch_size > 0 else "unlimited",
     )
 
+    all_results: list = []
     with multiprocessing.Pool(
         processes=num_workers,
         initializer=_worker_init,
         initargs=(settings,),
     ) as pool:
-        all_results = pool.map(_pii_task, tasks)
+        for idx, batch in enumerate(batches, start=1):
+            log.info(
+                "pii_scan_batch_start",
+                batch_index=idx,
+                batch_count=len(batches),
+                batch_size=len(batch),
+            )
+            all_results.extend(pool.map(_pii_task, batch))
 
     now = datetime.now(timezone.utc)
     success = failed = total_findings = 0
