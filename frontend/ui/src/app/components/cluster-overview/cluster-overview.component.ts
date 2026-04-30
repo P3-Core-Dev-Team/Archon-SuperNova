@@ -87,39 +87,56 @@ export interface ClustersResponse {
       <div class="grid">
         @for (c of sorted(); track c.cluster_id) {
           <div class="card"
-               [style.borderTopColor]="colorOf(c.cluster_id)"
                [class.pii-border]="c.pii_table_count > 0"
                [class.junction-only]="isJunctionOnly(c)">
+            <!-- Header row: small colored dot + "Cluster N" replaces the
+                 old top stripe.  The dot still carries cluster colour but
+                 with much less visual weight. -->
+            <div class="card-head">
+              <span class="cluster-dot"
+                    [style.background]="colorOf(c.cluster_id)"
+                    [title]="'Cluster ' + c.cluster_id"></span>
+              <span class="cluster-index">Cluster {{ c.cluster_id }}</span>
+              @if (c.pii_table_count > 0) {
+                <span class="pii-flag" title="Contains PII findings">&#128274;</span>
+              }
+            </div>
+
             <div class="card-name">{{ c.name }}</div>
-            <div class="divider"></div>
 
             <div class="stats-line">
               {{ c.table_count }} table{{ c.table_count !== 1 ? 's' : '' }}
-              &nbsp;·&nbsp;{{ c.intra_edges }} intra-edge{{ c.intra_edges !== 1 ? 's' : '' }}
-            </div>
-            <div class="inter-line">
-              {{ c.inter_edges }} connect{{ c.inter_edges !== 1 ? 's' : '' }} to other clusters
+              · {{ c.intra_edges }} intra-edge{{ c.intra_edges !== 1 ? 's' : '' }}
+              · {{ c.inter_edges }} ext
             </div>
 
-            <div class="archetype-bar-row">
-              <div class="mini-bar" [attr.title]="archetypeTitle(c)">
-                @for (seg of archetypeSegments(c); track seg.key) {
-                  <div class="seg"
-                       [style.width.%]="seg.pct"
-                       [style.background]="seg.color"
-                       [attr.title]="seg.key + ' ' + seg.count">
-                  </div>
-                }
-              </div>
-              <span class="archetype-labels">{{ archetypeLabel(c) }}</span>
+            <!-- Archetype proportion bar — full card width.  Inline
+                 middot-separated labels render BELOW (not overlaid) so
+                 nothing crams into a thin stacked bar. -->
+            <div class="arch-bar" [attr.title]="archetypeTitle(c)">
+              @for (seg of archetypeSegments(c); track seg.key) {
+                <div class="seg"
+                     [style.width.%]="seg.pct"
+                     [style.background]="seg.color"
+                     [attr.title]="seg.key + ' ' + seg.count">
+                </div>
+              }
+            </div>
+            <div class="arch-legend mono">
+              @for (seg of archetypeSegments(c); track seg.key; let last = $last) {
+                <span class="arch-label" [style.color]="seg.color">{{ archetypeAbbrev(seg.key) }}&nbsp;{{ seg.count }}</span>
+                @if (!last) { <span class="dot-sep">·</span> }
+              }
             </div>
 
             @if (c.pii_table_count > 0) {
-              <div class="pii-line">
-                <span class="lock">&#128274;</span>
+              <div class="pii-line"
+                   [attr.title]="c.subject_kinds.length > 2 ? c.subject_kinds.join(', ') : null">
                 {{ c.pii_table_count }} table{{ c.pii_table_count !== 1 ? 's' : '' }} with PII
                 @if (c.subject_kinds.length > 0) {
-                  <span class="pii-kinds">({{ c.subject_kinds.join(', ') }})</span>
+                  <span class="pii-kinds">
+                    (<span class="pii-list">{{ visiblePiiTags(c.subject_kinds).join(', ') }}</span>@if (c.subject_kinds.length > 2) {<span class="more">&nbsp;+{{ c.subject_kinds.length - 2 }} more</span>})
+                  </span>
                 }
               </div>
             }
@@ -179,22 +196,51 @@ export interface ClustersResponse {
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      /* Larger min track on wide screens — auto-fill flows up to 4-5
+       * cards per row before reflowing.  Each card stays comfortably
+       * sized at narrow widths thanks to the 320px floor. */
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 16px;
     }
 
     .card {
       background: #161b22;
       border: 1px solid #30363d;
-      /* Top edge stripe is the cluster's color (matches the macro graph). */
-      border-top: 4px solid #30363d;
       border-radius: 8px;
-      padding: 12px 18px 16px;
+      padding: 14px 16px 16px;
       display: flex;
       flex-direction: column;
+      /* Consistent 8px vertical rhythm across every row in the card. */
       gap: 8px;
       transition: box-shadow 0.15s, border-color 0.15s, transform 0.12s;
       position: relative;
+    }
+    /* Header row: cluster colour now lives in a small dot, not a chunky
+       stripe — same identity, much less visual weight. */
+    .card-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #8b949e;
+    }
+    .cluster-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      box-shadow: 0 0 0 2px rgba(13, 17, 23, 0.9), 0 0 0 3px rgba(255, 255, 255, 0.04);
+    }
+    .cluster-index {
+      font-weight: 600;
+      color: #c9d1d9;
+    }
+    .pii-flag {
+      margin-left: auto;
+      font-size: 11px;
+      color: #d29922;
     }
     .overview-header .spacer { flex: 1; }
     .overview-header .view-toggle {
@@ -244,28 +290,15 @@ export interface ClustersResponse {
       word-break: break-word;
     }
 
-    .divider {
-      height: 1px;
-      background: #30363d;
-      margin: 2px 0 4px;
-    }
-
     .stats-line {
-      font-size: 13px;
+      font-size: 12.5px;
       color: #c9d1d9;
     }
-    .inter-line {
-      font-size: 12px;
-      color: #8b949e;
-    }
 
-    .archetype-bar-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .mini-bar {
-      flex: 0 0 80px;
+    /* Full-width archetype bar.  The label row sits below it so type
+       names never overlap a thin stacked segment. */
+    .arch-bar {
+      width: 100%;
       height: 8px;
       border-radius: 4px;
       overflow: hidden;
@@ -273,14 +306,17 @@ export interface ClustersResponse {
       display: flex;
     }
     .seg { height: 100%; transition: width 0.3s; }
-    .archetype-labels {
+    .arch-legend {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px;
       font-size: 11px;
+      letter-spacing: 0.4px;
       color: #8b949e;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 160px;
     }
+    .arch-legend .arch-label { font-weight: 600; }
+    .arch-legend .dot-sep { color: #444c56; }
 
     .pii-line {
       font-size: 12px;
@@ -289,16 +325,19 @@ export interface ClustersResponse {
       align-items: baseline;
       gap: 4px;
       flex-wrap: wrap;
+      cursor: help;
     }
-    .pii-kinds {
+    .pii-line .pii-kinds {
       color: #8b949e;
       font-size: 11px;
     }
+    .pii-line .pii-list { color: #c9d1d9; }
+    .pii-line .more { color: #8b949e; }
 
     .modularity-line {
       font-size: 11px;
       color: #6e7681;
-      margin-top: 2px;
+      margin-top: -2px;
     }
 
     .open-btn {
@@ -385,13 +424,17 @@ export class ClusterOverviewComponent implements OnInit {
     return c.table_count > 0 && junctionCount === c.table_count;
   }
 
+  // Unified palette matching cluster-detail.component.ts so the cluster
+  // ERD bar and the cluster-card bar speak the same colour vocabulary.
+  // FACT = coral-red / DIM = sky-blue / LOOKUP = green / BRIDGE = lavender.
   private static readonly ARCHETYPE_COLORS: Record<string, string> = {
-    FACT:      '#1f6feb',
-    DIMENSION: '#3fb950',
+    FACT:      '#f78166',
+    DIMENSION: '#79c0ff',
+    LOOKUP:    '#56d364',
     JUNCTION:  '#d29922',
-    BRIDGE:    '#a371f7',
+    BRIDGE:    '#d2a8ff',
     REFERENCE: '#58a6ff',
-    UNKNOWN:   '#6e7681',
+    UNKNOWN:   '#8b949e',
   };
 
   archetypeSegments(c: Cluster): Array<{ key: string; count: number; pct: number; color: string }> {
@@ -403,21 +446,19 @@ export class ClusterOverviewComponent implements OnInit {
         key,
         count,
         pct: (count / total) * 100,
-        color: ClusterOverviewComponent.ARCHETYPE_COLORS[key] ?? '#6e7681',
+        color: ClusterOverviewComponent.ARCHETYPE_COLORS[key] ?? '#8b949e',
       }));
   }
 
-  archetypeLabel(c: Cluster): string {
-    return Object.entries(c.archetype_distribution)
-      .filter(([, v]) => v > 0)
-      .map(([k, v]) => {
-        const abbr: Record<string, string> = {
-          FACT: 'FACT', DIMENSION: 'DIM', JUNCTION: 'JN',
-          BRIDGE: 'BR', REFERENCE: 'REF', UNKNOWN: '?',
-        };
-        return `${abbr[k] ?? k} ${v}`;
-      })
-      .join(' ');
+  /** Short, readable abbreviation for the inline middot-separated label
+   * row beneath the archetype bar.  Matches cluster-detail's label
+   * column ("FACT 7 · DIM 5 · LOOKUP 5"). */
+  archetypeAbbrev(key: string): string {
+    const abbr: Record<string, string> = {
+      FACT: 'FACT', DIMENSION: 'DIM', LOOKUP: 'LOOKUP',
+      JUNCTION: 'JN', BRIDGE: 'BR', REFERENCE: 'REF', UNKNOWN: '?',
+    };
+    return abbr[key] ?? key;
   }
 
   archetypeTitle(c: Cluster): string {
@@ -425,5 +466,12 @@ export class ClusterOverviewComponent implements OnInit {
       .filter(([, v]) => v > 0)
       .map(([k, v]) => `${k}: ${v}`)
       .join(', ');
+  }
+
+  /** First two PII tag types — full list rendered in the row's title
+   * tooltip when there are ≥3.  Avoids the awkward many-tag wrap
+   * the previous design produced. */
+  visiblePiiTags(tags: string[]): string[] {
+    return tags.slice(0, 2);
   }
 }
