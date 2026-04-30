@@ -1128,22 +1128,61 @@ def _sse_frame(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data, separators=(',', ':'))}\n\n"
 
 
+# Maximum lifetime of a single SSE stream.  Even if the job never
+# reaches terminal status (stuck pipeline, browser tab forgotten), we
+# close the stream after 30 minutes so resources can't leak forever;
+# the client's EventSource auto-reconnects and gets a fresh snapshot.
+_SSE_MAX_LIFETIME_SECONDS = 30 * 60
+# Tick cadence — keep close to the prior polling interval so users
+# see updates within a second of the pipeline writing them.
+_SSE_TICK_SECONDS = 0.75
+
+
+def _query_run_log_raw_with(conn: psycopg2.extensions.connection) -> list[tuple]:
+    """Reuse a caller-provided psycopg2 connection for the run_log read.
+
+    Avoids the per-tick connect/close thrash that the standalone
+    ``_query_run_log_raw`` would produce inside the SSE generator.
+    Resets the search_path on every call defensively in case the
+    connection has been recycled.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SET search_path TO discovery;")
+        cur.execute(
+            """
+            SELECT phase, scope_type, scope_id, status,
+                   started_at, ended_at, error_message
+            FROM run_log
+            ORDER BY started_at ASC NULLS LAST, log_id ASC
+            """
+        )
+        return cur.fetchall()
+
+
 async def _job_event_stream(job_id: str) -> AsyncGenerator[str, None]:
     """Async generator yielding SSE frames for one job page.
 
-    Emits exactly four event kinds:
+    Emits five event kinds:
 
     * ``snapshot`` — once at connection time; carries the full
       JobStatus, log tail, and rolled-up run_log so the client can
       hydrate without a second round-trip.
-    * ``status`` — when the in-memory job status field changes
-      (queued -> running -> succeeded/failed).
-    * ``run_log`` — when the rolled-up run_log entry list changes
-      (new phase started, status changed, error_message filled).
-    * ``log`` — when the log file's tail differs from what we last
-      sent (new pipeline stdout lines).
-    * ``done`` — final frame when the job reaches a terminal status;
-      the generator returns immediately after, closing the stream.
+    * ``status``   — when the in-memory job status field changes.
+    * ``run_log``  — when the rolled-up run_log entry list changes.
+    * ``log``      — when the log file's tail differs from last sent.
+    * ``done``     — final frame when the job reaches terminal status,
+                     when the job vanishes from the registry, or when
+                     the stream hits ``_SSE_MAX_LIFETIME_SECONDS``.
+
+    Lifecycle guarantees:
+
+    * One persistent psycopg2 connection per stream — no per-tick
+      connect/close thrash on the results DB.
+    * try/finally always closes the connection when the generator is
+      torn down (terminal status, max-lifetime cap, OR client
+      disconnect via Starlette's ``CancelledError``).
+    * Hard cap at ``_SSE_MAX_LIFETIME_SECONDS`` so a stuck pipeline
+      with a forgotten browser tab can't pin resources indefinitely.
 
     The DB / file reads happen synchronously inside the async loop —
     each call blocks the event loop briefly (≤10ms typical).  At the
@@ -1151,67 +1190,93 @@ async def _job_event_stream(job_id: str) -> AsyncGenerator[str, None]:
     """
     job = _jobs[job_id]
 
-    def _build_snapshot() -> dict[str, Any]:
-        try:
-            run_log = _rollup_run_log(_query_run_log_raw())
-        except Exception:
-            run_log = []
-        return {
+    # Persistent results-DB connection for the lifetime of this stream.
+    # Close it in finally regardless of how the generator exits.
+    db_conn: Optional[psycopg2.extensions.connection] = None
+    try:
+        db_conn = psycopg2.connect(
+            **RESULTS_DB_DSN, options="-c search_path=discovery"
+        )
+
+        def _safe_run_log() -> list[dict[str, Any]]:
+            try:
+                return _rollup_run_log(_query_run_log_raw_with(db_conn))
+            except Exception:
+                # On a transient DB error, return [] rather than 500
+                # the snapshot — the client gets a tick of empty data
+                # but the stream stays alive.
+                if db_conn is not None and not db_conn.closed:
+                    try:
+                        db_conn.rollback()
+                    except Exception:
+                        pass
+                return []
+
+        snapshot = {
             "status": _job_status(job).model_dump(mode="json"),
-            "run_log": {"entries": run_log},
+            "run_log": {"entries": _safe_run_log()},
             "log": _log_tail_text(job["log_path"]),
         }
+        yield _sse_frame("snapshot", snapshot)
 
-    snapshot = _build_snapshot()
-    yield _sse_frame("snapshot", snapshot)
+        last_status = snapshot["status"]["status"]
+        last_run_log_sig = json.dumps(snapshot["run_log"], sort_keys=True)
+        last_log_text = snapshot["log"]
+        deadline = asyncio.get_event_loop().time() + _SSE_MAX_LIFETIME_SECONDS
 
-    last_status = snapshot["status"]["status"]
-    last_run_log_sig = json.dumps(snapshot["run_log"], sort_keys=True)
-    last_log_text = snapshot["log"]
+        while True:
+            if asyncio.get_event_loop().time() > deadline:
+                yield _sse_frame("done", {"reason": "max_lifetime"})
+                return
+            await asyncio.sleep(_SSE_TICK_SECONDS)
 
-    while True:
-        await asyncio.sleep(0.75)
+            job_now = _jobs.get(job_id)
+            if not job_now:
+                # Job vanished from the registry (process restart).
+                yield _sse_frame("done", {"reason": "job_gone"})
+                return
 
-        job_now = _jobs.get(job_id)
-        if not job_now:
-            # Job vanished from the registry (process restart, etc.).
-            yield _sse_frame("done", {"reason": "job_gone"})
-            return
+            # Status diff
+            try:
+                status_obj = _job_status(job_now).model_dump(mode="json")
+            except Exception:
+                status_obj = None
+            if status_obj is not None and status_obj.get("status") != last_status:
+                yield _sse_frame("status", status_obj)
+                last_status = status_obj["status"]
 
-        # Status diff
-        try:
-            status_obj = _job_status(job_now).model_dump(mode="json")
-        except Exception:
-            status_obj = None
-        if status_obj is not None and status_obj.get("status") != last_status:
-            yield _sse_frame("status", status_obj)
-            last_status = status_obj["status"]
-
-        # run_log diff — rolled up each tick.  Signature compare avoids
-        # re-emitting when nothing changed.
-        try:
-            run_log_entries = _rollup_run_log(_query_run_log_raw())
+            # run_log diff — rolled up each tick.  Signature compare
+            # avoids re-emitting when nothing changed.
+            run_log_entries = _safe_run_log()
             sig = json.dumps(run_log_entries, sort_keys=True)
             if sig != last_run_log_sig:
                 yield _sse_frame("run_log", {"entries": run_log_entries})
                 last_run_log_sig = sig
-        except Exception:
-            # Don't kill the stream on a transient DB blip.
-            pass
 
-        # log tail diff — read file, compare to last sent.
-        try:
-            log_text = _log_tail_text(job_now["log_path"])
-            if log_text != last_log_text:
-                yield _sse_frame("log", {"log": log_text})
-                last_log_text = log_text
-        except Exception:
-            pass
+            # log tail diff — read file, compare to last sent.
+            try:
+                log_text = _log_tail_text(job_now["log_path"])
+                if log_text != last_log_text:
+                    yield _sse_frame("log", {"log": log_text})
+                    last_log_text = log_text
+            except Exception:
+                # Transient file-system issue (mid-rotation, etc.) —
+                # skip this tick, keep the stream alive.
+                pass
 
-        # Terminal status: emit one final frame and close.
-        if last_status in ("succeeded", "failed"):
-            yield _sse_frame("done", {"status": last_status})
-            return
+            # Terminal status: emit one final frame and close.
+            if last_status in ("succeeded", "failed"):
+                yield _sse_frame("done", {"status": last_status})
+                return
+    finally:
+        # Always release the DB connection — covers normal completion,
+        # max-lifetime cap, job-gone, AND Starlette's CancelledError
+        # when the client disconnects mid-stream.
+        if db_conn is not None and not db_conn.closed:
+            try:
+                db_conn.close()
+            except Exception:
+                pass
 
 
 @app.get("/api/jobs/{job_id}/events")

@@ -2,9 +2,9 @@
 Phase ``cardinality_refine`` — live source-side cardinality probe.
 
 Runs after Phase 5 (validate).  For high-confidence FK relationships,
-asks the Java extraction service to return COUNT(*) and
-COUNT(DISTINCT col) directly from the source DB; uses those numbers
-to refine the ``cardinality`` field that Phase 5 derived from
+asks the Java extraction service to return ``COUNT(*)`` and
+``COUNT(DISTINCT col)`` directly from the source DB; uses those
+numbers to refine the ``cardinality`` field that Phase 5 derived from
 DuckDB-on-parquet counts.
 
 Why this matters
@@ -14,18 +14,29 @@ DISTINCT counts.  When extraction was sampled (e.g. TABLESAMPLE 1%
 on a 100M-row table), those counts are also sampled — fine for FK
 discovery (Jaccard containment is robust to sampling) but not
 authoritative for ``ONE_TO_ONE`` vs ``MANY_TO_ONE`` classification.
-A live probe asks the source DB for the exact totals, then re-runs
-the same classifier in :func:`_reclassify`.
+A live probe gives us the exact totals.
+
+What we can refine
+------------------
+Limited by what the probe response carries.  The service returns
+``total_rows`` and ``distinct_count`` for the CHILD column only —
+no orphan count, no parent's distinct values.  So we can only
+authoritatively flip relationships where the parquet already proved
+``orphans == 0`` (i.e. ``MANY_TO_ONE``): if ``distinct == total_rows``
+in the live probe, every child row has a unique value AND every value
+maps to a parent → ``ONE_TO_ONE``.  Other buckets (``PARTIAL`` /
+``NO_RELATIONSHIP``) are deliberately left alone — flipping them
+without orphan evidence would be lossy.
 
 Operator gates
 --------------
-Default OFF.  Two config knobs decide what gets probed:
+Default OFF.  Three config knobs:
 
 * ``RelationshipsConfig.cardinality_refine_enabled`` — master switch.
 * ``RelationshipsConfig.cardinality_refine_confidence_floor`` — only
   refine relationships at or above this confidence (default 0.85).
-  Probing every FK is wasteful and amplifies source-DB load; the
-  primary tier is the sensible target.
+* ``RelationshipsConfig.cardinality_refine_batch_size`` — pairs per
+  HTTP request (default 50).
 
 Failure mode: if the extraction service is unreachable or returns
 404 (older service without ``/probe-cardinality``), the phase logs
@@ -34,11 +45,11 @@ parquet-derived cardinality stays in place, no rows are touched.
 
 Identifier safety
 -----------------
-The pipeline sends `(schema, table, column)` triples.  Any
-identifier validation / quoting happens server-side in the
-extraction service (it owns the connection pool and dialect
-knowledge).  Python sends names verbatim and trusts the service
-to reject anything unsafe.
+The pipeline sends ``(schema, table, column)`` triples.  Identifier
+validation / quoting happens server-side in the extraction service
+(``ExtractionService.probeCardinality`` runs them through the strict
+``[A-Za-z_][A-Za-z0-9_$]*`` regex before splicing into SQL).  Python
+sends names verbatim and trusts the service to reject anything unsafe.
 """
 
 from __future__ import annotations
@@ -57,29 +68,6 @@ log = structlog.get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def _reclassify(
-    child_distinct: int,
-    parent_distinct: int,
-    orphans: int,
-    containment_threshold: float = 0.95,
-) -> str:
-    """Re-derive cardinality from refreshed distinct counts.
-
-    Mirrors validate.py:_classify so a probed relationship lands in
-    the same vocabulary the rest of the pipeline already uses.
-    """
-    if child_distinct == 0:
-        return "NO_RELATIONSHIP"
-    containment = 1.0 - (orphans / child_distinct)
-    if child_distinct == parent_distinct and orphans == 0:
-        return "ONE_TO_ONE"
-    if orphans == 0 and child_distinct < parent_distinct:
-        return "MANY_TO_ONE"
-    if orphans > 0 and containment >= containment_threshold:
-        return "PARTIAL"
-    return "NO_RELATIONSHIP"
-
-
 def _eligible_relationships(
     raw_rows: Iterable[dict[str, Any]],
     *,
@@ -90,17 +78,21 @@ def _eligible_relationships(
     A relationship is eligible when:
       * confidence is not NULL,
       * confidence >= ``confidence_floor``, AND
-      * cardinality wasn't already authoritative (we don't refine
-        ``ONE_TO_ONE`` because parquet COUNT(DISTINCT) collisions
-        for that classification are vanishingly rare; a future pass
-        could be more aggressive).
+      * Phase 5 classified it as ``MANY_TO_ONE``.
+
+    Why MANY_TO_ONE only?  See the module docstring.  In short: the
+    probe response gives us child total + child distinct, no orphan
+    count.  ``MANY_TO_ONE`` implies orphans were already 0 — so a
+    live ``distinct == total`` is sufficient to conclude
+    ``ONE_TO_ONE``.  ``PARTIAL`` / ``NO_RELATIONSHIP`` carry orphan
+    evidence the probe can't confirm; flipping them would be lossy.
     """
     out: list[dict[str, Any]] = []
     for r in raw_rows:
         c = r.get("confidence")
         if c is None or float(c) < confidence_floor:
             continue
-        if r.get("cardinality") == "ONE_TO_ONE":
+        if r.get("cardinality") != "MANY_TO_ONE":
             continue
         out.append(r)
     return out
@@ -249,46 +241,57 @@ def run_phase_cardinality_refine(engine: Any, config: Any) -> dict[str, int]:
             "skipped_no_change": 0,
         }
 
-    # Apply refinements — UPDATE the relationships table where the
-    # service returned new numbers AND the cardinality bucket actually
-    # changes.  The orphan count needed for re-classification isn't in
-    # the probe response (the service can't trivially compute it
-    # without the parent's distinct set), so the refresh is limited to
-    # the cardinality-bucket flip implied by new total/distinct counts.
+    # Apply refinements — flip MANY_TO_ONE → ONE_TO_ONE only when the
+    # live probe proves the child column is unique
+    # (``distinct == total_rows``).  Phase 5 already proved orphans=0
+    # for MANY_TO_ONE, so unique child values + zero orphans → 1:1.
+    #
+    # Transaction grain: commit every ``COMMIT_CHUNK`` rows so a
+    # service hiccup mid-phase doesn't roll back hundreds of valid
+    # refinements.  Per-row commit would be safer but ~50× slower on
+    # large schemas; 50 strikes the balance.
+    COMMIT_CHUNK = 50
     refined = 0
     skipped_no_change = 0
-    with txn(engine) as conn:
-        for r in eligible:
-            key = (
-                str(r["child_schema"]),
-                str(r["child_table"]),
-                str(r["child_column"]),
-            )
-            payload = results_by_key.get(key)
-            if not payload:
-                continue
-            total_rows = int(payload.get("total_rows") or 0)
-            distinct = int(payload.get("distinct_count") or 0)
-            # Heuristic: if distinct == total, every value is unique →
-            # MANY_TO_ONE / ONE_TO_ONE flip is justified.  Otherwise
-            # leave the parquet-derived classification alone.
-            if total_rows == 0 or distinct == 0:
-                skipped_no_change += 1
-                continue
-            new_card = (
-                "ONE_TO_ONE"
-                if distinct == total_rows and r["cardinality"] != "ONE_TO_ONE"
-                else None
-            )
-            if new_card is None:
-                skipped_no_change += 1
-                continue
+    pending: list[int] = []  # rel_ids queued for the next flush
+
+    def _flush(rel_ids: list[int]) -> None:
+        if not rel_ids:
+            return
+        with txn(engine) as conn:
             conn.execute(
                 update(relationships_t)
-                .where(relationships_t.c.rel_id == r["rel_id"])
-                .values(cardinality=new_card)
+                .where(relationships_t.c.rel_id.in_(rel_ids))
+                .values(cardinality="ONE_TO_ONE")
             )
-            refined += 1
+
+    for r in eligible:
+        key = (
+            str(r["child_schema"]),
+            str(r["child_table"]),
+            str(r["child_column"]),
+        )
+        payload = results_by_key.get(key)
+        if not payload:
+            continue
+        total_rows = int(payload.get("total_rows") or 0)
+        distinct = int(payload.get("distinct_count") or 0)
+        if total_rows == 0 or distinct == 0:
+            skipped_no_change += 1
+            continue
+        if distinct != total_rows:
+            # MANY_TO_ONE confirmed (duplicates in child column) — the
+            # parquet bucket is already correct; nothing to flip.
+            skipped_no_change += 1
+            continue
+        # Eligible filter guarantees current cardinality is MANY_TO_ONE,
+        # so this is genuinely a flip.
+        pending.append(int(r["rel_id"]))
+        refined += 1
+        if len(pending) >= COMMIT_CHUNK:
+            _flush(pending)
+            pending.clear()
+    _flush(pending)
 
     log.info(
         "cardinality_refine_done",

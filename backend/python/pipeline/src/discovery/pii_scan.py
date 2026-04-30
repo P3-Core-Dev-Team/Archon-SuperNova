@@ -1047,10 +1047,15 @@ def run_phase_3b(engine: "Engine", config: "AppConfig") -> None:
     workers_cfg = getattr(orch_cfg, "workers", None)
     num_workers: int = getattr(workers_cfg, "pii_scan", 16)
     # Adaptive batching — submit columns to the pool in chunks of
-    # ``pii_batch_size`` instead of one shot.  Caps peak memory
-    # (per-worker parquet handles + regex matchers) at
-    # ``batch_size * per_worker_overhead`` regardless of schema size.
-    # <=0 disables batching for backwards-compatibility.
+    # ``pii_batch_size`` instead of one shot.  Bounds the WORKER-SIDE
+    # peak memory: each generation only materialises ``batch_size``
+    # parquet handles / regex matchers concurrently.
+    #
+    # NB: does NOT bound the orchestrator-process memory.  Findings
+    # still accumulate in ``pending_writes`` until ``_PERSIST_BATCH``
+    # (500) triggers a ``_flush()``; on a multi-thousand-table schema
+    # the orchestrator RSS still grows linearly between flushes.
+    # <=0 disables batching (one-shot, original behaviour).
     from discovery.fallbacks import chunked  # local import: avoid cycle
     pii_batch_size: int = int(getattr(orch_cfg, "pii_batch_size", 50) or 0)
     if pii_batch_size <= 0:
