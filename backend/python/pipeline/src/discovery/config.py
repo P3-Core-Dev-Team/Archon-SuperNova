@@ -531,11 +531,16 @@ class RelationshipsConfig(BaseModel):
         ),
     )
     semantic_label_threshold: float = Field(
-        default=0.55,
+        default=0.30,
         description=(
             "Minimum cosine similarity between a cluster centroid and a "
             "vocabulary term to attach the term as the cluster's "
-            "semantic_label.  Below threshold => no label."
+            "semantic_label.  Below threshold => no label.  Empirical "
+            "calibration against all-MiniLM-L6-v2 on table-name corpora: "
+            "obvious matches score 0.25-0.35, unrelated pairs 0.05-0.20.  "
+            "0.30 is the operating point that picks up signal without "
+            "false-positive noise; raise to 0.45+ for strict labelling, "
+            "drop to 0.20 if you'd rather see speculative labels."
         ),
     )
     # ------------------------------------------------------------------

@@ -93,8 +93,14 @@ def _bootstrap_jobs_from_db() -> None:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # Default Angular dev server.
         "http://localhost:4200",
         "http://127.0.0.1:4200",
+        # Alternate UI port — used when 4200 is occupied (e.g. another
+        # ng dev server already running) and ``scripts/start.sh`` falls
+        # back to UI_PORT=4201.
+        "http://localhost:4201",
+        "http://127.0.0.1:4201",
     ],
     allow_credentials=False,
     allow_methods=["GET", "POST"],

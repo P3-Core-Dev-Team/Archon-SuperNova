@@ -19,8 +19,8 @@ PIDFILE="/tmp/archon-stack.pids"
 : "${DISCOVERY_API_TOKEN:=dev-secret}"
 : "${EXTRACTION_SERVICE_TOKEN:=dev-token}"
 : "${MOCK_PORT:=8080}"
-: "${API_PORT:=8000}"
-: "${UI_PORT:=4200}"
+: "${API_PORT:=9001}"
+: "${UI_PORT:=4201}"
 
 # Default parquet storage rotates per schema; the mock service points at
 # whatever the calling pipeline expects. We start it pointed at /tmp/archon-parquet
