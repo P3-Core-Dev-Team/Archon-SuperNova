@@ -492,6 +492,52 @@ class RelationshipsConfig(BaseModel):
             "cohesive clusters based on the validated FK graph and PII findings."
         ),
     )
+    # ------------------------------------------------------------------
+    # Hybrid (semantic + graph) clustering refinements — see clustering.py
+    # _semantic_merge() and _zero_shot_label().  Reuse the same
+    # SentenceTransformer model already loaded by name_similarity.py;
+    # if the model is unavailable, both passes silently no-op (graceful
+    # degradation).
+    # ------------------------------------------------------------------
+    semantic_merge_enabled: bool = Field(
+        default=True,
+        description=(
+            "After Louvain produces communities, optionally merge pairs of "
+            "clusters whose centroid embeddings are sufficiently similar AND "
+            "share inter-cluster FK edges.  Disabled => Louvain output only."
+        ),
+    )
+    semantic_merge_threshold: float = Field(
+        default=0.65,
+        description=(
+            "Minimum cosine similarity between two cluster centroids "
+            "before they are eligible to merge.  Higher = stricter."
+        ),
+    )
+    semantic_merge_modularity_floor: float = Field(
+        default=0.95,
+        description=(
+            "Modularity guard: a candidate merge is REJECTED if it would "
+            "drop the global modularity below this fraction of the pre-merge "
+            "value.  0.95 = tolerate up to 5% modularity loss."
+        ),
+    )
+    semantic_label_enabled: bool = Field(
+        default=True,
+        description=(
+            "Run zero-shot domain labelling: each cluster's centroid is "
+            "compared to a fixed business-domain vocabulary and tagged "
+            "with the closest match (e.g. 'Sales', 'Customer Management')."
+        ),
+    )
+    semantic_label_threshold: float = Field(
+        default=0.55,
+        description=(
+            "Minimum cosine similarity between a cluster centroid and a "
+            "vocabulary term to attach the term as the cluster's "
+            "semantic_label.  Below threshold => no label."
+        ),
+    )
 
 
 class ReportingConfig(BaseModel):

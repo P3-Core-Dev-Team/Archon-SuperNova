@@ -104,7 +104,16 @@ class ClusteredTable:
 
 @dataclass(frozen=True)
 class Cluster:
-    """One cluster: name, members, edge stats, modularity contribution."""
+    """One cluster: name, members, edge stats, modularity contribution.
+
+    ``semantic_label`` is the optional zero-shot business-domain tag
+    (e.g. ``"Sales"``, ``"Customer Management"``) attached by the
+    hybrid clustering pass when the cluster's centroid embedding scores
+    above ``RelationshipsConfig.semantic_label_threshold`` against the
+    fixed vocabulary in ``domain_vocab.DOMAINS``.  ``None`` for clusters
+    that didn't reach the threshold or when the SentenceTransformer
+    model is unavailable (the pass silently skips in that case).
+    """
 
     cluster_id: int
     name: str
@@ -114,6 +123,7 @@ class Cluster:
     intra_edge_count: int
     inter_edge_count: int
     modularity_contribution: float
+    semantic_label: str | None = None
 
 
 @dataclass(frozen=True)
@@ -522,6 +532,212 @@ def _singularise(token: str) -> str:
     return token
 
 
+def _semantic_merge(
+    communities: list[set[int]],
+    G: "nx.Graph",
+    table_by_id: dict[int, dict],
+    *,
+    threshold: float,
+    modularity_floor: float,
+) -> list[set[int]]:
+    """Merge Louvain communities that are semantically similar AND
+    structurally connected.
+
+    Three-step pass on top of ``louvain_communities``:
+
+    1. Compute a centroid embedding per community by averaging
+       :func:`name_similarity._embed` over each member's ``table_name``.
+       Communities with zero embeddable members are skipped.
+    2. For each PAIR of communities ``(c_i, c_j)`` connected by at
+       least one inter-community edge in ``G``, compute the cosine
+       similarity between centroids.
+    3. Greedily merge pairs whose similarity ≥ ``threshold`` AND whose
+       merge keeps the global modularity within ``modularity_floor`` of
+       the pre-merge value (typically 0.95 ≡ tolerate ≤5% drop).
+       Pairs are processed in descending similarity order so the
+       strongest semantic links are tested first.
+
+    Returns the post-merge community list.  The original Louvain output
+    is returned unchanged when:
+
+    * the SentenceTransformer model isn't available (semantic
+      similarity returns ``None`` for every pair),
+    * fewer than two communities exist, or
+    * no pair clears both the threshold and the modularity guard.
+
+    No DB writes, no logging — pure function so the test suite can
+    monkey-patch ``_embed`` deterministically.
+    """
+    # Guard rails ---------------------------------------------------
+    if threshold <= 0.0 or len(communities) < 2:
+        return communities
+
+    # Lazy-import to avoid forcing sentence-transformers on every
+    # caller of this module (and to give name_similarity a chance to
+    # flip SEMANTIC_AVAILABLE on first contact).
+    try:
+        from discovery.name_similarity import _embed
+        import numpy as np
+    except ImportError:
+        return communities
+
+    # Step 1 — centroid per community.  Skip communities with no
+    # embeddable member; their centroid would be undefined.
+    centroids: dict[int, "np.ndarray"] = {}
+    for idx, members in enumerate(communities):
+        vecs = []
+        for tid in members:
+            tname = table_by_id.get(tid, {}).get("table_name")
+            if not tname:
+                continue
+            v = _embed(str(tname))
+            if v is not None:
+                vecs.append(v)
+        if vecs:
+            centroids[idx] = np.mean(vecs, axis=0)
+
+    if len(centroids) < 2:
+        return communities  # not enough to merge
+
+    # Step 2 — pre-compute community membership lookup so we can
+    # detect inter-community edges in O(1) per edge.
+    member_to_idx: dict[int, int] = {}
+    for idx, members in enumerate(communities):
+        for tid in members:
+            member_to_idx[tid] = idx
+
+    inter_pairs: dict[tuple[int, int], int] = {}  # (i, j)<->edge_count
+    for u, v in G.edges():
+        a = member_to_idx.get(u)
+        b = member_to_idx.get(v)
+        if a is None or b is None or a == b:
+            continue
+        if a not in centroids or b not in centroids:
+            continue
+        key = (a, b) if a < b else (b, a)
+        inter_pairs[key] = inter_pairs.get(key, 0) + 1
+
+    if not inter_pairs:
+        return communities
+
+    # Step 3 — score each candidate pair, sort by similarity DESC,
+    # greedily merge while the modularity guard holds.
+    def _cos(a, b) -> float:
+        denom = float(np.linalg.norm(a) * np.linalg.norm(b))
+        if denom <= 0.0:
+            return 0.0
+        return float(np.dot(a, b) / denom)
+
+    candidates: list[tuple[float, int, int, int]] = []  # (sim, i, j, edge_count)
+    for (i, j), edge_count in inter_pairs.items():
+        sim = _cos(centroids[i], centroids[j])
+        if sim >= threshold:
+            candidates.append((sim, i, j, edge_count))
+    candidates.sort(key=lambda x: (-x[0], x[1], x[2]))
+
+    if not candidates:
+        return communities
+
+    # Modularity baseline.
+    base_mod: float
+    try:
+        base_mod = float(modularity(G, communities, weight="weight"))
+    except Exception:
+        base_mod = 0.0
+    # If base_mod is non-positive, the guard collapses to "any merge that
+    # doesn't make modularity worse than zero" — practically always
+    # accepts.  That's fine; the threshold itself is the gate.
+    floor = base_mod * modularity_floor if base_mod > 0 else float("-inf")
+
+    # Disjoint-set / union-find so a chain of acceptable merges
+    # collapses correctly.
+    parent = list(range(len(communities)))
+
+    def _find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def _materialise() -> list[set[int]]:
+        groups: dict[int, set[int]] = {}
+        for idx, members in enumerate(communities):
+            root = _find(idx)
+            groups.setdefault(root, set()).update(members)
+        return list(groups.values())
+
+    merged_count = 0
+    for sim, i, j, _edges in candidates:
+        ri, rj = _find(i), _find(j)
+        if ri == rj:
+            continue  # already merged via a previous candidate
+        # Tentatively union and re-evaluate modularity.
+        parent[ri] = rj
+        try:
+            trial_mod = float(modularity(G, _materialise(), weight="weight"))
+        except Exception:
+            trial_mod = base_mod  # leave alone on numeric quirks
+        if trial_mod >= floor:
+            merged_count += 1
+        else:
+            # Revert this merge.
+            parent[ri] = ri
+
+    if merged_count == 0:
+        return communities
+    return _materialise()
+
+
+def _zero_shot_label(
+    member_tables: list[dict],
+    *,
+    threshold: float,
+) -> str | None:
+    """Pick the closest business-domain term for one cluster.
+
+    Embeds the cluster's table-name list (concatenated) and each
+    vocabulary term, returns the term with the highest cosine
+    similarity provided it clears ``threshold``.  ``None`` when the
+    model is unavailable, the cluster has no embeddable tables, or no
+    term clears the threshold.
+
+    Vocabulary is :data:`discovery.domain_vocab.DOMAINS` — fourteen
+    English business-domain entries with synonym-expanded search text.
+    """
+    if threshold <= 0.0 or not member_tables:
+        return None
+    try:
+        from discovery.domain_vocab import DOMAINS
+        from discovery.name_similarity import _embed
+        import numpy as np
+    except ImportError:
+        return None
+
+    # Build a single embedding from the cluster's most-connected members
+    # (capped at 6 to avoid drowning the signal with long tails).
+    names = [str(t.get("table_name", "")) for t in member_tables[:6] if t.get("table_name")]
+    if not names:
+        return None
+    name_vec = _embed(" ".join(names))
+    if name_vec is None:
+        return None
+
+    best_label: str | None = None
+    best_sim = threshold  # only beat the threshold counts
+    for label, search_text in DOMAINS:
+        v = _embed(search_text)
+        if v is None:
+            continue
+        denom = float(np.linalg.norm(name_vec) * np.linalg.norm(v))
+        if denom <= 0.0:
+            continue
+        sim = float(np.dot(name_vec, v) / denom)
+        if sim > best_sim:
+            best_sim = sim
+            best_label = label
+    return best_label
+
+
 def _name_cluster(
     *,
     cluster_id: int,
@@ -607,6 +823,11 @@ def cluster_schema(
     pii_findings: list[dict],
     confidence_floor: float = 0.7,
     seed: int = 42,
+    semantic_merge_enabled: bool = True,
+    semantic_merge_threshold: float = 0.65,
+    semantic_merge_modularity_floor: float = 0.95,
+    semantic_label_enabled: bool = True,
+    semantic_label_threshold: float = 0.55,
 ) -> ClusteringResult:
     """
     Run the full cluster-engine pipeline for a single schema.
@@ -786,6 +1007,23 @@ def cluster_schema(
         # Sort communities deterministically by smallest member so that
         # cluster_id assignment is reproducible across runs.
         communities = [set(c) for c in communities]
+
+        # ----- 5b. Hybrid semantic merge -------------------------------
+        # Optional pass: combine clusters whose centroid embeddings are
+        # similar enough AND that share at least one inter-cluster
+        # FK edge in G.  Modularity guard rejects merges that would
+        # tank the global modularity beyond the configured floor.
+        # Silently no-ops when disabled or when sentence-transformers
+        # is unavailable.
+        if semantic_merge_enabled and len(communities) >= 2:
+            communities = _semantic_merge(
+                communities,
+                G,
+                table_by_id,
+                threshold=semantic_merge_threshold,
+                modularity_floor=semantic_merge_modularity_floor,
+            )
+
         communities.sort(key=lambda c: (min(c), len(c)))
         if G.number_of_edges() == 0:
             modularity_score = 0.0
@@ -898,6 +1136,18 @@ def cluster_schema(
             weighted_degree=weighted_degree,
         )
 
+        # Zero-shot business-domain label.  Cosine similarity between
+        # the cluster's table-name centroid and a fixed vocabulary;
+        # None when the model is unavailable or no term clears the
+        # threshold.  Never overrides ``cname`` — the UI renders the
+        # label as a subtitle.
+        sem_label: str | None = None
+        if semantic_label_enabled and member_rows:
+            sem_label = _zero_shot_label(
+                member_rows,
+                threshold=semantic_label_threshold,
+            )
+
         clusters_out.append(
             Cluster(
                 cluster_id=cid,
@@ -908,6 +1158,7 @@ def cluster_schema(
                 intra_edge_count=intra,
                 inter_edge_count=inter,
                 modularity_contribution=float(qc),
+                semantic_label=sem_label,
             )
         )
 
@@ -929,6 +1180,7 @@ def cluster_schema(
                 intra_edge_count=c.intra_edge_count,
                 inter_edge_count=c.inter_edge_count,
                 modularity_contribution=c.modularity_contribution,
+                semantic_label=c.semantic_label,
             )
         )
 

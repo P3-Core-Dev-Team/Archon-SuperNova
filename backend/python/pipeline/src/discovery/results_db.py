@@ -272,6 +272,11 @@ clusters_t = Table(
     Column("modularity_score", Real),
     Column("archetype_distribution", JSONB, nullable=False),
     Column("member_table_ids", JSONB, nullable=False),
+    # Sprint 3: zero-shot business-domain label (e.g. 'Sales',
+    # 'Customer Management').  NULL when the SentenceTransformer model
+    # is unavailable, the cluster has no embeddable members, or no
+    # vocabulary term clears the configured similarity threshold.
+    Column("semantic_label", Text),
     Column("generated_at", TIMESTAMPTZ, server_default=text("now()")),
 )
 
@@ -1021,6 +1026,9 @@ class Cluster:
                 "modularity_score": c.get("modularity_score"),
                 "archetype_distribution": c["archetype_distribution"],
                 "member_table_ids": c["member_table_ids"],
+                # Optional zero-shot label.  Older callers that don't
+                # set the key fall through to NULL via .get().
+                "semantic_label": c.get("semantic_label"),
             }
             stmt = insert(clusters_t).values(**row)
             update_cols = {

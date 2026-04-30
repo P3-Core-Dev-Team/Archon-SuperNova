@@ -1572,8 +1572,13 @@ def get_clusters(job_id: str) -> dict[str, Any]:
                 """, (schema,))
                 junctions_collapsed = int(cur.fetchone()[0] or 0)
 
-            # Fetch all clusters for schema
-            cur.execute("""
+            # Fetch all clusters for schema.  ``semantic_label`` is
+            # ``COALESCE``-d through information_schema in case the
+            # idempotent migration hasn't been applied yet — keeps old
+            # databases working without a forced re-run of init_schema.
+            has_semantic_label = _col_exists(cur, "clusters", "semantic_label")
+            label_select = "semantic_label" if has_semantic_label else "NULL::text AS semantic_label"
+            cur.execute(f"""
                 SELECT cluster_local_id,
                        name,
                        table_count,
@@ -1581,7 +1586,8 @@ def get_clusters(job_id: str) -> dict[str, Any]:
                        inter_edge_count,
                        archetype_distribution,
                        modularity_score,
-                       member_table_ids
+                       member_table_ids,
+                       {label_select}
                 FROM clusters
                 WHERE schema_name = %s
                 ORDER BY cluster_local_id
@@ -1597,7 +1603,7 @@ def get_clusters(job_id: str) -> dict[str, Any]:
                 (
                     c_local_id, c_name, c_table_count,
                     c_intra, c_inter, c_archetype_dist,
-                    c_mod_score, c_member_ids,
+                    c_mod_score, c_member_ids, c_semantic_label,
                 ) = row
 
                 member_ids: list[int] = list(c_member_ids) if c_member_ids else []
@@ -1647,6 +1653,9 @@ def get_clusters(job_id: str) -> dict[str, Any]:
                 clusters_out.append({
                     "cluster_id": int(c_local_id),
                     "name": c_name or "",
+                    # Sprint 3: zero-shot domain label.  Frontend
+                    # renders as a subtitle when present.
+                    "semantic_label": c_semantic_label or None,
                     "table_count": int(c_table_count or 0),
                     "intra_edges": int(c_intra or 0),
                     "inter_edges": int(c_inter or 0),

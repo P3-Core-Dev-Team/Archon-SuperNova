@@ -267,6 +267,16 @@ def run_phase_clustering(engine: Any, config: Any) -> dict:
     # (CL-1's algorithm default).  Do NOT use containment_threshold (0.95) — that
     # is the FK-validation gate and would discard most edges before Louvain runs.
     confidence_floor = float(getattr(rel_cfg, "clustering_confidence_floor", 0.7))
+    # Hybrid clustering knobs (Sprint 3) — feed the semantic-merge +
+    # zero-shot-label config through to ``cluster_schema``.  Defaults
+    # match RelationshipsConfig so a missing rel_cfg still works.
+    semantic_merge_enabled = bool(getattr(rel_cfg, "semantic_merge_enabled", True))
+    semantic_merge_threshold = float(getattr(rel_cfg, "semantic_merge_threshold", 0.65))
+    semantic_merge_modularity_floor = float(
+        getattr(rel_cfg, "semantic_merge_modularity_floor", 0.95)
+    )
+    semantic_label_enabled = bool(getattr(rel_cfg, "semantic_label_enabled", True))
+    semantic_label_threshold = float(getattr(rel_cfg, "semantic_label_threshold", 0.55))
 
     # Discover distinct schema names.
     with engine.connect() as conn:
@@ -333,6 +343,11 @@ def run_phase_clustering(engine: Any, config: Any) -> dict:
             pii_findings=pii_findings,
             confidence_floor=confidence_floor,
             seed=42,
+            semantic_merge_enabled=semantic_merge_enabled,
+            semantic_merge_threshold=semantic_merge_threshold,
+            semantic_merge_modularity_floor=semantic_merge_modularity_floor,
+            semantic_label_enabled=semantic_label_enabled,
+            semantic_label_threshold=semantic_label_threshold,
         )
 
         if not result.clusters:
@@ -366,6 +381,9 @@ def run_phase_clustering(engine: Any, config: Any) -> dict:
                     else dict(c.archetype_distribution)
                 ),
                 "member_table_ids": list(c.table_ids),
+                # Sprint 3: optional zero-shot domain label.  None
+                # propagates as NULL — the UI falls back to ``name``.
+                "semantic_label": getattr(c, "semantic_label", None),
             }
             for c in result.clusters
         ]

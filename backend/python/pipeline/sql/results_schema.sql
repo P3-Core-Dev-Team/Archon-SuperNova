@@ -338,6 +338,12 @@ CREATE TABLE IF NOT EXISTS clusters (
   UNIQUE (schema_name, cluster_local_id)
 );
 CREATE INDEX IF NOT EXISTS idx_clusters_schema ON clusters (schema_name);
+-- Idempotent additive migration: zero-shot semantic label (Sprint 3).
+-- Populated only when the SentenceTransformer model is available AND the
+-- cluster's centroid clears the configured similarity threshold against the
+-- fixed business-domain vocabulary in domain_vocab.py.  Nullable; the UI
+-- falls back to ``name`` when this is NULL.
+ALTER TABLE clusters ADD COLUMN IF NOT EXISTS semantic_label TEXT;
 
 -- Idempotent additive migration: cluster assignment columns on tbl_inventory.
 ALTER TABLE tbl_inventory ADD COLUMN IF NOT EXISTS cluster_id BIGINT;

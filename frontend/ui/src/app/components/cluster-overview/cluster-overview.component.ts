@@ -8,6 +8,10 @@ import { ClusterGraphComponent, clusterColor } from '../cluster-graph/cluster-gr
 export interface Cluster {
   cluster_id: number;
   name: string;
+  /** Zero-shot business-domain label (Sprint 3) — present when the
+   * pipeline's SentenceTransformer model was available AND the
+   * cluster centroid cleared the configured similarity threshold. */
+  semantic_label?: string | null;
   table_count: number;
   intra_edges: number;
   inter_edges: number;
@@ -103,6 +107,12 @@ export interface ClustersResponse {
             </div>
 
             <div class="card-name">{{ c.name }}</div>
+            @if (c.semantic_label) {
+              <div class="card-domain"
+                   title="Auto-detected business domain (Sprint 3 zero-shot label)">
+                {{ c.semantic_label }}
+              </div>
+            }
 
             <div class="stats-line">
               {{ c.table_count }} table{{ c.table_count !== 1 ? 's' : '' }}
@@ -288,6 +298,18 @@ export interface ClustersResponse {
       font-weight: 700;
       color: #e6edf3;
       word-break: break-word;
+    }
+    /* Sprint 3 zero-shot domain label — sits below the technical name
+       as a subtitle.  Tinted accent so it reads as metadata, not as a
+       second name. */
+    .card-domain {
+      font-size: 11px;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      color: #58a6ff;
+      font-weight: 600;
+      margin-top: -4px;
+      cursor: help;
     }
 
     .stats-line {
