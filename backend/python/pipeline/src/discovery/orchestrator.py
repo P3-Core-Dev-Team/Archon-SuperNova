@@ -74,6 +74,7 @@ PHASE_INHERITANCE = "inheritance"
 PHASE_PII_PROPAGATION = "pii_propagation"
 PHASE_PII_LEAK = "pii_leak"
 PHASE_CLUSTERING = "clustering"
+PHASE_CARDINALITY_REFINE = "cardinality_refine"
 PHASE_REPORT = "report"
 
 ALL_PHASES = [
@@ -90,6 +91,7 @@ ALL_PHASES = [
     PHASE_PII_PROPAGATION,
     PHASE_PII_LEAK,
     PHASE_CLUSTERING,
+    PHASE_CARDINALITY_REFINE,
     PHASE_REPORT,
 ]
 
@@ -538,6 +540,17 @@ def _run_advanced_fk_phases(
             log.warning("clustering_phase_skipped", error=str(exc))
             if not enable_fallbacks:
                 raise
+
+    # Live cardinality refinement (Sprint 4).  Default OFF — flips
+    # ``cardinality`` on high-confidence relationships when a live
+    # source-side COUNT(*) + COUNT(DISTINCT) probe disagrees with the
+    # parquet-derived value.  Requires a matching extraction-service
+    # endpoint; absent endpoint → phase logs a skip and exits clean.
+    _run_optional(
+        "cardinality_refine_enabled", rel_cfg, False,
+        "cardinality_refine", PHASE_CARDINALITY_REFINE,
+        "cardinality_probe", "run_phase_cardinality_refine",
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -144,6 +144,52 @@ class ExtractionClient:
         response.raise_for_status()
         log.info("extraction_client.test_connection.ok", conn_host=conn.host)
 
+    def probe_cardinality(
+        self,
+        conn: ConnectionConfig,
+        pairs: list[dict[str, str]],
+    ) -> list[dict[str, Any]]:
+        """Issue a live cardinality probe.
+
+        Body shape:
+            { "connection": {...}, "pairs": [{schema, table, column}, ...] }
+
+        Response shape:
+            { "results": [{schema, table, column, total_rows,
+                           distinct_count}, ...] }
+
+        Returns the bare ``results`` list.  Pairs that the service
+        couldn't probe (table missing, permission error, identifier
+        rejected) are simply absent from the result; the caller
+        handles partial success.
+
+        This endpoint is gated on the discovery side by
+        ``RelationshipsConfig.cardinality_refine_enabled`` (default
+        False).  If the extraction service version doesn't expose
+        ``/probe-cardinality`` yet, the call surfaces a 404 which the
+        phase swallows so the pipeline doesn't fail.
+        """
+        log.info(
+            "extraction_client.probe_cardinality.start",
+            conn=_safe_conn_repr(conn),
+            pair_count=len(pairs),
+        )
+        response = self._post_with_retry(
+            "/api/v1/probe-cardinality",
+            body={
+                "connection": conn.model_dump(mode="json"),
+                "pairs": pairs,
+            },
+        )
+        response.raise_for_status()
+        results = response.json().get("results", [])
+        log.info(
+            "extraction_client.probe_cardinality.done",
+            requested=len(pairs),
+            returned=len(results),
+        )
+        return results
+
     def extract_sync(self, req: ExtractionRequest) -> ExtractionResponse:
         """Submit a synchronous extraction request and block until it completes."""
         log.info(

@@ -538,6 +538,41 @@ class RelationshipsConfig(BaseModel):
             "semantic_label.  Below threshold => no label."
         ),
     )
+    # ------------------------------------------------------------------
+    # Live cardinality probe (Sprint 4) — when enabled, the pipeline
+    # asks the Java extraction service to run COUNT(*) +
+    # COUNT(DISTINCT) against the source DB for each high-confidence
+    # FK candidate, refining the cardinality field beyond the
+    # parquet-derived estimate.  Default OFF: the feature requires a
+    # matching extraction-service endpoint that may not be deployed
+    # yet, and runs source-side queries that operators may want to
+    # gate behind a flag for capacity reasons.
+    # ------------------------------------------------------------------
+    cardinality_refine_enabled: bool = Field(
+        default=False,
+        description=(
+            "Enable the live cardinality refinement phase.  Disabled by "
+            "default; flip to True only when the extraction service's "
+            "/probe-cardinality endpoint is available."
+        ),
+    )
+    cardinality_refine_confidence_floor: float = Field(
+        default=0.85,
+        description=(
+            "Minimum FK confidence for a relationship to be eligible for "
+            "live cardinality refinement.  Probing every FK is wasteful "
+            "and amplifies source-DB load; primary-tier FKs only is "
+            "sensible."
+        ),
+    )
+    cardinality_refine_batch_size: int = Field(
+        default=50,
+        description=(
+            "Number of (table, column) pairs sent per probe-cardinality "
+            "request.  Larger batches amortise HTTP overhead but extend "
+            "the per-request timeout window."
+        ),
+    )
 
 
 class ReportingConfig(BaseModel):

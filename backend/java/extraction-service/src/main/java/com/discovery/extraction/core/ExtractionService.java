@@ -213,6 +213,106 @@ public class ExtractionService {
     }
 
     /**
+     * Live cardinality probe (Sprint 4).  For each {@code (schema, table,
+     * column)} triple, runs {@code SELECT COUNT(*), COUNT(DISTINCT col)
+     * FROM "schema"."table"} on the source DB and returns the totals.
+     *
+     * <p>Identifiers are validated with a strict regex
+     * ({@link #VALID_IDENT}) before being spliced into SQL — JDBC
+     * doesn't parameterise identifiers so the only safe path is
+     * ALLOW-list-then-quote.  Any pair that fails validation, or that
+     * the database rejects (table missing, permission denied) is
+     * absent from the result list rather than emitted as a sentinel.
+     *
+     * <p>Postgres-only in this build, mirroring the rest of the
+     * service's source-type support.  Connection reuse via the
+     * existing {@link ConnectionPoolManager} so we don't multiply
+     * pools when the pipeline submits batches.
+     */
+    public com.discovery.extraction.api.CardinalityProbeResponse probeCardinality(
+            com.discovery.extraction.api.CardinalityProbeRequest request) {
+        validateRequired(request, "request");
+        validateRequired(request.connection(), "connection");
+        validateRequired(request.connection().type(), "connection.type");
+        if (request.connection().type() != DatabaseType.POSTGRES) {
+            throw new ExtractionException(
+                    "UNSUPPORTED_SOURCE",
+                    "Only postgres source type is supported in this build",
+                    false,
+                    null);
+        }
+        java.util.List<com.discovery.extraction.api.CardinalityProbeRequest.Pair> pairs =
+                request.pairs() == null
+                        ? java.util.List.of()
+                        : request.pairs();
+
+        java.util.List<com.discovery.extraction.api.CardinalityProbeResponse.Result> out =
+                new java.util.ArrayList<>(pairs.size());
+
+        com.zaxxer.hikari.HikariDataSource ds = pools.poolFor(request.connection());
+        try (java.sql.Connection conn = ds.getConnection()) {
+            for (com.discovery.extraction.api.CardinalityProbeRequest.Pair p : pairs) {
+                if (!isSafeIdentifier(p.schema())
+                        || !isSafeIdentifier(p.table())
+                        || !isSafeIdentifier(p.column())) {
+                    log.warn("probeCardinality.skipped_identifier schema={} table={} column={}",
+                            p.schema(), p.table(), p.column());
+                    continue;
+                }
+                String sql = String.format(
+                        "SELECT COUNT(*) AS total, COUNT(DISTINCT %s) AS distinct_count "
+                                + "FROM %s.%s",
+                        quoteIdent(p.column()),
+                        quoteIdent(p.schema()),
+                        quoteIdent(p.table()));
+                try (java.sql.Statement st = conn.createStatement();
+                     java.sql.ResultSet rs = st.executeQuery(sql)) {
+                    if (rs.next()) {
+                        out.add(new com.discovery.extraction.api.CardinalityProbeResponse.Result(
+                                p.schema(), p.table(), p.column(),
+                                rs.getLong(1), rs.getLong(2)));
+                    }
+                } catch (java.sql.SQLException sqe) {
+                    // Permission errors / missing tables / etc. — log
+                    // and skip; the response simply omits this pair.
+                    log.warn("probeCardinality.skipped sql_state={} message={}",
+                            sqe.getSQLState(), sqe.getMessage());
+                }
+            }
+        } catch (java.sql.SQLException sqe) {
+            throw new ExtractionException(
+                    "CONNECTION_FAILED",
+                    sqe.getMessage(),
+                    true,
+                    sqe);
+        }
+        return new com.discovery.extraction.api.CardinalityProbeResponse(out);
+    }
+
+    /**
+     * Strict identifier guard for the cardinality-probe path.
+     * Postgres allows quoted identifiers with virtually any character,
+     * but we reject anything outside [A-Za-z0-9_$.] to keep SQL
+     * splicing safe under a defensive interpretation.  A leading dot
+     * is also rejected.  This is intentionally narrower than what
+     * Postgres permits; if a user's schema legitimately contains
+     * spaces or unicode they'll need to migrate the table or extend
+     * this guard.
+     */
+    private static final java.util.regex.Pattern VALID_IDENT =
+            java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_$]*");
+
+    private static boolean isSafeIdentifier(String s) {
+        return s != null && !s.isEmpty() && VALID_IDENT.matcher(s).matches();
+    }
+
+    private static String quoteIdent(String s) {
+        // Even though the regex above forbids embedded double quotes,
+        // double them on output anyway — defence in depth.
+        return "\"" + s.replace("\"", "\"\"") + "\"";
+    }
+
+    /**
      * Validates the supplied {@link ConnectionConfig} by running a
      * short-lived probe.
      */

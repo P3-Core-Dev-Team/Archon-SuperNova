@@ -39,4 +39,16 @@ public class ExtractionController {
         service.testConnection(config);
         return ResponseEntity.ok().build();
     }
+
+    /**
+     * Live cardinality probe (Sprint 4).  Sync-only.  See
+     * {@link com.discovery.extraction.core.ExtractionService#probeCardinality}.
+     */
+    @PostMapping("/probe-cardinality")
+    public ResponseEntity<CardinalityProbeResponse> probeCardinality(
+            @RequestBody CardinalityProbeRequest request) {
+        log.info("POST /api/v1/probe-cardinality pairs={}",
+                request == null || request.pairs() == null ? 0 : request.pairs().size());
+        return ResponseEntity.ok(service.probeCardinality(request));
+    }
 }
