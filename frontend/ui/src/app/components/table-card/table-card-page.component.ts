@@ -26,6 +26,10 @@ interface ColumnRow {
   is_pk: boolean;
   is_fk: boolean;
   pii_types: string[];
+  /** IIN/BIN-derived brand list for CC_NUMBER columns — sorted by
+   * descending count so the dominant scheme renders first.  Empty for
+   * non-card columns. */
+  brands: string[];
 }
 
 interface FkRow {
@@ -119,7 +123,19 @@ interface FkRow {
             <span class="mono pill-name">{{ tableName() }}</span>
           </div>
           <div class="map-chip top-left chip-below muted small">
-            {{ mapEdges().length }} connection{{ mapEdges().length === 1 ? '' : 's' }}
+            <span class="conn-count">
+              {{ mapEdges().length }}@if (mapEdges().length !== totalMapEdgeCount()) {<span class="of-total">/{{ totalMapEdgeCount() }}</span>}
+              connection{{ mapEdges().length === 1 ? '' : 's' }}
+            </span>
+            <span class="chip-divider">·</span>
+            <label class="conf-slider-label"
+                   title="Hide edges with confidence below this threshold">
+              <span class="conf-label">min&nbsp;conf</span>
+              <input type="range" min="0" max="1" step="0.05"
+                     [value]="minMapConfidence()"
+                     (input)="onMapConfidenceChange($event)" />
+              <span class="mono conf-val">{{ minMapConfidence() | number:'1.2-2' }}</span>
+            </label>
           </div>
 
           <!-- Top-center floating jump-to-table search -->
@@ -171,7 +187,9 @@ interface FkRow {
                 <g class="map-edge-group" [class.dimmed]="hoveredCardId() && !isEdgeAdjacentToHover(e)">
                   <path class="map-edge"
                         [attr.d]="e.path"
-                        [attr.stroke]="e.color" />
+                        [attr.stroke]="e.color"
+                        [attr.stroke-dasharray]="e.dashArray || null"
+                        [attr.stroke-opacity]="e.strokeOpacity" />
                   <!-- Cardinality glyphs at endpoints -->
                   <text class="map-glyph"
                         [attr.x]="e.fromGlyphX"
@@ -181,13 +199,23 @@ interface FkRow {
                         [attr.x]="e.toGlyphX"
                         [attr.y]="e.toGlyphY"
                         [attr.fill]="e.color">{{ e.toGlyph }}</text>
-                  <!-- Joining column label, plain text on canvas (no pill) -->
+                  <!-- Joining column label, plain text on canvas (no pill).
+                       Confidence renders as a smaller dimmed line beneath
+                       it so the strength of each edge is visible at a
+                       glance — matches the relationship-graph slider. -->
                   @if (e.joinLabel) {
                     <text class="map-edge-label"
                           [attr.x]="e.midX"
                           [attr.y]="e.midY"
                           text-anchor="middle"
                           [attr.fill]="'#c9d1d9'">{{ e.joinLabel }}</text>
+                  }
+                  @if (e.confLabel) {
+                    <text class="map-edge-conf"
+                          [attr.x]="e.midX"
+                          [attr.y]="e.midY + 12"
+                          text-anchor="middle"
+                          [attr.fill]="confLabelColor(e.confidence)">{{ e.confLabel }}</text>
                   }
                 </g>
               }
@@ -263,6 +291,11 @@ interface FkRow {
                       @if (c.pii_types.length > 0) {
                         @for (p of c.pii_types; track p) {
                           <span class="kbadge pii">{{ p }}</span>
+                        }
+                        @if (c.brands.length > 0) {
+                          @for (b of c.brands; track b) {
+                            <span class="kbadge brand-tag" [class]="'brand-' + b.toLowerCase()">{{ b }}</span>
+                          }
                         }
                       } @else {
                         <span class="dash">—</span>
@@ -365,7 +398,13 @@ interface FkRow {
     }
   `,
   styles: [`
-    :host { display: block; max-width: 1400px; margin: 0 auto; padding: 0 4px; }
+    /* Standalone (route) mode keeps a comfortable max-width so the
+     * fields/relationships split doesn't stretch absurdly wide.  When
+     * embedded inside the job-detail Relationships tab, the parent
+     * decides the width — the :host-context override below clears
+     * this cap so the embedded view follows the page width. */
+    :host { display: block; max-width: 1500px; margin: 0 auto; padding: 0 4px; }
+    :host-context(.embedded), :host(.embedded) { max-width: none; }
     .back { color: #8b949e; font-size: 13px; }
 
     /* Top page header — table name + description on the left, view toggle on
@@ -508,6 +547,41 @@ interface FkRow {
       stroke: #0d1117;
       stroke-width: 4px;
       stroke-linejoin: round;
+    }
+    /* Numeric confidence rendered as a smaller, dimmer line under the
+       join-column label.  Same paint-order trick gives readability on
+       top of cards/edges without a backing pill. */
+    .map-edge-conf {
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 10px;
+      font-weight: 600;
+      pointer-events: none;
+      paint-order: stroke;
+      stroke: #0d1117;
+      stroke-width: 4px;
+      stroke-linejoin: round;
+    }
+    /* Confidence slider chip — sits next to the connection count chip
+       so the user can dial the visible-edge threshold without leaving
+       the canvas. */
+    .map-chip .conn-count { white-space: nowrap; }
+    .map-chip .conn-count .of-total { color: #6e7681; margin-right: 1px; }
+    .map-chip .chip-divider { color: #30363d; margin: 0 6px; }
+    .map-chip .conf-slider-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .map-chip .conf-slider-label input[type=range] {
+      width: 90px;
+      vertical-align: middle;
+    }
+    .map-chip .conf-label { color: #8b949e; }
+    .map-chip .conf-val {
+      min-width: 32px;
+      text-align: right;
+      color: #58a6ff;
+      font-weight: 600;
     }
 
     /* Cards (focal + neighbour) — IDENTICAL geometry per the spec.  Only
@@ -714,11 +788,14 @@ interface FkRow {
 
     .layout {
       display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 18px;
+      /* ~55% fields / ~45% relationships per the wide-viewport spec.
+       * Both columns have min-widths so neither collapses on
+       * mid-width screens (≈1280-1500px). */
+      grid-template-columns: minmax(540px, 55fr) minmax(440px, 45fr);
+      gap: 24px;
       align-items: start;
     }
-    @media (max-width: 1000px) { .layout { grid-template-columns: 1fr; } }
+    @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
 
     .main { display: flex; flex-direction: column; gap: 14px; }
     .sidebar { display: flex; flex-direction: column; gap: 14px; }
@@ -783,6 +860,20 @@ interface FkRow {
     .kbadge.pk { background: #1f6f3f; color: #aaf0c1; }
     .kbadge.fk { background: #1f4e7e; color: #aedcff; }
     .kbadge.pii { background: #3a0d0d; color: #ffabab; }
+    /* IIN/BIN brand chips, rendered next to the CC_NUMBER pii kbadge.
+       Subtle outlined fill so the brand name is unmistakable but the
+       chip doesn't compete with the primary PII tag for attention. */
+    .kbadge.brand-tag { font-size: 9.5px; border: 1px solid currentColor; }
+    .kbadge.brand-visa       { color: #6f8aff; background: rgba(26, 31, 113, 0.18); }
+    .kbadge.brand-mastercard { color: #ff7b8b; background: rgba(235, 0, 27, 0.16); }
+    .kbadge.brand-amex       { color: #7cb3e8; background: rgba(46, 119, 187, 0.18); }
+    .kbadge.brand-discover   { color: #ffa05a; background: rgba(255, 96, 0, 0.16); }
+    .kbadge.brand-diners     { color: #66b2e0; background: rgba(0, 121, 190, 0.18); }
+    .kbadge.brand-jcb        { color: #739dd0; background: rgba(14, 76, 150, 0.18); }
+    .kbadge.brand-unionpay   { color: #ff8090; background: rgba(209, 4, 41, 0.16); }
+    .kbadge.brand-maestro    { color: #a8a7ee; background: rgba(108, 107, 189, 0.18); }
+    .kbadge.brand-rupay      { color: #4cb6a6; background: rgba(9, 121, 105, 0.18); }
+    .kbadge.brand-mir        { color: #88e09a; background: rgba(77, 180, 94, 0.18); }
 
     .score-high { color: #3fb950; font-weight: 600; }
     .score-mid  { color: #d29922; }
@@ -1150,6 +1241,12 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
 
   hoveredCardId = signal<string | null>(null);
   searchQuery = signal('');
+  /** Minimum FK confidence threshold for the map view.  Edges (and any
+   * neighbour cards that no longer have a surviving edge) are hidden
+   * when their confidence is below this value.  Mirrors the slider on
+   * the all-tables relationship-graph component so users can dial
+   * down noise on either view consistently.  Default 0 = show all. */
+  minMapConfidence = signal(0);
   mapZoom = signal(1);
   mapPanX = signal(0);
   mapPanY = signal(0);
@@ -1196,8 +1293,11 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
    * dragged-card overrides survive. */
   private mapLayoutCards = computed<{ id: string; label: string; rows: number; fieldCount: number; relCount: number; module: string | null; width: number; height: number; x: number; y: number; }[]>(() => {
     const focal = this.tableName();
-    const out = this.outFks();
-    const inb = this.inFks();
+    // Use the confidence-filtered FK set so neighbour cards that no
+    // longer have any surviving edge fall out of the layout — keeps
+    // orphans off the canvas when the slider is dragged high.
+    const out = this.visibleOutFks();
+    const inb = this.visibleInFks();
     const neighbours = new Set<string>();
     for (const f of out) neighbours.add(f.parentTable);
     for (const f of inb) neighbours.add(f.childTable);
@@ -1328,6 +1428,14 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
       toGlyphY: number;
       fromTable: string;
       toTable: string;
+      // Confidence integration: numeric value + a pre-formatted display
+      // label, plus stroke styling derived from the bucket so weak FKs
+      // visually fade.  null confidence renders as a solid full-opacity
+      // edge with no numeric label.
+      confidence: number | null;
+      confLabel: string;
+      dashArray: string;
+      strokeOpacity: number;
     }
     interface Proto {
       id: string;
@@ -1339,7 +1447,11 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
 
     const protos: Proto[] = [];
     let pid = 0;
-    for (const f of this.outFks()) {
+    // Iterate the *visible* FK set so the slider drives both the
+    // card-set (via mapLayoutCards) and the edge-set together —
+    // dropping a low-conf edge naturally drops its neighbour card too
+    // unless that card is held by another edge.
+    for (const f of this.visibleOutFks()) {
       const nb = cardById.get(f.parentTable);
       if (!nb) continue;
       protos.push({
@@ -1350,7 +1462,7 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
         relType: this.classifyRelType(f),
       });
     }
-    for (const f of this.inFks()) {
+    for (const f of this.visibleInFks()) {
       const nb = cardById.get(f.childTable);
       if (!nb) continue;
       protos.push({
@@ -1450,6 +1562,20 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
         ? p.fk.childCol
         : `${p.fk.childCol} → ${p.fk.parentCol}`;
 
+      // Confidence-driven stroke styling: high (>=0.85) is solid /
+      // full-opacity, mid (>=0.65) is solid / slightly faded, low is
+      // dashed + heavily faded.  null confidence renders as full-strength
+      // (legacy edges from the discovery pipeline that didn't emit a
+      // score should still look canonical).
+      const conf = p.fk.confidence;
+      const dashArray = (conf != null && conf < 0.65) ? '6,4' : '';
+      const strokeOpacity = conf == null
+        ? 1.0
+        : conf >= 0.85 ? 1.0
+        : conf >= 0.65 ? 0.85
+        :                0.55;
+      const confLabel = conf == null ? '' : conf.toFixed(2);
+
       edges.push({
         id: p.id,
         color: this.relTypeColor(p.relType),
@@ -1464,6 +1590,10 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
         toGlyphY:   route.toY   + (b.side === 'top' ? -4 : b.side === 'bottom' ? 12 : 4),
         fromTable: p.from.id,
         toTable:   p.to.id,
+        confidence: conf,
+        confLabel,
+        dashArray,
+        strokeOpacity,
       });
     }
     return edges;
@@ -1724,6 +1854,22 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
     this.searchQuery.set((ev.target as HTMLInputElement).value);
   }
 
+  /** Range-input handler for the map's min-confidence slider. */
+  onMapConfidenceChange(ev: Event): void {
+    const v = parseFloat((ev.target as HTMLInputElement).value);
+    this.minMapConfidence.set(Number.isNaN(v) ? 0 : v);
+  }
+
+  /** Pick a hue for the conf number based on its bucket — green for
+   * strong, amber for medium, dim grey for weak.  Matches the score
+   * colour vocabulary used in the table-view sidebar. */
+  confLabelColor(c: number | null): string {
+    if (c == null) return '#8b949e';
+    if (c >= 0.85) return '#3fb950';
+    if (c >= 0.65) return '#d29922';
+    return '#8b949e';
+  }
+
   /** Click handler for the jump-to-table search dropdown.  Navigates
    * (route-driven) or emits (embedded) — same branching as
    * onMapCardClick. */
@@ -1915,11 +2061,18 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
   // Columns owned by this table.
   columns = computed<ColumnRow[]>(() => {
     const piiByCol = new Map<string, string[]>();
+    // Brand chips (IIN/BIN) per column — only populated when the
+    // column has a CC_NUMBER finding with a non-empty
+    // ``provider_breakdown``.  Sorted server-side by descending count.
+    const brandsByCol = new Map<string, string[]>();
     for (const f of this.allPii()) {
       if (f.table_name === this.tableName()) {
         const arr = piiByCol.get(f.column_name) ?? [];
         if (!arr.includes(f.pii_type)) arr.push(f.pii_type);
         piiByCol.set(f.column_name, arr);
+        if (f.pii_type === 'CC_NUMBER' && f.provider_breakdown && f.provider_breakdown.length > 0) {
+          brandsByCol.set(f.column_name, f.provider_breakdown.map(p => p.brand));
+        }
       }
     }
     return this.allColumns()
@@ -1933,6 +2086,7 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
         is_pk: c.is_pk,
         is_fk: c.is_fk,
         pii_types: piiByCol.get(c.column) ?? [],
+        brands: brandsByCol.get(c.column) ?? [],
       }));
   });
 
@@ -1947,6 +2101,22 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
       .filter(e => e.to === this.tableName())
       .map(e => this.parseEdge(e))
   );
+
+  /** Map-view-only FK projections, post min-confidence filter.  The
+   * sidebar/table view always shows the full set; the map filters so
+   * the canvas stays uncluttered when the user dials up the threshold.
+   * FKs without a confidence score are kept (treated as "trusted"). */
+  visibleOutFks = computed<FkRow[]>(() => {
+    const min = this.minMapConfidence();
+    return this.outFks().filter(f => f.confidence == null || f.confidence >= min);
+  });
+  visibleInFks = computed<FkRow[]>(() => {
+    const min = this.minMapConfidence();
+    return this.inFks().filter(f => f.confidence == null || f.confidence >= min);
+  });
+  /** Unfiltered map-edge count, used by the chip's "X/N connections"
+   * readout when the slider hides some of them. */
+  totalMapEdgeCount = computed(() => this.outFks().length + this.inFks().length);
 
   piiRows = computed<PiiFinding[]>(() =>
     this.allPii()
