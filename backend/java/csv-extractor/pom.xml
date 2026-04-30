@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.archon</groupId>
+  <artifactId>csv-extractor</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <name>archon-supernova csv-extractor</name>
+  <description>
+    Standalone Postgres → CSV exporter.  Lists every BASE TABLE in a target
+    schema and runs COPY ... TO STDOUT (FORMAT CSV, HEADER) per table on a
+    worker pool.  One CSV file per table under the chosen output directory.
+  </description>
+
+  <properties>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <postgres.version>42.7.3</postgres.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <version>${postgres.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <finalName>csv-extractor</finalName>
+    <plugins>
+      <!-- Build a single fat-jar with the postgres driver bundled in.
+           Run with: java -jar target/csv-extractor.jar [args]                 -->
+      <plugin>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.7.1</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>com.archon.csvextractor.CsvExtractor</mainClass>
+            </manifest>
+          </archive>
+          <descriptorRefs>
+            <descriptorRef>jar-with-dependencies</descriptorRef>
+          </descriptorRefs>
+          <appendAssemblyId>false</appendAssemblyId>
+        </configuration>
+        <executions>
+          <execution>
+            <id>make-assembly</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
