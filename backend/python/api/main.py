@@ -924,6 +924,15 @@ def _reset_pipeline_state_for_schema(schema_name: str) -> None:
         ("pii_findings",
          f"DELETE FROM discovery.pii_findings "
          f"WHERE column_id IN {cols_for_schema} OR table_id IN {tids_for_schema}", 2),
+        # Same FK-cascade gotcha for data_quality_findings — column_id
+        # references col_inventory, so we must DELETE before
+        # col_inventory below.  Without this entry the entire reset
+        # transaction silently rolled back and the next pipeline run
+        # scanned against stale parquets, leaving DUPLICATE_PK
+        # findings on composite-PK columns even after the gating fix.
+        ("data_quality_findings",
+         f"DELETE FROM discovery.data_quality_findings "
+         f"WHERE column_id IN {cols_for_schema}", 1),
         ("composite_relationships",
          f"DELETE FROM discovery.composite_relationships "
          f"WHERE child_table_id IN {tids_for_schema} OR parent_table_id IN {tids_for_schema}", 2),
@@ -1488,6 +1497,75 @@ def get_relationships(job_id: str, limit: int = 500) -> dict[str, Any]:
         "total_edges": len(edges),
         "total_tables": len(tables),
     }
+
+
+@app.get("/api/jobs/{job_id}/data_quality")
+def get_data_quality(job_id: str) -> dict[str, Any]:
+    """Return data-quality findings for the job's schema.
+
+    Findings are produced by the ``data_quality`` pipeline phase and
+    persist in ``data_quality_findings`` keyed on (column_id,
+    issue_type).  This endpoint joins against ``col_inventory`` /
+    ``tbl_inventory`` so the UI can show ``table.column`` directly.
+
+    The DQ table is created idempotently via the schema migration; if
+    the migration hasn't run yet the endpoint returns an empty list
+    rather than 500.
+    """
+    job = _jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "job not found")
+    schema = job["schema_name"]
+
+    conn = psycopg2.connect(**RESULTS_DB_DSN, options="-c search_path=discovery")
+    try:
+        with conn.cursor() as cur:
+            # Defensive: skip if table doesn't exist yet.
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema='discovery'
+                      AND table_name='data_quality_findings'
+                )
+            """)
+            if not cur.fetchone()[0]:
+                return {"schema": schema, "total": 0, "findings": []}
+            cur.execute("""
+                SELECT t.table_name, c.column_name,
+                       d.issue_type, d.severity,
+                       d.count, d.sample_rows, d.fraction, d.samples
+                FROM data_quality_findings d
+                JOIN col_inventory c ON c.column_id = d.column_id
+                JOIN tbl_inventory t ON t.table_id = c.table_id
+                WHERE t.schema_name = %s
+                ORDER BY
+                    CASE d.severity
+                        WHEN 'HIGH' THEN 0
+                        WHEN 'MEDIUM' THEN 1
+                        ELSE 2
+                    END,
+                    t.table_name,
+                    c.column_name,
+                    d.issue_type
+            """, (schema,))
+            rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    findings = [
+        {
+            "table_name": r[0],
+            "column_name": r[1],
+            "issue_type": r[2],
+            "severity": r[3],
+            "count": int(r[4] or 0),
+            "sample_rows": int(r[5] or 0),
+            "fraction": float(r[6] or 0.0),
+            "samples": r[7] or [],
+        }
+        for r in rows
+    ]
+    return {"schema": schema, "total": len(findings), "findings": findings}
 
 
 @app.get("/api/jobs/{job_id}/pii")

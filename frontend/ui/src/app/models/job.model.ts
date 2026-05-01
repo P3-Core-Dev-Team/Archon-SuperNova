@@ -80,6 +80,32 @@ export interface PiiTable {
   total: number;
 }
 
+/** One row from GET /api/jobs/{id}/data_quality. */
+export interface DataQualityFinding {
+  table_name: string;
+  column_name: string;
+  /** Stable string from discovery.data_quality.IssueType. */
+  issue_type:
+    | 'NULL_HEAVY'
+    | 'ALL_NULL'
+    | 'DUPLICATE_PK'
+    | 'LEADING_TRAILING_WHITESPACE'
+    | 'EMPTY_STRING'
+    | 'MIXED_CASE'
+    | 'LOW_CARDINALITY';
+  severity: 'HIGH' | 'MEDIUM' | 'LOW';
+  count: number;
+  sample_rows: number;
+  fraction: number;
+  samples: string[];
+}
+
+export interface DataQualityResponse {
+  schema: string;
+  total: number;
+  findings: DataQualityFinding[];
+}
+
 export interface JobSummary {
   job_id: string;
   schema_name: string;

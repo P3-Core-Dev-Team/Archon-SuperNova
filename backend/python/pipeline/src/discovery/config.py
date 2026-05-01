@@ -578,6 +578,41 @@ class RelationshipsConfig(BaseModel):
             "the per-request timeout window."
         ),
     )
+    # ------------------------------------------------------------------
+    # Data-quality phase (Sprint 5b: profiles null density / duplicate
+    # PKs / format-consistency on extracted parquets).  Default ON.
+    # ------------------------------------------------------------------
+    data_quality_enabled: bool = Field(
+        default=True,
+        description=(
+            "Enable the data_quality phase.  Profiles each extracted "
+            "parquet for null-heavy columns, duplicate PKs, leading/"
+            "trailing whitespace, empty strings, mixed-case duplicates, "
+            "and low-cardinality categoricals."
+        ),
+    )
+    data_quality_null_threshold: float = Field(
+        default=0.50,
+        description=(
+            "Fraction of rows where NULL count crosses into a "
+            "NULL_HEAVY finding.  Below threshold => no finding."
+        ),
+    )
+    data_quality_max_rows_per_table: int = Field(
+        default=100_000,
+        description=(
+            "Per-table row sample cap for profiling — keeps DuckDB "
+            "scans bounded on huge tables.  Distribution metrics are "
+            "drawn from the first N rows of each parquet."
+        ),
+    )
+    data_quality_max_examples: int = Field(
+        default=3,
+        description=(
+            "Max example values shown in chip tooltips for issues "
+            "where samples help (whitespace, mixed-case)."
+        ),
+    )
 
 
 class ReportingConfig(BaseModel):

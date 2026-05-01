@@ -259,6 +259,21 @@ jsonb_relationships_t = Table(
 # ``cluster_local_id`` is CL-1's 0-indexed cluster index within a schema.
 # ``cluster_id`` (BIGSERIAL PK) is assigned by Postgres; tbl_inventory rows
 # carry this PK via the ``cluster_id`` FK column.
+data_quality_findings_t = Table(
+    "data_quality_findings",
+    metadata,
+    Column("finding_id", BigInteger, primary_key=True),
+    Column("column_id", BigInteger, nullable=False),
+    Column("issue_type", Text, nullable=False),
+    Column("severity", Text, nullable=False),
+    Column("count", BigInteger, nullable=False),
+    Column("sample_rows", BigInteger, nullable=False),
+    Column("fraction", Real, nullable=False),
+    Column("samples", JSONB),
+    Column("detected_at", TIMESTAMPTZ, server_default=text("now()")),
+)
+
+
 clusters_t = Table(
     "clusters",
     metadata,

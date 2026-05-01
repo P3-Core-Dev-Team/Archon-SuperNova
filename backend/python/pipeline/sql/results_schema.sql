@@ -351,6 +351,35 @@ ALTER TABLE tbl_inventory ADD COLUMN IF NOT EXISTS archetype TEXT;       -- FACT
 ALTER TABLE tbl_inventory ADD COLUMN IF NOT EXISTS junction_collapsed BOOLEAN NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS idx_tbl_inventory_cluster ON tbl_inventory (cluster_id);
 
+-- ---------------------------------------------------------------------------
+-- Data-quality findings (architect-review Phase 5b).
+-- ---------------------------------------------------------------------------
+-- One row per (column, issue_type) pair.  Issue types live in a controlled
+-- vocabulary owned by ``discovery.data_quality.IssueType`` so the UI can
+-- render stable severity colors and copy.
+--   issue_type   : NULL_HEAVY | DUPLICATE_PK | LEADING_TRAILING_WHITESPACE
+--                  | EMPTY_STRING | MIXED_CASE | LOW_CARDINALITY (etc.)
+--   severity     : HIGH | MEDIUM | LOW
+--   count        : raw count of offending rows in the sample
+--   sample_rows  : total rows scanned (lets the UI compute fraction)
+--   fraction     : count / sample_rows, pre-computed for sort/filter
+--   samples      : up to 3 redacted example values that triggered the issue
+CREATE TABLE IF NOT EXISTS data_quality_findings (
+    finding_id   BIGSERIAL PRIMARY KEY,
+    column_id    BIGINT NOT NULL REFERENCES col_inventory,
+    issue_type   TEXT NOT NULL,
+    severity     TEXT NOT NULL,
+    count        BIGINT NOT NULL,
+    sample_rows  BIGINT NOT NULL,
+    fraction     REAL NOT NULL,
+    samples      JSONB,
+    detected_at  TIMESTAMPTZ DEFAULT now(),
+    UNIQUE (column_id, issue_type)
+);
+CREATE INDEX IF NOT EXISTS idx_dq_column ON data_quality_findings (column_id);
+CREATE INDEX IF NOT EXISTS idx_dq_severity ON data_quality_findings (severity);
+
+
 -- API job-history persistence. The FastAPI backend writes through to this
 -- table on every job submit / status change so that restarting the API
 -- does not blank the dashboard.

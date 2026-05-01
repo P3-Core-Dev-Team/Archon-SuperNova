@@ -5,6 +5,7 @@ import { catchError, shareReplay, switchMap } from 'rxjs/operators';
 import {
   ClusterDetail,
   ClusterList,
+  DataQualityResponse,
   Job,
   JobColumns,
   JobRequest,
@@ -197,6 +198,15 @@ export class JobService {
 
   pii(jobId: string): Observable<PiiTable> {
     return this.http.get<PiiTable>(`${this.base}/jobs/${jobId}/pii`);
+  }
+
+  /** Data-quality findings for a job — null density, duplicate PKs,
+   * whitespace, empty strings, mixed case, low cardinality.  Returned
+   * sorted by severity (HIGH > MEDIUM > LOW) then table, column. */
+  dataQuality(jobId: string): Observable<DataQualityResponse> {
+    return this.http.get<DataQualityResponse>(
+      `${this.base}/jobs/${jobId}/data_quality`,
+    );
   }
 
   summary(jobId: string): Observable<JobSummary> {

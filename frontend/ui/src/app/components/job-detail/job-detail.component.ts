@@ -10,8 +10,9 @@ import { PiiTableComponent } from '../pii-table/pii-table.component';
 import { ExportBarComponent } from '../export-bar/export-bar.component';
 import { TableCardPageComponent } from '../table-card/table-card-page.component';
 import { ClusterOverviewComponent } from '../cluster-overview/cluster-overview.component';
+import { DataQualityComponent } from '../data-quality/data-quality.component';
 
-type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
+type Tab = 'clusters' | 'relationships' | 'pii' | 'dq' | 'log';
 
 @Component({
   selector: 'app-job-detail',
@@ -21,6 +22,7 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
     RelationshipGraphComponent, PiiTableComponent,
     ExportBarComponent, TableCardPageComponent,
     ClusterOverviewComponent,
+    DataQualityComponent,
   ],
   template: `
     <a routerLink="/jobs" class="back">← Back to jobs</a>
@@ -73,6 +75,9 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
         </button>
         <button [class.active]="tab() === 'pii'" (click)="setTab('pii')">
           PII findings
+        </button>
+        <button [class.active]="tab() === 'dq'" (click)="setTab('dq')">
+          Data quality
         </button>
         <button [class.active]="tab() === 'log'" (click)="setTab('log')">
           Run log
@@ -140,6 +145,9 @@ type Tab = 'clusters' | 'relationships' | 'pii' | 'log';
         }
         @if (tab() === 'pii') {
           <app-pii-table [jobId]="j.job_id" />
+        }
+        @if (tab() === 'dq') {
+          <app-data-quality [jobId]="j.job_id" />
         }
         @if (tab() === 'log') {
           <div class="card runlog-card">
@@ -408,7 +416,7 @@ export class JobDetailComponent implements OnInit, OnDestroy {
     // (browser back/forward stays consistent with the on-screen toggle).
     this.qpSub = this.route.queryParamMap.subscribe(qp => {
       const t = qp.get('tab');
-      if (t === 'relationships' || t === 'clusters' || t === 'pii' || t === 'log') {
+      if (t === 'relationships' || t === 'clusters' || t === 'pii' || t === 'dq' || t === 'log') {
         this.tab.set(t);
       }
       const tbl = qp.get('table');

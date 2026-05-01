@@ -66,6 +66,9 @@ PHASE_FINGERPRINT = "fingerprint"
 PHASE_PII_SCAN = "pii_scan"
 PHASE_CANDIDATE_GEN = "candidate_gen"
 PHASE_VALIDATE = "validate"
+# Data-quality profiling — runs on the extracted parquets after
+# validate, surfaces null-heavy / duplicate-PK / format issues.
+PHASE_DATA_QUALITY = "data_quality"
 # New advanced FK detector phases (run after validate, before report).
 PHASE_COMPOSITE_FK = "composite_fk"
 PHASE_POLYMORPHIC_FK = "polymorphic_fk"
@@ -84,6 +87,7 @@ ALL_PHASES = [
     PHASE_PII_SCAN,
     PHASE_CANDIDATE_GEN,
     PHASE_VALIDATE,
+    PHASE_DATA_QUALITY,
     PHASE_COMPOSITE_FK,
     PHASE_POLYMORPHIC_FK,
     PHASE_JSONB_FK,
@@ -482,6 +486,16 @@ def _run_advanced_fk_phases(
             log.warning(f"{phase_label}_phase_skipped", error=str(exc))
             if not enable_fallbacks:
                 raise
+
+    # Data-quality profiling — runs first because the FK / propagation
+    # phases below all consume parquet data; surfacing null-heavy and
+    # duplicate-PK issues up-front lets analysts triage them while the
+    # remaining phases finish.
+    _run_optional(
+        "data_quality_enabled", rel_cfg, True,
+        "data_quality", PHASE_DATA_QUALITY,
+        "data_quality", "run_phase_data_quality",
+    )
 
     # Composite (Phase 4b).  ``composite_fk_enabled`` defaults True now
     # that composite_fk is folded into run-all.
