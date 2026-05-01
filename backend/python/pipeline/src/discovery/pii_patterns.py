@@ -551,10 +551,54 @@ _NEW_PATTERNS: list[PatternDef] = [
 
 
 # ---------------------------------------------------------------------------
+# PCI cardholder-data extras (Sprint 5: "PCI data" group)
+# ---------------------------------------------------------------------------
+#
+# CC_NUMBER lives in _EXISTING_PATTERNS; these two complete the trio so the
+# UI can group "Card Number / Card Name / CVV" under a single PCI badge.
+# Both rely on the column-name prior as the primary signal — content-only
+# detection of either is too lossy (a name could be anything; a 3-digit
+# CVV is indistinguishable from any 3-digit number).  The regexes below
+# exist so the scanner accepts a finding when the prior says "this is
+# CARD_HOLDER_NAME" or "this is CARD_CVV"; the regex match rate is mostly
+# advisory.
+_PCI_CARD_PATTERNS: list[PatternDef] = [
+    PatternDef(
+        name="CARD_HOLDER_NAME",
+        # Two-token-or-more name shape.  Permissive on purpose — the
+        # column-name prior gates surfacing.
+        regex_bytes=(
+            rb"\b[A-Z][A-Za-z'\-]{1,30}"
+            rb"(?:\s+[A-Z][A-Za-z'\-]{1,30}){1,3}\b"
+        ),
+        validator=None,
+        locale="global",
+        regulated=("PCI", "GDPR"),
+        specificity=4,
+        fp_class="H",
+    ),
+    PatternDef(
+        name="CARD_CVV",
+        # 3- or 4-digit numeric, anchored at word boundaries so we don't
+        # match the middle of a CC_NUMBER.  Without column-name prior this
+        # is too generic to surface; the priors module is what gates it.
+        regex_bytes=rb"\b\d{3,4}\b",
+        validator=None,
+        locale="global",
+        regulated=("PCI",),
+        specificity=2,
+        fp_class="H",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
-PATTERNS: list[PatternDef] = list(_EXISTING_PATTERNS) + list(_NEW_PATTERNS)
+PATTERNS: list[PatternDef] = (
+    list(_EXISTING_PATTERNS) + list(_NEW_PATTERNS) + list(_PCI_CARD_PATTERNS)
+)
 
 # Backward-compatible alias — the old ``pii_scan.PATTERN_DEFS`` callers
 # keep working without source changes.

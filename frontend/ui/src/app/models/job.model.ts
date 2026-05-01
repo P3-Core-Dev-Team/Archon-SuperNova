@@ -67,6 +67,11 @@ export interface PiiFinding {
   /** IIN/BIN-derived issuer breakdown for CC_NUMBER findings.  Empty
    * (or absent) for every other PII type.  Sorted by descending count. */
   provider_breakdown?: { brand: string; count: number; share: number }[];
+  /** Regulation tags lifted from the PatternDef catalog
+   * (``["PCI"]``, ``["GDPR", "CCPA"]``, etc.).  The UI uses this to
+   * render group badges — e.g. all PCI cardholder-data findings
+   * (CC_NUMBER, CARD_HOLDER_NAME, CARD_CVV) light up the same chip. */
+  regulated?: string[];
 }
 
 export interface PiiTable {

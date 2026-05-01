@@ -52,7 +52,11 @@ import { PiiFinding } from '../../models/job.model';
               </td>
               <td class="mono">{{ f.column_name }}</td>
               <td>
-                <span class="pii-type">{{ f.pii_type }}</span>
+                @for (reg of regulationTags(f); track reg) {
+                  <span class="reg-chip" [class]="'reg-' + reg.toLowerCase()"
+                        [title]="reg + ' regulated data'">{{ reg }}</span>
+                }
+                <span class="pii-type" [title]="f.pii_type">{{ piiLabel(f.pii_type) }}</span>
                 @if (f.provider_breakdown && f.provider_breakdown.length > 0) {
                   <span class="brand-row">
                     @for (p of f.provider_breakdown; track p.brand) {
@@ -140,6 +144,29 @@ import { PiiFinding } from '../../models/job.model';
       font-weight: 600;
       letter-spacing: 0.4px;
     }
+    /* Regulation tags — small filled chip carrying the regulatory
+       framework that gates this finding (PCI, GDPR, HIPAA, etc.).
+       Drawn BEFORE the pii_type so a row scanning left-to-right
+       reads "[PCI] Card Number" rather than vice-versa.  Same dark-
+       on-tinted treatment as the brand chips. */
+    .reg-chip {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-right: 4px;
+      cursor: help;
+      vertical-align: 1px;
+    }
+    .reg-chip.reg-pci   { color: #ff7b8b; background: rgba(235, 0, 27, 0.16); border: 1px solid rgba(235, 0, 27, 0.35); }
+    .reg-chip.reg-gdpr  { color: #79c0ff; background: rgba(121, 192, 255, 0.16); border: 1px solid rgba(121, 192, 255, 0.35); }
+    .reg-chip.reg-hipaa { color: #56d364; background: rgba(86, 211, 100, 0.16); border: 1px solid rgba(86, 211, 100, 0.35); }
+    .reg-chip.reg-ccpa  { color: #d2a8ff; background: rgba(210, 168, 255, 0.16); border: 1px solid rgba(210, 168, 255, 0.35); }
+    .reg-chip.reg-sox   { color: #d29922; background: rgba(210, 153, 34, 0.16); border: 1px solid rgba(210, 153, 34, 0.35); }
+    .reg-chip.reg-dpdpa { color: #ffa05a; background: rgba(255, 96, 0, 0.16); border: 1px solid rgba(255, 96, 0, 0.35); }
     /* IIN/BIN provider chips — one per detected card scheme.  Tinted
        per brand to match the issuer's recognised colour, with a count
        badge tucked on the right.  Wraps below the PII tag if needed. */
@@ -277,5 +304,44 @@ export class PiiTableComponent implements OnInit {
       return '';
     }
     return f.redacted_examples.map(String).join('\n');
+  }
+
+  /** Friendly display label for a PII type — shorter, more readable
+   * than the raw catalog name.  The full ``pii_type`` symbol stays in
+   * the title attribute for users who need the original string. */
+  private static readonly _PII_LABEL_MAP: Record<string, string> = {
+    CC_NUMBER: 'Card Number',
+    CARD_HOLDER_NAME: 'Card Name',
+    CARD_CVV: 'CVV',
+    SSN_US: 'SSN (US)',
+    PHONE_US: 'Phone (US)',
+    PASSPORT_US: 'Passport (US)',
+    PASSPORT_GB: 'Passport (UK)',
+    PASSPORT_IN: 'Passport (IN)',
+    AADHAAR_IN: 'Aadhaar',
+    PAN_IN: 'PAN (IN)',
+    NHS_GB: 'NHS Number',
+    NIR_FR: 'NIR',
+    PERSON_NAME: 'Person Name',
+    EMAIL: 'Email',
+    POSTAL_CODE: 'Postal Code',
+    COUNTRY_CODE: 'Country Code',
+    ADDRESS: 'Address',
+    DOB: 'Date of Birth',
+    IBAN: 'IBAN',
+    SWIFT_BIC: 'SWIFT / BIC',
+    BANK_ACCOUNT: 'Bank Account',
+    ABA_ROUTING_US: 'ABA Routing',
+  };
+
+  piiLabel(piiType: string): string {
+    return PiiTableComponent._PII_LABEL_MAP[piiType] ?? piiType;
+  }
+
+  /** Regulation-tag chips to render before the PII type.  Returns the
+   * ``regulated`` array as-is; UI deduplication is implicit (the
+   * backend already returns each tag once per finding). */
+  regulationTags(f: PiiFinding): string[] {
+    return Array.isArray(f.regulated) ? f.regulated : [];
   }
 }

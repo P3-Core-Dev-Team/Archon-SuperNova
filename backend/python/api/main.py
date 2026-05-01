@@ -1518,6 +1518,31 @@ def get_pii_findings(job_id: str) -> dict[str, Any]:
     finally:
         conn.close()
 
+    # Look up regulation tags per pii_type from the catalog.  ``regulated``
+    # isn't stored in pii_findings (it's an attribute of the PatternDef);
+    # surfacing it here lets the UI group PCI / GDPR / HIPAA findings.
+    # Cache the lookup so each pii_type is resolved once per request.
+    import sys as _sys
+    _pipeline_src = str(PIPELINE_SRC)
+    if _pipeline_src not in _sys.path:
+        _sys.path.insert(0, _pipeline_src)
+    try:
+        from discovery.pii_patterns import get_pattern as _get_pattern
+        def _regs_for(t: str) -> list[str]:
+            p = _get_pattern(t)
+            return list(p.regulated) if p else []
+    except Exception:
+        # Pipeline source not importable from the API process — degrade
+        # to empty regulation tags rather than crash the endpoint.
+        def _regs_for(_t: str) -> list[str]:
+            return []
+    _reg_cache: dict[str, list[str]] = {}
+
+    def _regulated(pii_type: str) -> list[str]:
+        if pii_type not in _reg_cache:
+            _reg_cache[pii_type] = _regs_for(pii_type)
+        return _reg_cache[pii_type]
+
     findings = [
         {
             "table_name": r[0], "column_name": r[1],
@@ -1530,6 +1555,11 @@ def get_pii_findings(job_id: str) -> dict[str, Any]:
             # IIN/BIN provider breakdown — list of {brand, count, share}
             # for CC_NUMBER findings, empty otherwise.  See pii_iin.py.
             "provider_breakdown": r[11] or [],
+            # Regulation tags lifted from the PatternDef catalog
+            # (``("PCI",)``, ``("GDPR", "CCPA")``, etc.).  The UI uses
+            # this to render group badges (e.g. all CC_NUMBER /
+            # CARD_HOLDER_NAME / CARD_CVV findings get a "PCI" tag).
+            "regulated": _regulated(r[2]),
         }
         for r in rows
     ]

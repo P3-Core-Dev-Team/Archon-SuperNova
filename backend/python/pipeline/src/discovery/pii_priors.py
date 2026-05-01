@@ -62,6 +62,25 @@ COLUMN_NAME_PRIORS: dict[re.Pattern[str], str] = {
     # India PAN.  Either side-by-side context disambiguates, or callers can
     # supply additional names via configuration.
 
+    # PCI cardholder name — matches before generic PERSON_NAME so a column
+    # called ``card_holder_name`` doesn't get mis-tagged as a generic name.
+    # Card holder names ARE person names (and inherit GDPR), but the PCI
+    # tag is the operationally important one and the column-name evidence
+    # is unambiguous.
+    re.compile(
+        r"\b(card\s?holder|card\s?holder\s?name|cardholder|name\s?on\s?card|cc\s?holder)\b",
+        re.I,
+    ): "CARD_HOLDER_NAME",
+    # PCI card verification value — column-name driven.  3- or 4-digit
+    # numerics are too generic to detect by content alone, so the prior is
+    # the primary signal.  Coverage spans the spelling variants in real
+    # schemas: cvv, cvc, csc, card_security_code, card_verification_value,
+    # security_code, verification_value, cvv2.
+    re.compile(
+        r"\b(cvv|cvv2|cvc|csc|card\s?security\s?code|card\s?verification(?:\s?value)?|security\s?code|verification\s?value)\b",
+        re.I,
+    ): "CARD_CVV",
+
     # --- Contact ---------------------------------------------------------
     re.compile(
         r"\b(phone|mobile|cell|tel|telephone|msisdn|phone\s?number)\b",

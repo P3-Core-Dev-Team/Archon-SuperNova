@@ -30,6 +30,11 @@ interface ColumnRow {
    * descending count so the dominant scheme renders first.  Empty for
    * non-card columns. */
   brands: string[];
+  /** Regulation tags from the backend (PCI / GDPR / HIPAA / …),
+   * deduplicated across this column's PII findings.  Lets the UI
+   * group e.g. card_holder_name + card_number + cvv under one PCI
+   * badge without forcing the user to interpret raw type names. */
+  regulations: string[];
 }
 
 interface FkRow {
@@ -289,8 +294,12 @@ interface FkRow {
                     </td>
                     <td class="muted small">
                       @if (c.pii_types.length > 0) {
+                        @for (reg of c.regulations; track reg) {
+                          <span class="kbadge reg-tag" [class]="'reg-' + reg.toLowerCase()"
+                                [title]="reg + ' regulated data'">{{ reg }}</span>
+                        }
                         @for (p of c.pii_types; track p) {
-                          <span class="kbadge pii">{{ p }}</span>
+                          <span class="kbadge pii" [title]="p">{{ piiLabel(p) }}</span>
                         }
                         @if (c.brands.length > 0) {
                           @for (b of c.brands; track b) {
@@ -860,6 +869,16 @@ interface FkRow {
     .kbadge.pk { background: #1f6f3f; color: #aaf0c1; }
     .kbadge.fk { background: #1f4e7e; color: #aedcff; }
     .kbadge.pii { background: #3a0d0d; color: #ffabab; }
+    /* Regulation tags — one chip per regulatory framework that gates
+       the column's findings (PCI / GDPR / HIPAA / …).  Drawn before
+       the pii_type chips so a row reads "[PCI] Card Number" l-to-r. */
+    .kbadge.reg-tag { font-size: 9.5px; border: 1px solid currentColor; }
+    .kbadge.reg-pci   { color: #ff7b8b; background: rgba(235, 0, 27, 0.16); }
+    .kbadge.reg-gdpr  { color: #79c0ff; background: rgba(121, 192, 255, 0.16); }
+    .kbadge.reg-hipaa { color: #56d364; background: rgba(86, 211, 100, 0.16); }
+    .kbadge.reg-ccpa  { color: #d2a8ff; background: rgba(210, 168, 255, 0.16); }
+    .kbadge.reg-sox   { color: #d29922; background: rgba(210, 153, 34, 0.16); }
+    .kbadge.reg-dpdpa { color: #ffa05a; background: rgba(255, 96, 0, 0.16); }
     /* IIN/BIN brand chips, rendered next to the CC_NUMBER pii kbadge.
        Subtle outlined fill so the brand name is unmistakable but the
        chip doesn't compete with the primary PII tag for attention. */
@@ -2065,6 +2084,10 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
     // column has a CC_NUMBER finding with a non-empty
     // ``provider_breakdown``.  Sorted server-side by descending count.
     const brandsByCol = new Map<string, string[]>();
+    // Regulation tags per column — deduplicated union of every
+    // finding's ``regulated`` array.  PCI shows once even when both
+    // CC_NUMBER and CARD_CVV fire on the same column.
+    const regsByCol = new Map<string, string[]>();
     for (const f of this.allPii()) {
       if (f.table_name === this.tableName()) {
         const arr = piiByCol.get(f.column_name) ?? [];
@@ -2072,6 +2095,11 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
         piiByCol.set(f.column_name, arr);
         if (f.pii_type === 'CC_NUMBER' && f.provider_breakdown && f.provider_breakdown.length > 0) {
           brandsByCol.set(f.column_name, f.provider_breakdown.map(p => p.brand));
+        }
+        if (Array.isArray(f.regulated) && f.regulated.length > 0) {
+          const cur = regsByCol.get(f.column_name) ?? [];
+          for (const r of f.regulated) if (!cur.includes(r)) cur.push(r);
+          regsByCol.set(f.column_name, cur);
         }
       }
     }
@@ -2087,8 +2115,43 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
         is_fk: c.is_fk,
         pii_types: piiByCol.get(c.column) ?? [],
         brands: brandsByCol.get(c.column) ?? [],
+        regulations: regsByCol.get(c.column) ?? [],
       }));
   });
+
+  /** Friendly display label for a PII type symbol — keeps tables
+   * scannable without dropping the canonical name (the raw symbol
+   * stays in the chip's title attribute for power users).  Mirrors
+   * the mapping in pii-table.component.ts so the two surfaces show
+   * the same labels. */
+  private static readonly _PII_LABEL_MAP: Record<string, string> = {
+    CC_NUMBER: 'Card Number',
+    CARD_HOLDER_NAME: 'Card Name',
+    CARD_CVV: 'CVV',
+    SSN_US: 'SSN (US)',
+    PHONE_US: 'Phone (US)',
+    PASSPORT_US: 'Passport (US)',
+    PASSPORT_GB: 'Passport (UK)',
+    PASSPORT_IN: 'Passport (IN)',
+    AADHAAR_IN: 'Aadhaar',
+    PAN_IN: 'PAN (IN)',
+    NHS_GB: 'NHS Number',
+    NIR_FR: 'NIR',
+    PERSON_NAME: 'Person Name',
+    EMAIL: 'Email',
+    POSTAL_CODE: 'Postal Code',
+    COUNTRY_CODE: 'Country Code',
+    ADDRESS: 'Address',
+    DOB: 'Date of Birth',
+    IBAN: 'IBAN',
+    SWIFT_BIC: 'SWIFT / BIC',
+    BANK_ACCOUNT: 'Bank Account',
+    ABA_ROUTING_US: 'ABA Routing',
+  };
+
+  piiLabel(piiType: string): string {
+    return TableCardPageComponent._PII_LABEL_MAP[piiType] ?? piiType;
+  }
 
   outFks = computed<FkRow[]>(() =>
     this.allEdges()
