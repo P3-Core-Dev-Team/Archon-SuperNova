@@ -168,9 +168,9 @@ const NODE_SEP = 48;
               </div>
             </div>
             <!-- Column rows.  stopPropagation on mousedown so the wrap
-                 doesn't start a pan when a row is clicked.  When
-                 nullPct is known, a thin red bar is anchored to
-                 the bottom of the row, width proportional to fraction. -->
+                 doesn't start a pan when a row is clicked.  Null
+                 fraction surfaces in the row tooltip only — the
+                 in-row red bar was visually noisy. -->
             <div class="card-cols">
               @for (c of n.columns; track c.name) {
                 <div class="col-row"
@@ -180,12 +180,6 @@ const NODE_SEP = 48;
                      (mouseenter)="onColEnter(n.id, c.name)"
                      (mouseleave)="onColLeave()"
                      (mousedown)="$event.stopPropagation()">
-                  @if (c.nullPct != null && c.nullPct > 0) {
-                    <span class="null-bar"
-                          [style.width.%]="c.nullPct * 100"
-                          [class.null-heavy]="c.nullPct >= 0.5"
-                          [class.null-all]="c.nullPct >= 0.99"></span>
-                  }
                   <span class="col-key">
                     @if (c.keyKind === 'pkfk') {
                       <span class="key-pkfk" title="Primary &amp; foreign key">PK·FK</span>
@@ -390,21 +384,7 @@ const NODE_SEP = 48;
       border-bottom: 1px solid rgba(48, 54, 61, 0.55);
     }
     .col-row:last-child { border-bottom: none; }
-    .col-row { position: relative; }
     .col-row:hover { background: rgba(88, 166, 255, 0.07); }
-    /* Null-density bar — mirrors the relationship-graph treatment.
-       Pinned to the bottom of each row, width proportional to null
-       fraction, escalating colour at >=50% / >=99%. */
-    .col-row .null-bar {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      height: 2px;
-      background: rgba(248, 81, 73, 0.35);
-      pointer-events: none;
-    }
-    .col-row .null-bar.null-heavy { background: rgba(248, 81, 73, 0.7); }
-    .col-row .null-bar.null-all   { background: #f85149; height: 3px; }
     .col-row.col-pk { color: #e6edf3; }
     .col-row.col-fk { color: #c9d1d9; }
     .col-key { display: flex; align-items: center; gap: 2px; }

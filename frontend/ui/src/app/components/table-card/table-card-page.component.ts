@@ -1135,6 +1135,10 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
   private allColumns = signal<ColumnInfo[]>([]);
   private allEdges = signal<RelationshipEdge[]>([]);
   private allPii = signal<PiiFinding[]>([]);
+  /** Per-table row count from the relationships graph nodes payload.
+   * Used by the map view's neighbour-card subtitle.  Null when the
+   * relationships request hasn't completed yet. */
+  private rowCountByTable = signal<Map<string, number>>(new Map());
 
   setView(v: 'table' | 'map'): void {
     if (this.view() === v) return;
@@ -1342,16 +1346,12 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
       colCount.set(c.table, (colCount.get(c.table) ?? 0) + 1);
     }
 
-    // Row count from the relationships graph nodes payload.
-    // Loaded into allEdges only — we don't currently load the nodes for
-    // map-mode; fall back to 0 when unknown.
-    const rowCount = (id: string): number => {
-      // The TABLE-mode header doesn't load the relationships nodes
-      // payload either; rows are unknown for non-focal tables in this
-      // pass.  We could lift them in a follow-up by fetching the
-      // graph payload alongside columns/pii.
-      return 0;
-    };
+    // Row count looked up in the rowCountByTable signal that ngOnInit
+    // populates from the relationships nodes payload.  Falls back to
+    // 0 when the lookup hasn't loaded yet (which only happens during
+    // the initial render before forkJoin resolves).
+    const rcLookup = this.rowCountByTable();
+    const rowCount = (id: string): number => rcLookup.get(id) ?? 0;
 
     const CARD_W = 240;
     const CARD_H = 100;
@@ -2065,6 +2065,16 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
         this.allColumns.set(r.cols.columns ?? []);
         this.allEdges.set(r.rels.edges ?? []);
         this.allPii.set(r.pii.findings ?? []);
+        // Build the per-table row-count lookup from the relationships
+        // nodes payload.  Each node carries ``row_count`` (lifted from
+        // ``tbl_inventory.row_count_estimate`` by the API).  Falls
+        // back to the legacy ``value`` (edge degree) only on older
+        // API responses that don't yet ship the field.
+        const rc = new Map<string, number>();
+        for (const n of (r.rels.nodes ?? [])) {
+          rc.set(n.id, (n as any).row_count ?? n.value ?? 0);
+        }
+        this.rowCountByTable.set(rc);
         this.loading.set(false);
         // Deep-link case: ?view=map on first load — once the data lands
         // and the map block has been projected, fit the radial layout to

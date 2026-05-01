@@ -191,12 +191,6 @@ const NODE_SEP = 36;        // horizontal gap within a rank
                      [class.col-fk]="c.isFk"
                      [title]="c.nullPct != null ? c.name + ' — ' + (c.nullPct * 100 | number:'1.1-1') + '% null' : c.name"
                      (mousedown)="$event.stopPropagation()">
-                  @if (c.nullPct != null && c.nullPct > 0) {
-                    <span class="null-bar"
-                          [style.width.%]="c.nullPct * 100"
-                          [class.null-heavy]="c.nullPct >= 0.5"
-                          [class.null-all]="c.nullPct >= 0.99"></span>
-                  }
                   <span class="col-name mono">{{ c.name }}</span>
                   <span class="col-type" [title]="c.dataType">{{ c.typeGlyph }}</span>
                   <span class="col-key">
@@ -451,20 +445,6 @@ const NODE_SEP = 36;        // horizontal gap within a rank
     }
     .col-row:last-child { border-bottom: none; }
     .col-row:hover { background: rgba(88, 166, 255, 0.07); }
-    /* Null-density bar: a thin coloured strip pinned to the bottom of
-       each column row, width proportional to null fraction.  Subtle
-       at low fractions, escalates to red at >=50% and bright red at
-       100% (matches the data-quality phase severity ramp). */
-    .col-row .null-bar {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      height: 2px;
-      background: rgba(248, 81, 73, 0.35);
-      pointer-events: none;
-    }
-    .col-row .null-bar.null-heavy { background: rgba(248, 81, 73, 0.7); }
-    .col-row .null-bar.null-all   { background: #f85149; height: 3px; }
     .col-row.col-pk { color: #e6edf3; }
     .col-row.col-fk { color: #c9d1d9; }
     .col-name {
