@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { JobService } from '../../services/job.service';
 import { ClusterGraphComponent, clusterColor } from '../cluster-graph/cluster-graph.component';
+import { SchemaInsightsComponent } from '../schema-insights/schema-insights.component';
 
 /** Shape returned by GET /api/jobs/{id}/clusters (CL-3 contract). */
 export interface Cluster {
@@ -32,7 +33,7 @@ export interface ClustersResponse {
 @Component({
   selector: 'app-cluster-overview',
   standalone: true,
-  imports: [CommonModule, RouterLink, ClusterGraphComponent],
+  imports: [CommonModule, RouterLink, ClusterGraphComponent, SchemaInsightsComponent],
   template: `
     @if (loading()) {
       <div class="state-msg muted">Computing clusters...</div>
@@ -52,6 +53,11 @@ export interface ClustersResponse {
     }
 
     @if (!loading() && !error() && data() && data()!.total_clusters > 0) {
+      <!-- Schema-design insights panel — known-schema fingerprint,
+           temporal/CDC pattern, surrogate keys, bridge tables,
+           polymorphic roots.  Sits above the cluster header so it's
+           the first thing the user sees in the Clusters tab. -->
+      <app-schema-insights [jobId]="jobId()" />
       <div class="overview-header">
         <span>Schema: <strong>{{ data()!.schema }}</strong></span>
         <span class="sep">·</span>

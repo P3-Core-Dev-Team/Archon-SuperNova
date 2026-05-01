@@ -110,6 +110,58 @@ export interface DataQualityResponse {
   findings: DataQualityFinding[];
 }
 
+/** GET /api/jobs/{id}/insights — schema-design pattern panel. */
+export interface SchemaMatch {
+  name: string;
+  confidence: number;
+  matched: string[];
+  missing: string[];
+  extra_count: number;
+  extra_sample: string[];
+  anchor_size: number;
+  observed_size: number;
+}
+
+export interface TemporalInsight {
+  tracked_tables: number;
+  total_tables: number;
+  fraction: number;
+  supports_cdc: boolean;
+}
+
+export interface SurrogateKeyStats {
+  tables_with_pk: number;
+  surrogate_count: number;
+  integer_count: number;
+  surrogate_pct: number;
+  integer_pct: number;
+}
+
+export interface BridgeTable {
+  table: string;
+  fk_count: number;
+  total_cols: number;
+  parents: string[];
+}
+
+export interface SubtypeRoot {
+  supertype: string;
+  fk_column: string;
+  subtypes: string[];
+  count: number;
+}
+
+export interface SchemaInsights {
+  schema: string;
+  table_count: number;
+  schema_match: SchemaMatch | null;
+  temporal: TemporalInsight | null;
+  surrogate_keys: SurrogateKeyStats | null;
+  bridge_tables: BridgeTable[];
+  subtype_supertype: SubtypeRoot[];
+  error?: string;
+}
+
 export interface JobSummary {
   job_id: string;
   schema_name: string;

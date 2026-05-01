@@ -1531,6 +1531,109 @@ def get_relationships(job_id: str, limit: int = 500) -> dict[str, Any]:
     }
 
 
+@app.get("/api/jobs/{job_id}/insights")
+def get_schema_insights(job_id: str) -> dict[str, Any]:
+    """High-level schema-design pattern panel.
+
+    Combines five small detections that the underlying pipeline already
+    has the data for but doesn't presently advertise:
+
+      * known-schema fingerprint (closest match in
+        ``KNOWN_SCHEMAS`` plus a coverage diff)
+      * temporal-tracking pattern (% of tables with modified_date /
+        updated_at / etc. — supports CDC if >= 75%)
+      * surrogate-key prevalence (% of tables whose PK is *_id-shaped
+        and integer-typed)
+      * bridge / junction tables (those whose columns are mostly FKs
+        to two different parents)
+      * subtype / supertype patterns (polymorphic roots — multiple
+        children sharing an FK column to the same parent)
+
+    All detection happens via the pure helpers in
+    ``discovery.schema_patterns`` so the endpoint is a thin
+    SQL-and-shape router with no business logic of its own.
+    """
+    job = _jobs.get(job_id)
+    if not job:
+        raise HTTPException(404, "job not found")
+    schema = job["schema_name"]
+
+    # Reuse PIPELINE_SRC import path — same pattern as the regulated-tag
+    # lookup in get_pii_findings.
+    import sys as _sys
+    _pipeline_src = str(PIPELINE_SRC)
+    if _pipeline_src not in _sys.path:
+        _sys.path.insert(0, _pipeline_src)
+    try:
+        from discovery.schema_patterns import (  # noqa: PLC0415
+            bridge_tables as _bridge_tables,
+            detect_temporal as _detect_temporal,
+            match_known_schema as _match_known_schema,
+            subtype_supertype as _subtype_supertype,
+            surrogate_key_stats as _surrogate_key_stats,
+        )
+    except Exception:
+        return {
+            "schema": schema,
+            "schema_match": None,
+            "temporal": None,
+            "surrogate_keys": None,
+            "bridge_tables": [],
+            "subtype_supertype": [],
+            "error": "discovery.schema_patterns import failed",
+        }
+
+    conn = psycopg2.connect(**RESULTS_DB_DSN, options="-c search_path=discovery")
+    try:
+        with conn.cursor() as cur:
+            # Tables and per-column inventory.
+            cur.execute("""
+                SELECT t.table_name, c.column_name, c.data_type, c.is_pk
+                FROM tbl_inventory t
+                JOIN col_inventory c ON c.table_id = t.table_id
+                WHERE t.schema_name = %s
+            """, (schema,))
+            col_rows = cur.fetchall()
+
+            # Edges with labels — drive bridge + subtype detection.
+            cur.execute("""
+                SELECT
+                    ct.table_name AS from_t,
+                    pt.table_name AS to_t,
+                    cc.column_name || ' → ' || pc.column_name AS label
+                FROM relationships r
+                JOIN col_inventory cc ON cc.column_id = r.child_col_id
+                JOIN col_inventory pc ON pc.column_id = r.parent_col_id
+                JOIN tbl_inventory ct ON ct.table_id = cc.table_id
+                JOIN tbl_inventory pt ON pt.table_id = pc.table_id
+                WHERE ct.schema_name = %s
+            """, (schema,))
+            edge_rows = cur.fetchall()
+    finally:
+        conn.close()
+
+    # Project to the dict shape the helpers expect.
+    columns = [
+        {"table": r[0], "column": r[1], "data_type": r[2], "is_pk": bool(r[3])}
+        for r in col_rows
+    ]
+    table_names = sorted({c["table"] for c in columns})
+    edges = [
+        {"from": r[0], "to": r[1], "label": r[2]}
+        for r in edge_rows
+    ]
+
+    return {
+        "schema": schema,
+        "table_count": len(table_names),
+        "schema_match": _match_known_schema(table_names),
+        "temporal": _detect_temporal(columns, total_tables=len(table_names)),
+        "surrogate_keys": _surrogate_key_stats(columns),
+        "bridge_tables": _bridge_tables(columns, edges),
+        "subtype_supertype": _subtype_supertype(edges),
+    }
+
+
 @app.get("/api/jobs/{job_id}/data_quality")
 def get_data_quality(job_id: str) -> dict[str, Any]:
     """Return data-quality findings for the job's schema.

@@ -12,6 +12,7 @@ import {
   JobSummary,
   PiiTable,
   RelationshipGraph,
+  SchemaInsights,
   SchemaList,
   SourceDbType,
 } from '../models/job.model';
@@ -206,6 +207,16 @@ export class JobService {
   dataQuality(jobId: string): Observable<DataQualityResponse> {
     return this.http.get<DataQualityResponse>(
       `${this.base}/jobs/${jobId}/data_quality`,
+    );
+  }
+
+  /** Schema-design insights — known-schema fingerprint, temporal /
+   * CDC pattern, surrogate-key prevalence, bridge tables, subtype
+   * roots.  Returns ``null`` for any sub-section the pipeline
+   * couldn't compute (e.g. no edges → no bridge detection). */
+  insights(jobId: string): Observable<SchemaInsights> {
+    return this.http.get<SchemaInsights>(
+      `${this.base}/jobs/${jobId}/insights`,
     );
   }
 
