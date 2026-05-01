@@ -55,6 +55,7 @@ from discovery.pii_patterns import (  # noqa: F401  (re-exports)
     get_pattern,
 )
 from discovery.pii_priors import (
+    is_credential_name,
     is_free_text_column_name,
     is_structural_pointer_name,
     name_prior,
@@ -682,6 +683,17 @@ def scan_column(
     # ``api_key`` and ``password_hash`` legitimately hold credentials.
     is_struct_pointer = is_structural_pointer_name(column)
 
+    # Credential-storage suppression: ``password`` / ``password_hash`` /
+    # ``pwd_hash`` columns hold bcrypt / argon2 / scrypt output (high
+    # entropy) which the generic API_KEY entropy regex matches gleefully —
+    # producing both a misleading API_KEY tag AND its inherited SOX
+    # regulation chip.  Neither label fits credential storage.  We
+    # suppress every PII finding on these columns unless the column name
+    # positively implies that specific type (CREDENTIAL_HASH wins;
+    # everything else gets dropped).  Mirrors the structural-pointer
+    # gate above.
+    is_cred = is_credential_name(column)
+
     # Free-text content names (``description``, ``comments``, ``notes``,
     # ``body``, ``title``, ``status``, ``created_by``, …).  Findings on
     # such columns are dampened in the score formula when there's no
@@ -699,6 +711,12 @@ def scan_column(
         # passes do NOT override: the API_KEY entropy validator passes on
         # any UUID, the Luhn check passes on plenty of dense-integer ids.
         if is_struct_pointer and np_strength == 0.0:
+            continue
+        # Same gate for credential-storage columns: a bcrypt /
+        # argon2 / scrypt hash matches API_KEY's entropy regex but is
+        # not an API key.  Only let CREDENTIAL_HASH (the type that
+        # the column name positively implies) survive.
+        if is_cred and np_strength == 0.0:
             continue
         rate_regex = match_count / max(rows_scanned, 1)
         rate_validated = validated / max(match_count, 1)
@@ -753,6 +771,9 @@ def scan_column(
         # help here — it's still spotting an entity-shaped substring, not
         # a confirmed PII value.
         if is_struct_pointer and np_strength == 0.0:
+            continue
+        # Credential columns: same suppression for spurious NER hits.
+        if is_cred and np_strength == 0.0:
             continue
         rate_regex = count / max(rows_scanned, 1)
         score = column_pii_confidence(

@@ -52,21 +52,18 @@ import { PiiFinding } from '../../models/job.model';
               </td>
               <td class="mono">{{ f.column_name }}</td>
               <td>
-                @for (reg of regulationTags(f); track reg) {
-                  <span class="reg-chip" [class]="'reg-' + reg.toLowerCase()"
-                        [title]="reg + ' regulated data'">{{ reg }}</span>
-                }
-                <span class="pii-type" [title]="f.pii_type">{{ piiLabel(f.pii_type) }}</span>
-                @if (f.provider_breakdown && f.provider_breakdown.length > 0) {
-                  <span class="brand-row">
-                    @for (p of f.provider_breakdown; track p.brand) {
-                      <span class="brand-chip"
-                            [class]="'brand-' + p.brand.toLowerCase()"
-                            [title]="p.brand + ' · ' + p.count + ' cards (' + ((p.share * 100) | number:'1.1-1') + '%)'">
-                        {{ p.brand }}<span class="brand-count">·{{ p.count }}</span>
-                      </span>
-                    }
-                  </span>
+                @if (isPci(f)) {
+                  <!-- PCI cardholder data: render a single flat [PCI] chip
+                       carrying Card Number / Card Name / CVV + brand
+                       breakdown in the title tooltip.  No supplementary
+                       per-type or per-brand chips. -->
+                  <span class="reg-chip reg-pci" [title]="pciTooltip(f)">PCI</span>
+                } @else {
+                  @for (reg of regulationTags(f); track reg) {
+                    <span class="reg-chip" [class]="'reg-' + reg.toLowerCase()"
+                          [title]="reg + ' regulated data'">{{ reg }}</span>
+                  }
+                  <span class="pii-type" [title]="f.pii_type">{{ piiLabel(f.pii_type) }}</span>
                 }
               </td>
               <td class="mono small">{{ f.detector }}</td>
@@ -313,6 +310,7 @@ export class PiiTableComponent implements OnInit {
     CC_NUMBER: 'Card Number',
     CARD_HOLDER_NAME: 'Card Name',
     CARD_CVV: 'CVV',
+    CREDENTIAL_HASH: 'Credential Hash',
     SSN_US: 'SSN (US)',
     PHONE_US: 'Phone (US)',
     PASSPORT_US: 'Passport (US)',
@@ -343,5 +341,31 @@ export class PiiTableComponent implements OnInit {
    * backend already returns each tag once per finding). */
   regulationTags(f: PiiFinding): string[] {
     return Array.isArray(f.regulated) ? f.regulated : [];
+  }
+
+  /** True iff this finding is in the PCI cardholder-data group.
+   * Used to collapse the row's chip stack down to a single flat
+   * ``[PCI]`` chip; the detail (Card Number / Card Name / CVV +
+   * brand breakdown) goes into the tooltip. */
+  isPci(f: PiiFinding): boolean {
+    return Array.isArray(f.regulated) && f.regulated.includes('PCI');
+  }
+
+  /** Compose the ``[PCI]`` chip's title tooltip.  Carries the
+   * underlying type label (Card Number / Card Name / CVV) and, when
+   * present, the IIN/BIN brand breakdown. */
+  pciTooltip(f: PiiFinding): string {
+    const parts: string[] = [`PCI: ${this.piiLabel(f.pii_type)}`];
+    if (Array.isArray(f.provider_breakdown) && f.provider_breakdown.length > 0) {
+      parts.push(
+        f.provider_breakdown
+          .map(p => `${p.brand}: ${p.count}`)
+          .join(', '),
+      );
+    }
+    if (Array.isArray(f.redacted_examples) && f.redacted_examples.length > 0) {
+      parts.push('e.g. ' + f.redacted_examples.slice(0, 3).map(String).join(', '));
+    }
+    return parts.join('\n');
   }
 }

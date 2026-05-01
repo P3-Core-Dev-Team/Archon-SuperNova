@@ -294,16 +294,21 @@ interface FkRow {
                     </td>
                     <td class="muted small">
                       @if (c.pii_types.length > 0) {
-                        @for (reg of c.regulations; track reg) {
-                          <span class="kbadge reg-tag" [class]="'reg-' + reg.toLowerCase()"
-                                [title]="reg + ' regulated data'">{{ reg }}</span>
-                        }
-                        @for (p of c.pii_types; track p) {
-                          <span class="kbadge pii" [title]="p">{{ piiLabel(p) }}</span>
-                        }
-                        @if (c.brands.length > 0) {
-                          @for (b of c.brands; track b) {
-                            <span class="kbadge brand-tag" [class]="'brand-' + b.toLowerCase()">{{ b }}</span>
+                        @if (c.regulations.includes('PCI')) {
+                          <!-- PCI cardholder data: collapse the multiple
+                               supplementary chips (Card Number / Card
+                               Name / CVV + brand chips) into a single
+                               flat [PCI] tag.  Detail goes to the
+                               tooltip so the row stays scannable. -->
+                          <span class="kbadge reg-tag reg-pci"
+                                [title]="pciColumnTooltip(c)">PCI</span>
+                        } @else {
+                          @for (reg of c.regulations; track reg) {
+                            <span class="kbadge reg-tag" [class]="'reg-' + reg.toLowerCase()"
+                                  [title]="reg + ' regulated data'">{{ reg }}</span>
+                          }
+                          @for (p of c.pii_types; track p) {
+                            <span class="kbadge pii" [title]="p">{{ piiLabel(p) }}</span>
                           }
                         }
                       } @else {
@@ -2128,6 +2133,7 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
     CC_NUMBER: 'Card Number',
     CARD_HOLDER_NAME: 'Card Name',
     CARD_CVV: 'CVV',
+    CREDENTIAL_HASH: 'Credential Hash',
     SSN_US: 'SSN (US)',
     PHONE_US: 'Phone (US)',
     PASSPORT_US: 'Passport (US)',
@@ -2151,6 +2157,20 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
 
   piiLabel(piiType: string): string {
     return TableCardPageComponent._PII_LABEL_MAP[piiType] ?? piiType;
+  }
+
+  /** Tooltip for the collapsed [PCI] chip on a column row.  Lists the
+   * underlying PII types (Card Number / Card Name / CVV) and the
+   * IIN/BIN brand breakdown so the user can see the detail without
+   * the row carrying five separate chips. */
+  pciColumnTooltip(c: ColumnRow): string {
+    const types = c.pii_types
+      .map(t => TableCardPageComponent._PII_LABEL_MAP[t] ?? t);
+    const lines: string[] = [`PCI: ${types.join(', ')}`];
+    if (c.brands.length > 0) {
+      lines.push(c.brands.join(', '));
+    }
+    return lines.join('\n');
   }
 
   outFks = computed<FkRow[]>(() =>

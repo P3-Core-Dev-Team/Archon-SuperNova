@@ -591,13 +591,44 @@ _PCI_CARD_PATTERNS: list[PatternDef] = [
     ),
 ]
 
+# ---------------------------------------------------------------------------
+# Credential storage (Sprint 5 follow-up: password_hash mis-tagging)
+# ---------------------------------------------------------------------------
+#
+# A column called ``password_hash`` was being tagged as both ``[SOX]`` and
+# ``[API Key]`` because the bcrypt / argon2 / scrypt output is high entropy
+# and the generic ``API_KEY`` regex matches gleefully.  Neither label fits
+# password storage; the column-name suppression in
+# :func:`pii_priors.is_credential_name` drops every other PII finding on
+# such columns, leaving only this dedicated CREDENTIAL_HASH tag.  The
+# ``regulated`` tuple is empty on purpose — password storage isn't
+# directly a SOX / PCI / HIPAA concern in the same way as cardholder data
+# or PHI; the chip is informational.
+_CREDENTIAL_PATTERNS: list[PatternDef] = [
+    PatternDef(
+        name="CREDENTIAL_HASH",
+        # 20+ char base64url / hex shape; matches bcrypt, argon2, scrypt,
+        # PBKDF2 hex digests.  The column-name prior is the primary
+        # signal — this regex just gives the scanner something to count.
+        regex_bytes=rb"\b[A-Za-z0-9+/=._\-$]{20,200}\b",
+        validator=None,
+        locale="global",
+        regulated=(),
+        specificity=2,
+        fp_class="H",
+    ),
+]
+
 
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 PATTERNS: list[PatternDef] = (
-    list(_EXISTING_PATTERNS) + list(_NEW_PATTERNS) + list(_PCI_CARD_PATTERNS)
+    list(_EXISTING_PATTERNS)
+    + list(_NEW_PATTERNS)
+    + list(_PCI_CARD_PATTERNS)
+    + list(_CREDENTIAL_PATTERNS)
 )
 
 # Backward-compatible alias — the old ``pii_scan.PATTERN_DEFS`` callers

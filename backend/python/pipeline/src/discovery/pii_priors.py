@@ -81,6 +81,18 @@ COLUMN_NAME_PRIORS: dict[re.Pattern[str], str] = {
         re.I,
     ): "CARD_CVV",
 
+    # Credential storage — password / password_hash / pwd_hash / etc.
+    # Listed before generic name patterns so a column called
+    # ``password_hash`` resolves to CREDENTIAL_HASH rather than
+    # something else.  See :func:`is_credential_name` for the
+    # suppression that drops API_KEY / SOX tags on these columns.
+    re.compile(
+        r"\b(password|passwd|pwd|hashed\s?password|password\s?hash|password\s?digest|"
+        r"passwd\s?hash|pwd\s?hash|user\s?pass|secret\s?hash|"
+        r"credentials?\s?hash|auth\s?hash)\b",
+        re.I,
+    ): "CREDENTIAL_HASH",
+
     # --- Contact ---------------------------------------------------------
     re.compile(
         r"\b(phone|mobile|cell|tel|telephone|msisdn|phone\s?number)\b",
@@ -263,6 +275,42 @@ def is_structural_key_name(column_name: str) -> bool:
     if not column_name:
         return False
     return bool(_STRUCTURAL_KEY_NAME_RE.search(column_name.strip().lower()))
+
+
+# Credential / password storage column names — ``password``,
+# ``password_hash``, ``passwd``, ``pwd_hash``, ``user_pass``,
+# ``password_digest``, ``hashed_password``, etc.  These columns hold
+# bcrypt / argon2 / scrypt / PBKDF2 output (high entropy) which the
+# generic ``API_KEY`` entropy regex matches gleefully — producing both
+# a misleading API_KEY tag AND its inherited SOX regulation chip.
+# Neither label fits a password hash: it isn't an API key, and SOX
+# financial-controls scope doesn't apply to user authentication
+# storage.  We suppress every matched PII type on these columns
+# unless the column name positively implies that specific type
+# (mirrors the structural-pointer suppression).  The CREDENTIAL_HASH
+# type is the one positively-implied label, surfaced via the
+# COLUMN_NAME_PRIORS table; everything else gets dropped.
+_CREDENTIAL_NAME_RE = re.compile(
+    r"^(password|passwd|pwd|user_?pass|hashed_password|"
+    r"password_hash|password_digest|passwd_hash|pwd_hash|"
+    r"secret_hash|credentials?_hash|auth_hash)$|"
+    r"_(password|passwd|password_hash|password_digest|pwd_hash)$",
+    re.IGNORECASE,
+)
+
+
+def is_credential_name(column_name: str) -> bool:
+    """Return True for password / password-hash column shapes.
+
+    Used by :mod:`pii_scan` to suppress entropy-based / regex-based
+    findings (notably ``API_KEY``, which carries a SOX regulation tag
+    that is wrong for credential storage) on these columns.  The only
+    finding that survives on a credential-named column is the one whose
+    own ``name_prior`` matches — i.e. ``CREDENTIAL_HASH`` itself.
+    """
+    if not column_name:
+        return False
+    return bool(_CREDENTIAL_NAME_RE.search(column_name.strip().lower()))
 
 
 # ---------------------------------------------------------------------------
