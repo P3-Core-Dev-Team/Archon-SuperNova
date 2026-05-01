@@ -703,6 +703,27 @@ def scan_column(
 
     seen_types: set[str] = set()
 
+    # Types whose regex is so permissive that a regex-only emission is
+    # almost always a false positive — they MUST have a positive
+    # column-name prior to surface.  Each one's regex is intentionally
+    # broad because the PRIOR is the primary signal:
+    #
+    #   CARD_HOLDER_NAME : 2-4 capitalized words  (matches city /
+    #                      department / country names)
+    #   CARD_CVV         : \\b\\d{3,4}\\b          (matches every 3-4
+    #                      digit substring in address lines, product
+    #                      names, free-text comments)
+    #   AADHAAR_IN       : 12 contiguous digits   (matches international
+    #                      phone numbers stored without "+")
+    #
+    # Without this gate every adv schema gets a flood of spurious
+    # PCI / DPDPA chips on totally unrelated columns.
+    _NAME_PRIOR_REQUIRED: frozenset[str] = frozenset({
+        "CARD_HOLDER_NAME",
+        "CARD_CVV",
+        "AADHAAR_IN",
+    })
+
     # Regex / Hyperscan findings
     for pii_type, match_count in regex_match_counts.items():
         validated = validated_counts.get(pii_type, 0)
@@ -717,6 +738,12 @@ def scan_column(
         # not an API key.  Only let CREDENTIAL_HASH (the type that
         # the column name positively implies) survive.
         if is_cred and np_strength == 0.0:
+            continue
+        # High-FP types that REQUIRE a positive name prior to surface.
+        # Without this gate, ``CARD_HOLDER_NAME``'s permissive regex
+        # tags every multi-word proper noun (cities, departments,
+        # country names) at score 1.0.
+        if pii_type in _NAME_PRIOR_REQUIRED and np_strength == 0.0:
             continue
         rate_regex = match_count / max(rows_scanned, 1)
         rate_validated = validated / max(match_count, 1)

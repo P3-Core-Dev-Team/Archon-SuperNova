@@ -183,6 +183,21 @@ _NEGATIVE_PRIORS: dict[str, list[str]] = {
     # tokens as PESEL_PL apply.
     "PASSPORT_GB": ["phone", "phone_number", "mobile", "cell", "fax"],
     "BSN_NL": ["phone", "phone_number", "mobile", "cell", "fax"],
+    # AADHAAR_IN's regex is 12 contiguous digits — the same shape as a
+    # country-coded phone number stored without ``+``.  Without this
+    # negative prior, ``person_phone.phone_number`` columns on every
+    # international dataset get a spurious ``DPDPA`` regulation tag.
+    "AADHAAR_IN": ["phone", "phone_number", "mobile", "cell", "fax", "msisdn"],
+    # CARD_HOLDER_NAME's two-token Capitalized-Word regex matches any
+    # multi-word proper noun — city names, department names, country
+    # names, address-line-1.  The positive ``card_holder`` /
+    # ``cardholder`` / ``name_on_card`` prior is still the primary gate;
+    # this just dampens the score on common false-positive shapes.
+    "CARD_HOLDER_NAME": [
+        "address", "address_line", "city", "state", "country",
+        "region", "department", "group_name", "title",
+        "description", "name", "category",
+    ],
 }
 
 
@@ -291,10 +306,18 @@ def is_structural_key_name(column_name: str) -> bool:
 # type is the one positively-implied label, surfaced via the
 # COLUMN_NAME_PRIORS table; everything else gets dropped.
 _CREDENTIAL_NAME_RE = re.compile(
+    # Core credential-storage shapes — password / hash / salt / digest /
+    # iterations / kdf parameters.  Salt + iterations live alongside
+    # the hash in PBKDF2 / scrypt schemes; tagging only the hash and
+    # leaving the salt to be mis-classified as PHONE_US (which the
+    # pipeline did before this pass) was the original bug.
     r"^(password|passwd|pwd|user_?pass|hashed_password|"
     r"password_hash|password_digest|passwd_hash|pwd_hash|"
+    r"password_salt|passwd_salt|pwd_salt|salt|"
+    r"password_iterations|pbkdf2_iterations|kdf_iterations|"
     r"secret_hash|credentials?_hash|auth_hash)$|"
-    r"_(password|passwd|password_hash|password_digest|pwd_hash)$",
+    r"_(password|passwd|password_hash|password_digest|pwd_hash|"
+    r"password_salt|password_iterations)$",
     re.IGNORECASE,
 )
 

@@ -50,6 +50,15 @@ from discovery.pii_patterns import get_pattern
     "auth_hash",
     "PASSWORD",          # case-insensitive
     "Password_Hash",
+    # Salt + iteration columns live alongside the hash in PBKDF2 /
+    # scrypt schemes; they were originally missed and ended up tagged
+    # PHONE_US (their value digits matched the phone regex).
+    "password_salt",
+    "passwd_salt",
+    "pwd_salt",
+    "password_iterations",
+    "pbkdf2_iterations",
+    "kdf_iterations",
 ])
 def test_credential_name_matches(col):
     assert is_credential_name(col) is True
