@@ -37,6 +37,10 @@ interface ColumnRow {
   isPk: boolean;
   isFk: boolean;
   keyKind: KeyKind;
+  /** Null fraction in [0, 1] from the fingerprint phase.  Drives a
+   * red bar at the bottom of each column row.  Null when not
+   * profiled. */
+  nullPct: number | null;
 }
 
 interface CardNode {
@@ -44,6 +48,9 @@ interface CardNode {
   label: string;
   isBridge: boolean;
   bridgeColor: string | null;
+  /** Row count from tbl_inventory (via the relationships API
+   * ``nodes.value`` field).  ~0 for empty tables. */
+  rows: number;
   columns: ColumnRow[];
   width: number;
   height: number;
@@ -149,22 +156,36 @@ const NODE_SEP = 48;
             <div class="card-head"
                  [style.background]="headerBackground(n)"
                  (mousedown)="onHeaderMouseDown($event, n)">
-              <span class="card-dot" [style.background]="n.isBridge ? '#d29922' : '#58a6ff'"></span>
-              <span class="card-table mono">{{ n.label }}</span>
-              @if (n.isBridge) {
-                <span class="bridge-pill" title="Outside this cluster">external</span>
-              }
+              <div class="card-head-main">
+                <span class="card-dot" [style.background]="n.isBridge ? '#d29922' : '#58a6ff'"></span>
+                <span class="card-table mono">{{ n.label }}</span>
+                @if (n.isBridge) {
+                  <span class="bridge-pill" title="Outside this cluster">external</span>
+                }
+              </div>
+              <div class="card-rows" [title]="n.rows + ' rows'">
+                {{ formatRowCount(n.rows) }} rows
+              </div>
             </div>
             <!-- Column rows.  stopPropagation on mousedown so the wrap
-                 doesn't start a pan when a row is clicked. -->
+                 doesn't start a pan when a row is clicked.  When
+                 nullPct is known, a thin red bar is anchored to
+                 the bottom of the row, width proportional to fraction. -->
             <div class="card-cols">
               @for (c of n.columns; track c.name) {
                 <div class="col-row"
                      [class.col-pk]="c.isPk"
                      [class.col-fk]="c.isFk"
+                     [title]="c.nullPct != null ? c.name + ' — ' + (c.nullPct * 100 | number:'1.1-1') + '% null' : c.name"
                      (mouseenter)="onColEnter(n.id, c.name)"
                      (mouseleave)="onColLeave()"
                      (mousedown)="$event.stopPropagation()">
+                  @if (c.nullPct != null && c.nullPct > 0) {
+                    <span class="null-bar"
+                          [style.width.%]="c.nullPct * 100"
+                          [class.null-heavy]="c.nullPct >= 0.5"
+                          [class.null-all]="c.nullPct >= 0.99"></span>
+                  }
                   <span class="col-key">
                     @if (c.keyKind === 'pkfk') {
                       <span class="key-pkfk" title="Primary &amp; foreign key">PK·FK</span>
@@ -334,6 +355,24 @@ const NODE_SEP = 48;
       background: rgba(210, 153, 34, 0.18);
       border: 1px solid rgba(210, 153, 34, 0.35);
     }
+    /* Header layout — name + dot + bridge pill on the left, row count
+       subtitle on the right.  Mirror of the relationship-graph card
+       header so analysts get the same visual vocabulary in both. */
+    .card-head-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .card-rows {
+      flex: 0 0 auto;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 10px;
+      color: #8b949e;
+      letter-spacing: 0.3px;
+      cursor: help;
+    }
 
     .card-cols { display: flex; flex-direction: column; }
     /* Column row layout — single key column (PK / FK / PK·FK / blank)
@@ -351,7 +390,21 @@ const NODE_SEP = 48;
       border-bottom: 1px solid rgba(48, 54, 61, 0.55);
     }
     .col-row:last-child { border-bottom: none; }
+    .col-row { position: relative; }
     .col-row:hover { background: rgba(88, 166, 255, 0.07); }
+    /* Null-density bar — mirrors the relationship-graph treatment.
+       Pinned to the bottom of each row, width proportional to null
+       fraction, escalating colour at >=50% / >=99%. */
+    .col-row .null-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 2px;
+      background: rgba(248, 81, 73, 0.35);
+      pointer-events: none;
+    }
+    .col-row .null-bar.null-heavy { background: rgba(248, 81, 73, 0.7); }
+    .col-row .null-bar.null-all   { background: #f85149; height: 3px; }
     .col-row.col-pk { color: #e6edf3; }
     .col-row.col-fk { color: #c9d1d9; }
     .col-key { display: flex; align-items: center; gap: 2px; }
@@ -708,6 +761,7 @@ export class ClusterErdComponent implements AfterViewInit, OnChanges, OnDestroy 
         isPk: c.is_pk,
         isFk: c.is_fk,
         keyKind,
+        nullPct: c.null_pct == null ? null : Number(c.null_pct),
       });
       out.set(c.table, arr);
     }
@@ -731,6 +785,11 @@ export class ClusterErdComponent implements AfterViewInit, OnChanges, OnDestroy 
     const cby = this.columnsByTable();
     const colors = this.bridgeColors();
     const allNodes = this.allNodes();
+    const rowsByTable = new Map<string, number>(
+      // Prefer the explicit row_count field; fall back to the legacy
+      // ``value`` (edge degree) for older API responses.
+      allNodes.map(n => [n.id, n.row_count ?? n.value ?? 0]),
+    );
     const allTables = new Set<string>([
       ...allNodes.map(n => n.id),
       ...this.allEdges().flatMap(e => [e.from, e.to]),
@@ -751,6 +810,7 @@ export class ClusterErdComponent implements AfterViewInit, OnChanges, OnDestroy 
         label: t,
         isBridge,
         bridgeColor: isBridge ? (colors[t] ?? null) : null,
+        rows: rowsByTable.get(t) ?? 0,
         columns: cols,
         width: CARD_W,
         height,
@@ -895,6 +955,15 @@ export class ClusterErdComponent implements AfterViewInit, OnChanges, OnDestroy 
       case 'text':          return '#d29922';
       case 'history':       return '#8b949e';
     }
+  }
+
+  /** Compact row-count label — matches the relationship-graph card
+   * header so analysts see the same vocabulary across both views. */
+  formatRowCount(n: number): string {
+    if (n == null || !isFinite(n) || n < 0) return '?';
+    if (n < 1000) return String(n);
+    if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`;
+    return `${(n / 1_000_000).toFixed(1)}M`;
   }
 
   private labelFor(c: string | null | undefined): string | null {

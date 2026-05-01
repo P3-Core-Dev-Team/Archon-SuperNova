@@ -364,6 +364,12 @@ CREATE INDEX IF NOT EXISTS idx_tbl_inventory_cluster ON tbl_inventory (cluster_i
 --   sample_rows  : total rows scanned (lets the UI compute fraction)
 --   fraction     : count / sample_rows, pre-computed for sort/filter
 --   samples      : up to 3 redacted example values that triggered the issue
+-- Per-column null fraction, populated by the data_quality phase
+-- regardless of whether a NULL_HEAVY / ALL_NULL finding fires.  Lets
+-- the UI render a tiny red bar on every column row showing how
+-- empty it is, not just the over-threshold ones.  Idempotent migration.
+ALTER TABLE col_inventory ADD COLUMN IF NOT EXISTS null_fraction REAL;
+
 CREATE TABLE IF NOT EXISTS data_quality_findings (
     finding_id   BIGSERIAL PRIMARY KEY,
     column_id    BIGINT NOT NULL REFERENCES col_inventory,

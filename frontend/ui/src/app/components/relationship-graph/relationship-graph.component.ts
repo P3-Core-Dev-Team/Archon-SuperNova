@@ -21,6 +21,11 @@ interface ColumnRow {
   typeGlyph: string;       // single-char abbreviation (i / c / t / # / b / ·)
   isPk: boolean;
   isFk: boolean;
+  /** Null fraction in [0, 1] from the fingerprint phase.  Null when
+   * the column wasn't profiled (extremely rare).  The card-row
+   * renders a tiny red bar proportional to this so columns with
+   * heavy null density are visible at a glance. */
+  nullPct: number | null;
 }
 
 interface CardNode {
@@ -159,23 +164,39 @@ const NODE_SEP = 36;        // horizontal gap within a rank
                (mouseenter)="hoveredCardId.set(n.id)"
                (mouseleave)="hoveredCardId.set(null)">
             <!-- HEADER (table-name strip) — the ONLY draggable surface.
-                 Click without drag promotes to focal + switches to map. -->
+                 Click without drag promotes to focal + switches to map.
+                 Row count subtitle gives the analyst a sense of table
+                 weight at a glance. -->
             <div class="card-head"
                  (mousedown)="onHeaderMouseDown($event, n)">
-              <span class="card-table mono">{{ n.label }}</span>
-              @if (n.module) {
-                <span class="card-module">{{ n.module }}</span>
-              }
+              <div class="card-head-main">
+                <span class="card-table mono">{{ n.label }}</span>
+                @if (n.module) {
+                  <span class="card-module">{{ n.module }}</span>
+                }
+              </div>
+              <div class="card-rows" [title]="n.rows + ' rows'">
+                {{ formatRowCount(n.rows) }} rows
+              </div>
             </div>
             <!-- COLUMN ROWS — column rows do NOT start a drag.  Mouse-down
                  stops propagation so the wrapping graph-wrap doesn't
-                 mistake it for a pan-start either. -->
+                 mistake it for a pan-start either.  When a column has
+                 a known null_pct, a tiny red bar at the top edge of
+                 the row gives a visual cue (full width = 100% null). -->
             <div class="card-cols">
               @for (c of n.columns; track c.name) {
                 <div class="col-row"
                      [class.col-pk]="c.isPk"
                      [class.col-fk]="c.isFk"
+                     [title]="c.nullPct != null ? c.name + ' — ' + (c.nullPct * 100 | number:'1.1-1') + '% null' : c.name"
                      (mousedown)="$event.stopPropagation()">
+                  @if (c.nullPct != null && c.nullPct > 0) {
+                    <span class="null-bar"
+                          [style.width.%]="c.nullPct * 100"
+                          [class.null-heavy]="c.nullPct >= 0.5"
+                          [class.null-all]="c.nullPct >= 0.99"></span>
+                  }
                   <span class="col-name mono">{{ c.name }}</span>
                   <span class="col-type" [title]="c.dataType">{{ c.typeGlyph }}</span>
                   <span class="col-key">
@@ -392,6 +413,24 @@ const NODE_SEP = 36;        // horizontal gap within a rank
       color: #a371f7;
       background: rgba(163, 113, 247, 0.14);
     }
+    /* Header layout — table name on the left, row count subtitle on
+       the right.  card-head-main groups name + module so the row
+       count chip can sit in its own column without wrapping. */
+    .card-head-main {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+    .card-rows {
+      flex: 0 0 auto;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 10px;
+      color: #8b949e;
+      letter-spacing: 0.3px;
+      cursor: help;
+    }
 
     /* Column rows: tight, scannable, key-marker on the right. */
     .card-cols {
@@ -408,9 +447,24 @@ const NODE_SEP = 36;        // horizontal gap within a rank
       font-size: 12px;
       color: #c9d1d9;
       border-bottom: 1px solid rgba(48, 54, 61, 0.55);
+      position: relative;
     }
     .col-row:last-child { border-bottom: none; }
     .col-row:hover { background: rgba(88, 166, 255, 0.07); }
+    /* Null-density bar: a thin coloured strip pinned to the bottom of
+       each column row, width proportional to null fraction.  Subtle
+       at low fractions, escalates to red at >=50% and bright red at
+       100% (matches the data-quality phase severity ramp). */
+    .col-row .null-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: 2px;
+      background: rgba(248, 81, 73, 0.35);
+      pointer-events: none;
+    }
+    .col-row .null-bar.null-heavy { background: rgba(248, 81, 73, 0.7); }
+    .col-row .null-bar.null-all   { background: #f85149; height: 3px; }
     .col-row.col-pk { color: #e6edf3; }
     .col-row.col-fk { color: #c9d1d9; }
     .col-name {
@@ -868,6 +922,7 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
         typeGlyph: this.typeGlyph(c.data_type),
         isPk: c.is_pk,
         isFk: c.is_fk,
+        nullPct: c.null_pct == null ? null : Number(c.null_pct),
       });
       out.set(c.table, arr);
     }
@@ -904,7 +959,10 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
         return {
           id: n.id,
           label: n.label,
-          rows: n.value ?? 0,
+          // Prefer the explicit row_count from tbl_inventory; fall
+          // back to the legacy ``value`` (edge degree) if the API
+          // hasn't been redeployed yet.
+          rows: n.row_count ?? n.value ?? 0,
           fieldCount: degree.get(n.id) ?? 0,
           module: this.moduleBadge(n.id),
           columns: cols,
@@ -1104,6 +1162,16 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
 
   /** Single-character abbreviation for a SQL data type — keeps the
    * column row tight while still hinting at the type at a glance. */
+  /** Compact row-count label for the card header.  Numbers above 1k
+   * collapse to ``1.2k`` / ``45k`` / ``2.3M`` so the subtitle never
+   * wraps and stays at-a-glance scannable. */
+  formatRowCount(n: number): string {
+    if (n == null || !isFinite(n) || n < 0) return '?';
+    if (n < 1000) return String(n);
+    if (n < 1_000_000) return `${(n / 1000).toFixed(n < 10000 ? 1 : 0)}k`;
+    return `${(n / 1_000_000).toFixed(1)}M`;
+  }
+
   private typeGlyph(t: string): string {
     const lc = (t || '').toLowerCase();
     if (/int|serial|bigint|smallint/.test(lc))                          return 'i';

@@ -1455,8 +1455,40 @@ def get_relationships(job_id: str, limit: int = 500) -> dict[str, Any]:
         table_degree[ct] += 1
         table_degree[pt] += 1
 
+    # Pull row counts in a single query so each node carries it.
+    # Without this the UI can only show edge-degree as a proxy
+    # for "table weight"; analysts kept asking for actual row counts.
+    row_counts: dict[str, int] = {}
+    if table_degree:
+        conn2 = psycopg2.connect(
+            **RESULTS_DB_DSN, options="-c search_path=discovery"
+        )
+        try:
+            with conn2.cursor() as cur2:
+                cur2.execute(
+                    """
+                    SELECT table_name, COALESCE(row_count_estimate, 0)
+                    FROM tbl_inventory
+                    WHERE schema_name = %s
+                      AND table_name = ANY(%s)
+                    """,
+                    (schema, list(table_degree.keys())),
+                )
+                for tname, rc in cur2.fetchall():
+                    row_counts[tname] = int(rc or 0)
+        finally:
+            conn2.close()
+
     nodes = [
-        {"id": name, "label": name, "value": deg}
+        {
+            "id": name,
+            "label": name,
+            # ``value`` retained for backwards compatibility (edge degree).
+            "value": deg,
+            # ``row_count`` is the actual ``tbl_inventory.row_count_estimate``;
+            # the UI prefers this for the card-header subtitle.
+            "row_count": row_counts.get(name, 0),
+        }
         for name, deg in table_degree.items()
     ]
 
@@ -2668,7 +2700,8 @@ def get_job_columns(job_id: str) -> dict[str, Any]:
                     EXISTS (
                         SELECT 1 FROM relationships r
                         WHERE r.child_col_id = c.column_id
-                    ) AS is_fk
+                    ) AS is_fk,
+                    c.null_pct
                 FROM tbl_inventory t
                 JOIN col_inventory c ON c.table_id = t.table_id
                 WHERE t.schema_name = %s
@@ -2688,6 +2721,12 @@ def get_job_columns(job_id: str) -> dict[str, Any]:
             "data_type": r[3],
             "is_pk": bool(r[4]),
             "is_fk": bool(r[5]),
+            # Null fraction in [0, 1].  Populated by the fingerprint
+            # phase from sampled rows.  Frontend renders as a tiny red
+            # bar on each column row so you can spot null-heavy
+            # columns without leaving the diagram.  Null when the
+            # phase didn't profile (very rare; defensive fallback).
+            "null_pct": float(r[6]) if r[6] is not None else None,
         }
         for r in rows
     ]

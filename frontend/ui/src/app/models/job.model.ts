@@ -32,7 +32,11 @@ export interface Job {
 export interface RelationshipNode {
   id: string;
   label: string;
+  /** Edge degree (legacy field, retained for backwards compatibility). */
   value: number;
+  /** Actual row count from ``tbl_inventory.row_count_estimate``.
+   * Prefer this over ``value`` when displaying table weight. */
+  row_count?: number;
 }
 
 export interface RelationshipEdge {
@@ -145,6 +149,9 @@ export interface ColumnInfo {
   data_type: string;
   is_pk: boolean;
   is_fk: boolean;
+  /** Null fraction in [0, 1] from sampled fingerprint pass.  Null
+   * when the fingerprint phase didn't profile this column. */
+  null_pct?: number | null;
 }
 
 export interface JobColumns {
