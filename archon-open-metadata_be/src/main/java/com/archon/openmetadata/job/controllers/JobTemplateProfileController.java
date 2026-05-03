@@ -21,7 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/jobtemplateprofiles")
+@RequestMapping("/api/v1/job-template-profiles")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class JobTemplateProfileController {
@@ -61,7 +61,11 @@ public class JobTemplateProfileController {
   @PostMapping
   public ResponseEntity<EntityModel<JobTemplateProfileDto>> create(
       @RequestBody JobTemplateProfileDto dto) {
-    JobTemplateProfile saved = service.save(modelMapper.map(dto, JobTemplateProfile.class));
+    JobTemplateProfile entity = modelMapper.map(dto, JobTemplateProfile.class);
+    if (entity.getOptions() != null) {
+      entity.getOptions().forEach(o -> o.setJobTemplateProfile(entity));
+    }
+    JobTemplateProfile saved = service.save(entity);
     return ResponseEntity.ok(
         EntityModel.of(
             modelMapper.map(saved, JobTemplateProfileDto.class),
@@ -75,7 +79,30 @@ public class JobTemplateProfileController {
   public ResponseEntity<EntityModel<JobTemplateProfileDto>> update(
       @PathVariable UUID id, @RequestBody JobTemplateProfileDto dto) {
     dto.setId(id);
-    JobTemplateProfile updated = service.save(modelMapper.map(dto, JobTemplateProfile.class));
+    JobTemplateProfile entity = service.findById(id);
+    if (entity == null) return ResponseEntity.notFound().build();
+    
+    // Clear and add to let Hibernate manage the collection!
+    entity.setName(dto.getName());
+    
+    if (entity.getOptions() != null) {
+        entity.getOptions().clear();
+    } else {
+        entity.setOptions(new java.util.ArrayList<>());
+    }
+    
+    if (dto.getOptions() != null) {
+        for (com.archon.openmetadata.job.dto.JobTemplateOptionRuleDto optDto : dto.getOptions()) {
+            com.archon.openmetadata.job.models.JobTemplateOptionRule rule = new com.archon.openmetadata.job.models.JobTemplateOptionRule();
+            rule.setOperationName(optDto.getOperationName());
+            rule.setMinValue(optDto.getMinValue());
+            rule.setMaxValue(optDto.getMaxValue());
+            rule.setJobTemplateProfile(entity);
+            entity.getOptions().add(rule);
+        }
+    }
+    
+    JobTemplateProfile updated = service.save(entity);
     return ResponseEntity.ok(
         EntityModel.of(
             modelMapper.map(updated, JobTemplateProfileDto.class),

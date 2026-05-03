@@ -1,0 +1,137 @@
+# Discovery Pipeline — default configuration
+# Override via environment variables or a custom YAML via --config PATH
+
+extraction_service:
+  base_url: ${EXTRACTION_SERVICE_URL:http://localhost:8080}
+  auth_token: ${EXTRACTION_SERVICE_TOKEN}
+  request_timeout_seconds: 7200            # 2 hr ceiling for huge tables
+  retry_attempts: 3
+  retry_backoff_seconds: 5
+
+source_db:
+  type: postgres                           # postgres | mysql | oracle | sqlserver
+  host: ${SOURCE_DB_HOST}
+  port: ${SOURCE_DB_PORT:5432}
+  database: ${SOURCE_DB_NAME}
+  user: ${SOURCE_DB_USER}
+  password_secret_ref: ${SOURCE_DB_PASSWORD_SECRET_REF}
+  schemas: ["public"]                      # which schemas to inventory
+  ssl_mode: require
+
+results_db:
+  host: ${RESULTS_DB_HOST}
+  port: ${RESULTS_DB_PORT:5432}
+  database: ${RESULTS_DB_NAME:discovery_results}
+  user: ${RESULTS_DB_USER}
+  password: ${RESULTS_DB_PASSWORD}
+  schema: discovery
+
+storage:
+  base_path: /data/parquet
+  duckdb_temp_dir: /data/duckdb_tmp
+  duckdb_memory_limit: "32GB"              # for 64GB node, 32GB for DuckDB
+  parquet_cap_bytes: 268435456000          # 250 GB soft cap (warn, not abort)
+
+orchestration:
+  workers:
+    extract: 8                             # source-throttled
+    fingerprint: 16
+    pii_scan: 16
+    validate: 8
+  retry_max_attempts: 3
+  retry_backoff_seconds: 5
+
+extraction:
+  # When true, Phase-2 SELECT projects only FK-eligible / fingerprintable
+  # columns inventoried in col_inventory; when false, falls back to SELECT *
+  # (legacy mode — slower, useful only for debugging).
+  column_projection: true
+
+fingerprint:
+  sketcher: hyperminhash                   # hyperminhash | minhash
+  num_buckets: 1024
+  bits_per_bucket: 8
+  hash_algorithm: xxh3_64
+  hll_p: 14                                # ~1% error
+  exact_distinct_below: 10000              # use exact COUNT(DISTINCT) below this
+  # Adaptive HLL early-stop: abort row-group reads once relative cardinality
+  # delta drops below this for 2 consecutive row groups (after >= 3 read).
+  # 0.005 = 0.5%.  Set to 0 to disable (always read every row group).
+  early_stop_delta: 0.005
+
+pii:
+  scan_rows_per_column: 50000
+  detectors:
+    hyperscan: true                        # use Hyperscan SIMD when available
+    detect_secrets: true                   # advisory; not yet wired
+    luhn_validation: true                  # if false, skip Luhn checks (validator returns True)
+    stdnum_validators: [iban, us_ssn, uk_nhs, vat]   # which stdnum validators to run
+    # Opt-in spaCy NER pass.  Requires spacy + en_core_web_sm model.  When true
+    # and a STRING_LONG column is scanned, augments regex findings with NER
+    # entities (PERSON / GPE / ORG / LOC / DATE).
+    spacy_ner: true                          # NER on STRING_LONG when spaCy + model present (auto-fallback to regex-only)
+  # Persistence threshold.  A finding is written only when match_rate >= this
+  # OR validated=True OR name_prior=True (so name-anchored / validated findings
+  # are never dropped).  Lowering exposes more advisory hits at higher noise.
+  match_rate_threshold: 0.05
+  redact_examples: true
+  fallback_engine: regex                   # if hyperscan unavailable
+
+relationships:
+  parent_distinct_ratio_min: 0.95
+  child_min_distinct_count: 100
+  containment_threshold: 0.95
+  lsh_threshold: 0.7
+  lsh_num_perm: 256
+  faiss_index_type: IndexBinaryFlat        # exact for 60K cols, totally fine
+  # When true, candidates whose parent table has no PK / unique-index metadata
+  # are demoted to advisory_lowconf instead of being silently rejected.
+  require_parent_pk: true
+  # When true, Phase 5 validates only candidates with tier='primary'; advisory
+  # rows written by Phase 4 are skipped (the A5/M2 ~50x working-set reduction).
+  validate_only_primary_tier: true
+
+  # Tier 1+2 accuracy (cheap, recall-improving)
+  plural_name_normalize: true
+  pii_filter_enabled: true
+  one_implicit_pk_per_table: true
+  reverse_direction_reconciliation: true
+  top_k_per_child: 10
+  dense_serial_hard_reject: true
+  range_overlap_gate_enabled: true
+  max_relationships: null  # no global cap; set int to limit
+
+  # Tier 3 — semantic.  Sprint A8: default flipped to true; sentence-
+  # transformers is loaded lazily at Phase-4 start.  When the package
+  # isn't installed, the helper logs a warning and falls back to lexical
+  # similarity (no error).
+  semantic_name_similarity: true
+  semantic_min_score: 0.5
+
+  # Composite FK detection (Phase 4b) -- ON by default; runs as part of run-all
+  composite_fk_enabled: true
+  composite_fk_max_arity: 3
+  composite_fk_min_containment: 0.95
+
+  # Polymorphic FK detection (Phase 4c) -- Rails / Django / Laravel pattern
+  polymorphic_fk_enabled: true
+  polymorphic_min_containment: 0.95
+  polymorphic_max_discriminator_distinct: 20
+  polymorphic_min_partition_rows: 1
+
+  # JSONB soft-FK detection (Phase 4d)
+  jsonb_fk_enabled: true
+  jsonb_sample_rows: 1000
+  jsonb_min_containment: 0.95
+  jsonb_min_distinct_count: 5
+
+  # Inheritance annotator (post-Phase-5 evidence tag)
+  inheritance_annotator_enabled: true
+  inheritance_min_name_sim: 0.95
+
+  # Schema clustering (groups tables into FK-graph communities per schema)
+  clustering_enabled: true
+
+reporting:
+  output_dir: /data/reports
+  formats: [csv, excel]

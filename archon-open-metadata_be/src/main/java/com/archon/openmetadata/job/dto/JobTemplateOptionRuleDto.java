@@ -11,7 +11,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class JobTemplateOptionRuleDto extends AuditModelDto {
   private UUID id;
-  private JobTemplateProfileDto jobTemplateProfile;
+  
   private String operationName;
   private Float minValue;
   private Float maxValue;

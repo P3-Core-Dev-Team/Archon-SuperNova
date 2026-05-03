@@ -1,1 +1,52 @@
-<p>admin works!</p>
+<div id="p-admin-users" class="page">
+  <div class="page-header">
+    <div class="page-title">User Management</div>
+  </div>
+  <div class="card">
+    <table class="tbl">
+      <tr>
+        <th>Username</th>
+        <th>Auth Type</th>
+        <th>Groups</th>
+        <th>Status</th>
+      </tr>
+      <tr *ngFor="let user of users">
+        <td style="font-weight:500">&#123;&#123; user.username &#125;&#125;</td>
+        <td><span class="badge b-gray">&#123;&#123; user.authType === 'LOCAL' ? 'InMemory' : user.authType
+            &#125;&#125;</span></td>
+        <td>&#123;&#123; user.groups?.length ? user.groups![0].groupName : 'None' &#125;&#125;</td>
+        <td><span class="badge b-green">Active</span></td>
+      </tr>
+      <tr *ngIf="users.length === 0">
+        <td colspan="4" style="text-align:center;padding:40px 20px">
+          <div style="font-size:15px;font-weight:500;color:var(--color-text-primary)">No users found</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<div id="p-admin-groups" class="page">
+  <div class="page-header">
+    <div class="page-title">Group Management</div>
+  </div>
+  <div class="card">
+    <table class="tbl">
+      <tr>
+        <th>Group Name</th>
+        <th>Roles</th>
+        <th>Status</th>
+      </tr>
+      <tr *ngFor="let group of groups">
+        <td style="font-weight:500">&#123;&#123; group.groupName &#125;&#125;</td>
+        <td>&#123;&#123; group.roles?.length ? group.roles![0].roleName : 'None' &#125;&#125;</td>
+        <td><span class="badge b-green">Active</span></td>
+      </tr>
+      <tr *ngIf="groups.length === 0">
+        <td colspan="3" style="text-align:center;padding:40px 20px">
+          <div style="font-size:15px;font-weight:500;color:var(--color-text-primary)">No groups found</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+</div>

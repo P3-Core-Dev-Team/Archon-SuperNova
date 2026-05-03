@@ -1,35 +1,349 @@
-import { Component } from '@angular/core';
-import { TranslateService } from '@ngx-translate/core';
+import { Component, OnInit } from '@angular/core';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { ConnectionProfile, Job, DatasourceForm, ApiResponse, User, Group } from './core/models/app.models';
 
 @Component({
   selector: 'app-root',
-  template: `
-    <div class="root">
-      <div class="topbar">
-        <div class="logo-dot"></div>
-        <span class="logo-text">Archon Metadata</span>
-        <span class="logo-sub">Core Engine</span>
-        <div class="topbar-tabs">
-          <a class="ttab" routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
-          <a class="ttab" routerLink="/job-profile" routerLinkActive="active">Jobs</a>
-          <a class="ttab" routerLink="/datasource" routerLinkActive="active">Profiles</a>
-        </div>
-        <div class="topbar-status"><div class="pulse"></div>Engine active</div>
-      </div>
-      <div class="main-layout">
-        <app-sidebar></app-sidebar>
-        <div class="content">
-          <router-outlet></router-outlet>
-        </div>
-      </div>
-    </div>
-  `,
-  styles: []
+  templateUrl: './app.component.html',
+  styleUrls: []
 })
-export class AppComponent {
-  constructor(private translate: TranslateService) {
-    const savedLang = localStorage.getItem('language') || 'en';
-    translate.setDefaultLang('en');
-    translate.use(savedLang);
+export class AppComponent implements OnInit {
+  private baseUrl = 'http://localhost:8080/api';
+  datasources: ConnectionProfile[] = [];
+  jobs: Job[] = [];
+  sensitiveDataCount: number = 0;
+  audits: any[] = [];
+  dataCleanupDays: number = 30;
+  jobTemplates: any[] = [];
+  users: User[] = [];
+  groups: Group[] = [];
+  newDs: DatasourceForm = {
+    dbType: 'postgres',
+    port: 5432,
+    host: '127.0.0.1',
+    username: 'adsuser',
+    password: 'AdS@3421',
+
+  };
+
+  get isDsFormValid(): boolean {
+    return !!(this.newDs.profileName && this.newDs.host && this.newDs.port && this.newDs.databaseName && this.newDs.username && this.newDs.password);
+  }
+  testResult: string = '';
+  isDarkTheme: boolean = false;
+  toasts: { id: number, message: string, type: string }[] = [];
+  private toastIdCounter = 0;
+
+  constructor(private http: HttpClient) { }
+
+  ngOnInit() {
+    this.isDarkTheme = localStorage.getItem('theme') === 'dark';
+    if (this.isDarkTheme) {
+      document.body.classList.add('dark-theme');
+    }
+    this.fetchDatasources();
+    this.fetchJobs();
+  }
+
+  showToast(message: string, type: 'success' | 'error' = 'error') {
+    const id = this.toastIdCounter++;
+    this.toasts.push({ id, message, type });
+    setTimeout(() => {
+      this.toasts = this.toasts.filter(t => t.id !== id);
+    }, 4000);
+  }
+
+  removeToast(id: number) {
+    this.toasts = this.toasts.filter(t => t.id !== id);
+  }
+
+  private extractError(err: HttpErrorResponse | any): string {
+    if (err && err.error && err.error.message) {
+      return err.error.message;
+    } else if (err && err.message) {
+      return err.message;
+    }
+    return 'An unknown server error occurred.';
+  }
+
+  fetchDatasources() {
+    this.http.get<ApiResponse<ConnectionProfile>>(`${this.baseUrl}/v1/connection-profiles`).subscribe(
+      res => this.datasources = res._embedded?.connectionProfileDtoList || [],
+      err => this.showToast('Failed to load connection profiles: ' + this.extractError(err), 'error')
+    );
+  }
+
+  fetchJobTemplates() {
+    this.http.get<any>(`${this.baseUrl}/v1/job-template-profiles`).subscribe(
+      res => this.jobTemplates = res._embedded?.jobTemplateProfileDtoList || [],
+      err => this.showToast('Failed to load job templates', 'error')
+    );
+  }
+
+  fetchJobs() {
+    this.http.get<ApiResponse<Job>>(`${this.baseUrl}/v1/jobs`).subscribe(
+      res => this.jobs = res._embedded?.jobDtoList || [],
+      err => this.showToast('Failed to load jobs: ' + this.extractError(err), 'error')
+    );
+  }
+
+  fetchUsers() {
+    this.http.get<ApiResponse<User>>(`${this.baseUrl}/v1/users`).subscribe(
+      res => this.users = res._embedded?.userDtoList || [],
+      err => this.showToast('Failed to load users: ' + this.extractError(err), 'error')
+    );
+  }
+
+      fetchSystemProperties() {
+    this.http.get<any[]>(`${this.baseUrl}/system-properties`).subscribe(
+      res => {
+        const prop = res.find((p: any) => p.propKey === 'dataCleanupDays');
+        if (prop) {
+          this.dataCleanupDays = parseInt(prop.propValue, 10);
+        }
+      },
+      err => console.error('Failed to load system properties')
+    );
+  }
+
+  fetchAudits() {
+    this.http.get<any[]>(`${this.baseUrl}/audits`).subscribe(
+      res => this.audits = res || [],
+      err => this.showToast('Failed to load audits', 'error')
+    );
+  }
+
+  saveSystemConfig() {
+    this.http.post(`${this.baseUrl}/system-properties`, {
+      propKey: 'dataCleanupDays',
+      propValue: this.dataCleanupDays.toString()
+    }).subscribe(
+      () => this.showToast('System configuration saved. Cleanup set to ' + this.dataCleanupDays + ' days.', 'success'),
+      () => this.showToast('Failed to save system configuration', 'error')
+    );
+  }
+
+  fetchGroups() {
+    this.http.get<ApiResponse<Group>>(`${this.baseUrl}/v1/groups`).subscribe(
+      res => this.groups = res._embedded?.groupDtoList || [],
+      err => this.showToast('Failed to load groups: ' + this.extractError(err), 'error')
+    );
+  }
+
+  fetchData() {
+    // Keep for backward compatibility with inner component triggers if any
+    if (document.getElementById('p-dashboard')?.classList.contains('on')) { this.fetchDatasources(); this.fetchJobs(); }
+    else if (document.getElementById('p-ds-list')?.classList.contains('on')) this.fetchDatasources();
+    else if (document.getElementById('p-jobs-all')?.classList.contains('on')) { this.fetchJobs(); this.fetchDatasources(); this.fetchJobTemplates(); }
+    else if (document.getElementById('p-settings-tpl')?.classList.contains('on')) this.fetchJobTemplates();
+    else if (document.getElementById('p-admin-users')?.classList.contains('on')) { this.fetchUsers(); this.fetchGroups(); }
+    else if (document.getElementById('p-admin-groups')?.classList.contains('on')) this.fetchGroups();
+  }
+
+  go(id: string, navEl: any, section: string, screen: string) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
+    const p = document.getElementById('p-' + id);
+    if (p) p.classList.add('on');
+
+    if (navEl) {
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      navEl.classList.add('active');
+    }
+    const breadcrumb = document.getElementById('breadcrumb');
+    if (breadcrumb) {
+      breadcrumb.innerHTML = `<span>${section}</span><span class="breadcrumb-sep">›</span><span class="breadcrumb-cur">${screen}</span>`;
+    }
+    
+    // Trigger specific APIs based on screen selection
+    if (id === 'dashboard') {
+      this.fetchDatasources();
+      this.fetchJobs();
+    } else if (id === 'ds-list') {
+      this.fetchDatasources();
+    } else if (id === 'jobs-all') {
+      this.fetchJobs();
+      this.fetchDatasources();
+      this.fetchJobTemplates();
+    } else if (id === 'settings-tpl') {
+      this.fetchJobTemplates();
+    } else if (id === 'settings-system') {
+      this.fetchSystemProperties();
+    } else if (id === 'system-audit') {
+      this.fetchAudits();
+    } else if (id === 'admin-users') {
+      this.fetchUsers();
+      this.fetchGroups();
+    } else if (id === 'admin-groups') {
+      this.fetchGroups();
+    }
+  }
+
+  toggle(subId: string, navEl: any) {
+    const sub = document.getElementById(subId);
+    if (!sub) return;
+    const expId = subId.replace('-sub', '-exp');
+    const exp = document.getElementById(expId);
+    const isOpen = sub.classList.contains('open');
+    sub.classList.toggle('open');
+    if (exp && exp.parentElement) exp.parentElement.classList.toggle('expanded', !isOpen);
+  }
+
+  toggleTheme() {
+    this.isDarkTheme = !this.isDarkTheme;
+    if (this.isDarkTheme) {
+      document.body.classList.add('dark-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.body.classList.remove('dark-theme');
+      localStorage.setItem('theme', 'light');
+    }
+  }
+
+  testConnection() {
+    const driver = this.newDs.dbType === 'postgres' ? 'postgresql' : this.newDs.dbType;
+    const payload = {
+      profileName: this.newDs.profileName,
+      url: `jdbc:${driver}://${this.newDs.host}:${this.newDs.port}/${this.newDs.databaseName}`,
+      user: this.newDs.username,
+      pass: this.newDs.password
+    };
+    this.http.post<any>(`${this.baseUrl}/v1/connection-profiles/test-connection`, payload).subscribe(
+      res => {
+        if (res.status === 'SUCCESS') {
+          this.testResult = 'Connection successful!';
+          this.showToast('Connection tested successfully.', 'success');
+        } else {
+          this.testResult = 'Connection failed: ' + res.message;
+          this.showToast('Test failed: ' + res.message, 'error');
+        }
+      },
+      err => {
+        this.testResult = 'Connection failed!';
+        this.showToast('Connection failed: ' + this.extractError(err), 'error');
+      }
+    );
+  }
+
+  
+  createJob(payload: any) {
+    this.http.post(`${this.baseUrl}/v1/jobs`, payload).subscribe(
+      res => {
+        this.showToast('Job created successfully.', 'success');
+        this.fetchData();
+        this.go('jobs-all', null, 'Job profiles', 'All jobs');
+      },
+      err => this.showToast('Failed to create job: ' + this.extractError(err), 'error')
+    );
+  }
+
+  
+  saveJobTemplate(payload: any) {
+    if (payload.id) {
+      this.http.put(`${this.baseUrl}/v1/job-template-profiles/${payload.id}`, payload).subscribe(
+        res => {
+          this.showToast('Job template updated successfully.', 'success');
+          this.fetchData();
+        },
+        err => this.showToast('Failed to update job template: ' + this.extractError(err), 'error')
+      );
+    } else {
+      this.http.post(`${this.baseUrl}/v1/job-template-profiles`, payload).subscribe(
+        res => {
+          this.showToast('Job template created successfully.', 'success');
+          this.fetchData();
+        },
+        err => this.showToast('Failed to create job template: ' + this.extractError(err), 'error')
+      );
+    }
+  }
+
+  deleteJobTemplate(id: string) {
+    this.http.delete(`${this.baseUrl}/v1/job-template-profiles/${id}`).subscribe(
+      res => {
+        this.showToast('Job template deleted.', 'success');
+        this.fetchData();
+      },
+      err => this.showToast('Failed to delete template: ' + this.extractError(err), 'error')
+    );
+  }
+
+  saveDatasource() {
+    const driver = this.newDs.dbType === 'postgres' ? 'postgresql' : this.newDs.dbType;
+    const payload = {
+      profileName: this.newDs.profileName,
+      url: `jdbc:${driver}://${this.newDs.host}:${this.newDs.port}/${this.newDs.databaseName}`,
+      user: this.newDs.username,
+      pass: this.newDs.password,
+      listOfSchemas: this.newDs.listOfSchemas
+    };
+
+    if (this.newDs.id) {
+      this.http.put(`${this.baseUrl}/v1/connection-profiles/${this.newDs.id}`, payload).subscribe(
+        res => {
+          this.showToast('Datasource updated successfully.', 'success');
+          this.fetchData();
+          this.go('ds-list', null, 'Data', 'Datasources');
+          this.resetDsForm();
+        },
+        err => this.showToast('Failed to update datasource: ' + this.extractError(err), 'error')
+      );
+    } else {
+      this.http.post(`${this.baseUrl}/v1/connection-profiles`, payload).subscribe(
+        res => {
+          this.showToast('Datasource saved successfully.', 'success');
+          this.fetchData();
+          this.go('ds-list', null, 'Data', 'Datasources');
+          this.resetDsForm();
+        },
+        err => this.showToast('Failed to save datasource: ' + this.extractError(err), 'error')
+      );
+    }
+  }
+
+  editDatasource(ds: ConnectionProfile) {
+    this.newDs = {
+      id: ds.id,
+      profileName: ds.profileName,
+      dbType: ds.dbType || 'postgres',
+      host: ds.host,
+      port: typeof ds.port === 'string' ? parseInt(ds.port, 10) : (ds.port || 5432),
+      databaseName: ds.databaseName,
+      listOfSchemas: ds.listOfSchemas,
+      username: ds.user,
+      password: ds.pass
+    };
+    this.testResult = '';
+    this.go('ds-new', null, 'Datasources', 'Edit profile');
+  }
+
+  resetDsForm() {
+    this.newDs = { dbType: 'postgres', port: 5432, host: '127.0.0.1', username: 'adsuser', password: 'AdS@3421', listOfSchemas: '' };
+    this.testResult = '';
+  }
+
+  deleteDatasource(id: string | undefined) {
+    if (!id) return;
+    if (confirm('Are you sure you want to delete this datasource?')) {
+      this.http.delete(`${this.baseUrl}/v1/connection-profiles/${id}`).subscribe(
+        () => {
+          this.showToast('Datasource deleted.', 'success');
+          this.fetchData();
+        },
+        err => this.showToast('Failed to delete datasource: ' + this.extractError(err), 'error')
+      );
+    }
+  }
+
+  deleteJob(id: string | undefined) {
+    if (!id) return;
+    if (confirm('Are you sure you want to delete this job?')) {
+      this.http.delete(`${this.baseUrl}/v1/jobs/${id}`).subscribe(
+        () => {
+          this.showToast('Job deleted.', 'success');
+          this.fetchData();
+        },
+        err => this.showToast('Failed to delete job: ' + this.extractError(err), 'error')
+      );
+    }
   }
 }

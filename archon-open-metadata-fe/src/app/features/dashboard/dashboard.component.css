@@ -1,0 +1,20 @@
+.dashboard-tbl {
+  border: none !important;
+  background: transparent !important;
+}
+
+.dashboard-tbl th {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(0,0,0,0.05);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  padding: 12px 0 !important;
+}
+
+.dashboard-tbl td {
+  border-bottom: 1px solid rgba(0,0,0,0.02) !important;
+  padding: 16px 0 !important;
+  font-size: 13px;
+  color: var(--color-text-primary);
+}

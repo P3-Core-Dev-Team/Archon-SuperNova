@@ -43,4 +43,24 @@ public class ColumnEntity extends AuditModel {
 
   @Column(name = "is_index")
   private Boolean indexColumn;
+
+  // Sensitive Data Analysis
+  @Column(name = "is_sensitive")
+  private Boolean isSensitive;
+
+  @Column(name = "sensitivity_type")
+  private String sensitivityType; // e.g., PII, PCI, FIN, PHI
+
+  @Column(name = "sensitivity_score")
+  private Double sensitivityScore; // Confidence score (0.0 - 1.0)
+
+  // Data Profiling Metrics (for relationship analysis)
+  @Column(name = "total_count")
+  private Long totalCount;
+
+  @Column(name = "unique_count")
+  private Long uniqueCount;
+
+  @Column(name = "null_count")
+  private Long nullCount;
 }

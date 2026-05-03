@@ -1,4 +1,5 @@
-import { Component } from '@angular/core';
+import { ConnectionProfile, DatasourceForm } from '../../core/models/app.models';
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { ApiService } from '../../core/api.service';
 
 @Component({
@@ -7,23 +8,22 @@ import { ApiService } from '../../core/api.service';
   styleUrls: ['./datasource-manager.component.css']
 })
 export class DatasourceManagerComponent {
-  profile = {
-    profileName: '',
-    url: '',
-    user: '',
-    pass: '',
-    listOfSchemas: ''
-  };
+  @Input() datasources: ConnectionProfile[] = [];
+  @Input() newDs: any = {};
+  @Input() isDsFormValid: boolean = false;
+  @Input() testResult: string = '';
+  
+  @Output() testConnection = new EventEmitter<void>();
+  @Output() saveDatasource = new EventEmitter<void>();
+  @Output() editDs = new EventEmitter<ConnectionProfile>();
+  @Output() deleteDs = new EventEmitter<string>();
+  @Output() resetDs = new EventEmitter<void>();
+  @Output() goEvt = new EventEmitter<any>();
 
-  constructor(private api: ApiService) {}
-
-  saveDatasource() {
-    this.api.createDatasource(this.profile).subscribe({
-      next: (res) => {
-        alert('Datasource Created Successfully!');
-        this.profile = { profileName: '', url: '', user: '', pass: '', listOfSchemas: '' };
-      },
-      error: (err) => console.error(err)
-    });
+  resetDsForm() { this.resetDs.emit(); }
+  editDatasource(ds: any) { this.editDs.emit(ds); }
+  deleteDatasource(id: string | undefined) { if(id) this.deleteDs.emit(id); }
+  go(id: string, target: any, section: string, screen: string) { 
+    this.goEvt.emit({id, target, section, screen}); 
   }
 }

@@ -1,99 +1,143 @@
-
-<div class="stat-row">
-  <div class="stat-card">
-    <div class="stat-label">Tables Crawled</div>
-    <div class="stat-val c-blue">304</div>
-    <div class="stat-sub" style="color:var(--accent2)">+12 since last run</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Relationships Found</div>
-    <div class="stat-val c-green">24</div>
-    <div class="stat-sub" style="color:var(--muted)">Avg score 0.84</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Sensitive Columns</div>
-    <div class="stat-val c-red">12</div>
-    <div class="stat-sub" style="color:var(--accent4)">3 HIGH risk</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Domain Clusters</div>
-    <div class="stat-val c-amber">6</div>
-    <div class="stat-sub" style="color:var(--muted)">DBSCAN auto-grouped</div>
-  </div>
-</div>
-
-<div class="pipeline-row">
-  <div class="stage">
-    <div class="stage-icon done">🗂</div>
-    <div class="stage-name">Schema Crawl</div>
-    <div class="stage-status done">Done</div>
-  </div>
-  <div class="pipe-arrow">→</div>
-  <div class="stage">
-    <div class="stage-icon done">🔗</div>
-    <div class="stage-name">Matching</div>
-    <div class="stage-status done">Done</div>
-  </div>
-  <div class="pipe-arrow">→</div>
-  <div class="stage">
-    <div class="stage-icon running">🔐</div>
-    <div class="stage-name">PII Detect</div>
-    <div class="stage-status running">Running…</div>
-  </div>
-  <div class="pipe-arrow">→</div>
-  <div class="stage">
-    <div class="stage-icon pending">🧠</div>
-    <div class="stage-name">Clustering</div>
-    <div class="stage-status pending">Pending</div>
-  </div>
-</div>
-
-<div class="two-col">
-  <div class="panel">
-    <div class="panel-header">
-      <span class="panel-title">Top Relationships</span>
-      <span class="panel-action">View all →</span>
+<div id="p-dashboard" class="page on">
+  <div class="kpi-row" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 40px; padding-top: 16px;">
+    <div class="kpi" style="border: none; padding: 0; box-shadow: none; background: transparent;">
+      <div class="kpi-label" style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 8px;">Datasources</div>
+      <div class="kpi-val" style="font-size: 28px; font-weight: 500; margin-bottom: 4px; color: var(--color-text-primary);">{{ datasources.length > 0 ? datasources.length : 12 }}</div>
+      <div style="font-size: 11px; color: var(--color-text-tertiary);">4 active</div>
     </div>
-    <div class="rel-row">
-      <span class="tname">customer</span>
-      <span class="col-chip">cust_id</span>
-      <span class="arrow-icon">→</span>
-      <span class="tname">orders</span>
-      <span class="col-chip">customer_id</span>
-      <div class="score-bar-wrap"><div class="score-bar" style="width:92%;background:var(--accent2)"></div></div>
-      <span class="card-tag high">0.92 · 1:N</span>
+    <div class="kpi" style="border: none; padding: 0; box-shadow: none; background: transparent;">
+      <div class="kpi-label" style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 8px;">Tables profiled</div>
+      <div class="kpi-val" style="font-size: 28px; font-weight: 500; margin-bottom: 4px; color: var(--color-text-primary);">1,847</div>
+      <div style="font-size: 11px; color: var(--color-text-tertiary);">↑ 128 this week</div>
     </div>
-    <div class="rel-row">
-      <span class="tname">employee</span>
-      <span class="col-chip">dept_id</span>
-      <span class="arrow-icon">→</span>
-      <span class="tname">department</span>
-      <span class="col-chip">dept_id</span>
-      <div class="score-bar-wrap"><div class="score-bar" style="width:78%;background:var(--accent3)"></div></div>
-      <span class="card-tag med">0.78 · N:1</span>
+    <div class="kpi" style="border: none; padding: 0; box-shadow: none; background: transparent;">
+      <div class="kpi-label" style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 8px;">Relationships</div>
+      <div class="kpi-val" style="font-size: 28px; font-weight: 500; margin-bottom: 4px; color: var(--color-text-primary);">342</div>
+      <div style="font-size: 11px; color: var(--color-text-tertiary);">across 8 domains</div>
+    </div>
+    <div class="kpi" style="border: none; padding: 0; box-shadow: none; background: transparent;">
+      <div class="kpi-label" style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 8px;">Sensitive columns</div>
+      <div class="kpi-val" style="font-size: 28px; font-weight: 500; margin-bottom: 4px; color: var(--color-text-primary);">89</div>
+      <div style="font-size: 11px; color: var(--color-text-tertiary);">PII · PHI · Financial</div>
     </div>
   </div>
 
-  <div class="panel">
-    <div class="panel-header">
-      <span class="panel-title">Sensitive Columns</span>
-      <span class="panel-action">All 12 →</span>
-    </div>
-    <div class="sens-row">
-      <div class="sens-icon pii">🔒</div>
-      <div>
-        <div style="font-size:12px;font-weight:500">employee.ssn</div>
-        <div style="font-size:10px;color:var(--muted)">Presidio · regex + NER</div>
+  <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 40px; margin-bottom: 40px;">
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="font-size: 14px; font-weight: 500; color: var(--color-text-secondary);">Active datasource connections</div>
+        <div style="font-size: 12px; color: var(--color-text-tertiary); cursor: pointer;">View all →</div>
       </div>
-      <span class="sens-cat PII">PII</span>
+      <table class="tbl dashboard-tbl">
+        <tr>
+          <th>Profile</th>
+          <th>Engine</th>
+          <th>Tables</th>
+          <th>Last crawl</th>
+          <th>Status</th>
+        </tr>
+        <tr *ngFor="let ds of (datasources.length > 0 ? datasources : mockDatasources)">
+          <td style="font-weight: 500">{{ ds.profileName }}</td>
+          <td>{{ ds.dbType }}</td>
+          <td>{{ ds.tables || (ds.dbType === 'PostgreSQL' ? 412 : 840) }}</td>
+          <td>{{ ds.lastCrawl || '2h ago' }}</td>
+          <td>{{ ds.status || 'Active' }}</td>
+        </tr>
+        <tr *ngIf="datasources.length === 0 && mockDatasources.length === 0">
+          <td colspan="5" style="text-align:center;padding:40px 20px">
+            <div style="font-size:14px;font-weight:500;color:var(--color-text-secondary)">No active connections</div>
+          </td>
+        </tr>
+      </table>
     </div>
-    <div class="sens-row">
-      <div class="sens-icon fin">💰</div>
-      <div>
-        <div style="font-size:12px;font-weight:500">employee.salary</div>
-        <div style="font-size:10px;color:var(--muted)">spaCy · NLP classification</div>
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="font-size: 14px; font-weight: 500; color: var(--color-text-secondary);">Table type distribution</div>
       </div>
-      <span class="sens-cat FIN">FINANCIAL</span>
+      <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 24px;">
+        <div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px;">
+            <div style="font-weight: 500">Fact tables</div>
+            <div style="color: var(--color-text-tertiary)">523 · 28%</div>
+          </div>
+          <div style="height: 4px; background: rgba(0,0,0,0.05); border-radius: 2px;">
+            <div style="height: 100%; width: 28%; background: #2563eb; border-radius: 2px;"></div>
+          </div>
+        </div>
+        <div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px;">
+            <div style="font-weight: 500">Dimension tables</div>
+            <div style="color: var(--color-text-tertiary)">712 · 39%</div>
+          </div>
+          <div style="height: 4px; background: rgba(0,0,0,0.05); border-radius: 2px;">
+            <div style="height: 100%; width: 39%; background: #0d9488; border-radius: 2px;"></div>
+          </div>
+        </div>
+        <div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px;">
+            <div style="font-weight: 500">Staging / temp</div>
+            <div style="color: var(--color-text-tertiary)">312 · 17%</div>
+          </div>
+          <div style="height: 4px; background: rgba(0,0,0,0.05); border-radius: 2px;">
+            <div style="height: 100%; width: 17%; background: #8b5cf6; border-radius: 2px;"></div>
+          </div>
+        </div>
+        <div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 12px;">
+            <div style="font-weight: 500">Reference / lookup</div>
+            <div style="color: var(--color-text-tertiary)">300 · 16%</div>
+          </div>
+          <div style="height: 4px; background: rgba(0,0,0,0.05); border-radius: 2px;">
+            <div style="height: 100%; width: 16%; background: #059669; border-radius: 2px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 3fr 2fr; gap: 40px;">
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="font-size: 14px; font-weight: 500; color: var(--color-text-secondary);">Recent jobs</div>
+        <div style="font-size: 12px; color: var(--color-text-tertiary); cursor: pointer;">View all →</div>
+      </div>
+      <table class="tbl dashboard-tbl">
+        <tr>
+          <th>Job ID</th>
+          <th>Source</th>
+          <th>Stage</th>
+          <th>Status</th>
+        </tr>
+        <tr *ngFor="let job of (jobs.length > 0 ? jobs : mockJobs)">
+          <td style="font-weight: 500">{{ job.jobName || job.jobId }}</td>
+          <td>{{ job.source || 'prod-postgres-01' }}</td>
+          <td>{{ job.stage || '6/6' }}</td>
+          <td>{{ job.status || 'Done' }}</td>
+        </tr>
+      </table>
+    </div>
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="font-size: 14px; font-weight: 500; color: var(--color-text-secondary);">Recent activity</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 24px;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 13px; font-weight: 500;">JOB-0042 completed on prod-postgres-01</div>
+          <div style="font-size: 11px; color: var(--color-text-tertiary);">Today · 14:22 · sarah.r</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 13px; font-weight: 500;">Datasource profile updated — schema filter changed</div>
+          <div style="font-size: 11px; color: var(--color-text-tertiary);">Today · 13:10 · sarah.r</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 13px; font-weight: 500;">JOB-0041 failed at regex_detection stage</div>
+          <div style="font-size: 11px; color: var(--color-text-tertiary);">Today · 11:32 · system</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 13px; font-weight: 500;">User james.k added to data-analysts group</div>
+          <div style="font-size: 11px; color: var(--color-text-tertiary);">Yesterday · 16:45 · sarah.r</div>
+        </div>
+      </div>
     </div>
   </div>
 </div>

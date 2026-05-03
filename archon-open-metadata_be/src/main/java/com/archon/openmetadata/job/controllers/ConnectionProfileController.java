@@ -21,7 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/connectionprofiles")
+@RequestMapping("/api/v1/connection-profiles")
 @RequiredArgsConstructor
 @CrossOrigin(origins = "*")
 public class ConnectionProfileController {

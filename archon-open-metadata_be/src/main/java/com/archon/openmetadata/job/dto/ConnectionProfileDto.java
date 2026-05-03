@@ -16,4 +16,36 @@ public class ConnectionProfileDto extends AuditModelDto {
   private String user;
   private String pass;
   private String listOfSchemas;
+
+  public String getDbType() {
+    if (url != null && url.startsWith("jdbc:")) {
+      String[] parts = url.split(":");
+      if (parts.length > 2) return parts[1];
+    }
+    return null;
+  }
+
+  public String getHost() {
+    if (url != null) {
+      java.util.regex.Matcher m = java.util.regex.Pattern.compile("://([^:/]+)").matcher(url);
+      if (m.find()) return m.group(1);
+    }
+    return null;
+  }
+
+  public Integer getPort() {
+    if (url != null) {
+      java.util.regex.Matcher m = java.util.regex.Pattern.compile(":(\\d+)/").matcher(url);
+      if (m.find()) return Integer.parseInt(m.group(1));
+    }
+    return null;
+  }
+
+  public String getDatabaseName() {
+    if (url != null) {
+      java.util.regex.Matcher m = java.util.regex.Pattern.compile("/([^/?]+)(?:\\?|$)").matcher(url);
+      if (m.find()) return m.group(1);
+    }
+    return null;
+  }
 }
