@@ -1,0 +1,33 @@
+
+<div class="sidebar">
+  <div class="sidebar-section">
+    <div class="sidebar-label">{{ 'SIDEBAR.ANALYSIS' | translate }}</div>
+    <a class="nav-item" routerLink="/dashboard" routerLinkActive="active">
+      <div class="nav-dot" style="background:var(--accent)"></div>{{ 'SIDEBAR.DASHBOARD' | translate }}
+    </a>
+    <a class="nav-item" routerLink="/job-profile" routerLinkActive="active">
+      <div class="nav-dot" style="background:var(--accent2)"></div>{{ 'SIDEBAR.RELATIONSHIPS' | translate }}
+      <span class="nav-badge">24</span>
+    </a>
+    <a class="nav-item" routerLink="/audit" routerLinkActive="active">
+      <div class="nav-dot" style="background:var(--accent4)"></div>{{ 'SIDEBAR.SENSITIVE_DATA' | translate }}
+      <span class="nav-badge hot">12</span>
+    </a>
+  </div>
+
+  <div class="sidebar-section" style="margin-top:12px">
+    <div class="sidebar-label">{{ 'SIDEBAR.SYSTEM' | translate }}</div>
+    <a class="nav-item" routerLink="/datasource" routerLinkActive="active">
+      <div class="nav-dot" style="background:var(--accent3)"></div>{{ 'SIDEBAR.DATASOURCES' | translate }}
+    </a>
+    <a class="nav-item" routerLink="/settings" routerLinkActive="active">
+      <div class="nav-dot" style="background:var(--muted)"></div>{{ 'SIDEBAR.SETTINGS' | translate }}
+    </a>
+    <a class="nav-item" routerLink="/admin" routerLinkActive="active">
+      <div class="nav-dot" style="background:var(--accent4)"></div>{{ 'SIDEBAR.ADMIN' | translate }}
+    </a>
+    <a class="nav-item" routerLink="/user" routerLinkActive="active">
+      <div class="nav-dot" style="background:var(--accent2)"></div>{{ 'SIDEBAR.USER_PROFILE' | translate }}
+    </a>
+  </div>
+</div>

@@ -1,0 +1,99 @@
+
+<div class="stat-row">
+  <div class="stat-card">
+    <div class="stat-label">Tables Crawled</div>
+    <div class="stat-val c-blue">304</div>
+    <div class="stat-sub" style="color:var(--accent2)">+12 since last run</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Relationships Found</div>
+    <div class="stat-val c-green">24</div>
+    <div class="stat-sub" style="color:var(--muted)">Avg score 0.84</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Sensitive Columns</div>
+    <div class="stat-val c-red">12</div>
+    <div class="stat-sub" style="color:var(--accent4)">3 HIGH risk</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Domain Clusters</div>
+    <div class="stat-val c-amber">6</div>
+    <div class="stat-sub" style="color:var(--muted)">DBSCAN auto-grouped</div>
+  </div>
+</div>
+
+<div class="pipeline-row">
+  <div class="stage">
+    <div class="stage-icon done">🗂</div>
+    <div class="stage-name">Schema Crawl</div>
+    <div class="stage-status done">Done</div>
+  </div>
+  <div class="pipe-arrow">→</div>
+  <div class="stage">
+    <div class="stage-icon done">🔗</div>
+    <div class="stage-name">Matching</div>
+    <div class="stage-status done">Done</div>
+  </div>
+  <div class="pipe-arrow">→</div>
+  <div class="stage">
+    <div class="stage-icon running">🔐</div>
+    <div class="stage-name">PII Detect</div>
+    <div class="stage-status running">Running…</div>
+  </div>
+  <div class="pipe-arrow">→</div>
+  <div class="stage">
+    <div class="stage-icon pending">🧠</div>
+    <div class="stage-name">Clustering</div>
+    <div class="stage-status pending">Pending</div>
+  </div>
+</div>
+
+<div class="two-col">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Top Relationships</span>
+      <span class="panel-action">View all →</span>
+    </div>
+    <div class="rel-row">
+      <span class="tname">customer</span>
+      <span class="col-chip">cust_id</span>
+      <span class="arrow-icon">→</span>
+      <span class="tname">orders</span>
+      <span class="col-chip">customer_id</span>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:92%;background:var(--accent2)"></div></div>
+      <span class="card-tag high">0.92 · 1:N</span>
+    </div>
+    <div class="rel-row">
+      <span class="tname">employee</span>
+      <span class="col-chip">dept_id</span>
+      <span class="arrow-icon">→</span>
+      <span class="tname">department</span>
+      <span class="col-chip">dept_id</span>
+      <div class="score-bar-wrap"><div class="score-bar" style="width:78%;background:var(--accent3)"></div></div>
+      <span class="card-tag med">0.78 · N:1</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Sensitive Columns</span>
+      <span class="panel-action">All 12 →</span>
+    </div>
+    <div class="sens-row">
+      <div class="sens-icon pii">🔒</div>
+      <div>
+        <div style="font-size:12px;font-weight:500">employee.ssn</div>
+        <div style="font-size:10px;color:var(--muted)">Presidio · regex + NER</div>
+      </div>
+      <span class="sens-cat PII">PII</span>
+    </div>
+    <div class="sens-row">
+      <div class="sens-icon fin">💰</div>
+      <div>
+        <div style="font-size:12px;font-weight:500">employee.salary</div>
+        <div style="font-size:10px;color:var(--muted)">spaCy · NLP classification</div>
+      </div>
+      <span class="sens-cat FIN">FINANCIAL</span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,33 @@
+
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Create Datasource Profile</span>
+  </div>
+  <div style="padding: 20px;">
+    <form (ngSubmit)="saveDatasource()">
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Profile Name</label>
+          <input type="text" class="form-control" [(ngModel)]="profile.profileName" name="profileName" placeholder="e.g. Prod Postgres" required>
+        </div>
+        <div class="form-group">
+          <label>Connection URL</label>
+          <input type="text" class="form-control" [(ngModel)]="profile.url" name="url" placeholder="jdbc:postgresql://localhost:5432/db" required>
+        </div>
+        <div class="form-group">
+          <label>Database User</label>
+          <input type="text" class="form-control" [(ngModel)]="profile.user" name="user" required>
+        </div>
+        <div class="form-group">
+          <label>Database Password</label>
+          <input type="password" class="form-control" [(ngModel)]="profile.pass" name="pass" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Schemas (comma separated)</label>
+        <input type="text" class="form-control" [(ngModel)]="profile.listOfSchemas" name="schemas" placeholder="public, analytics">
+      </div>
+      <button type="submit" class="btn">Connect & Save</button>
+    </form>
+  </div>
+</div>

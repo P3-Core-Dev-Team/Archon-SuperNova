@@ -1,0 +1,13 @@
+
+.sidebar-section { padding: 6px 16px; margin-bottom: 2px; }
+.sidebar-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; font-weight: 500; }
+.nav-item {
+  display: flex; align-items: center; gap: 9px; padding: 8px 12px;
+  border-radius: 7px; cursor: pointer; font-size: 13px; color: var(--text2);
+  transition: all .15s; margin-bottom: 1px; text-decoration: none;
+}
+.nav-item.active { background: rgba(79,142,247,0.15); color: var(--accent); }
+.nav-item:hover:not(.active) { background: var(--slate); color: var(--text); }
+.nav-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.nav-badge { margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 10px; background: var(--slate); color: var(--muted); }
+.nav-badge.hot { background: rgba(230,92,92,0.2); color: var(--accent4); }

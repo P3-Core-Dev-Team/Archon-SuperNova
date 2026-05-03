@@ -1,0 +1,33 @@
+{
+  "SETTINGS": {
+    "TITLE": "System Settings",
+    "SUBTITLE": "Manage global application settings, configurations, and localization.",
+    "API_CONFIG": "API Configuration",
+    "API_DESC": "Configure backend service endpoints.",
+    "JAVA_URL": "Java Backend URL",
+    "PYTHON_URL": "Python Pipeline URL",
+    "SAVE_URLS": "Save API Endpoints",
+    "LOCALIZATION": "Localization",
+    "LANG_DESC": "Select preferred language.",
+    "SELECT_LANG": "Choose Language",
+    "ENGLISH": "English",
+    "FRENCH": "French",
+    "CUSTOMIZATION": "Customization",
+    "CUST_DESC": "Configure pipeline stages and thresholds.",
+    "MANAGE_TEMPLATES": "Manage Job Templates",
+    "LOGS": "Log Management",
+    "LOGS_DESC": "Clear historical job logs from the system.",
+    "CLEAR_LOGS": "Clear Job Logs"
+  },
+  "SIDEBAR": {
+    "ANALYSIS": "Analysis",
+    "DASHBOARD": "Dashboard",
+    "RELATIONSHIPS": "Relationships",
+    "SENSITIVE_DATA": "Sensitive Data",
+    "SYSTEM": "System",
+    "DATASOURCES": "Datasources",
+    "SETTINGS": "Settings",
+    "ADMIN": "Admin Controls",
+    "USER_PROFILE": "User Profile"
+  }
+}

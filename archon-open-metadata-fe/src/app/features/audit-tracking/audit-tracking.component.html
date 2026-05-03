@@ -1,0 +1,90 @@
+<div class="wrap" style="border:0.5px solid var(--border); border-radius:8px; overflow:hidden; background:rgba(15,23,42,0.6)">
+
+  <div class="toolbar">
+    <span class="toolbar-title" style="font-size:14px; font-weight:500;">Sensitive columns</span>
+    <span class="count-badge" style="font-size:11px; padding:2px 8px; border-radius:10px; background:#4b1113; color:#f85149;">{{filteredCols.length}} flagged</span>
+    <div class="filter-group" style="display:flex; gap:4px; margin-left:auto;">
+      <span class="fchip" [class.on]="activeFilter === 'all'" (click)="setFilter('all')">All</span>
+      <span class="fchip" [class.on]="activeFilter === 'PII'" (click)="setFilter('PII')">PII</span>
+      <span class="fchip" [class.on]="activeFilter === 'PCI'" (click)="setFilter('PCI')" style="border-color:var(--accent4)">PCI</span>
+      <span class="fchip" [class.on]="activeFilter === 'FIN'" (click)="setFilter('FIN')" style="border-color:var(--accent3)">Financial</span>
+      <span class="fchip" [class.on]="activeFilter === 'HIGH'" (click)="setFilter('HIGH')">High risk</span>
+      <span class="fchip" [class.on]="activeFilter === 'REVIEW'" (click)="setFilter('REVIEW')" style="border-color:var(--accent3)">Needs review</span>
+    </div>
+  </div>
+
+  <div class="warn-banner" style="display:flex; align-items:center; gap:10px; padding:9px 16px; background:rgba(210,153,34,0.15); border-bottom:0.5px solid rgba(210,153,34,0.5); font-size:12px; color:#d29922;">
+    <span>⚠ 1 column requires manual review — <strong>sap_hr.bank_acct</strong> confidence 0.53 (below threshold 0.60)</span>
+    <button class="btn" style="margin-left:auto; padding:4px 10px; font-size:11px;">Review ↗</button>
+  </div>
+
+  <div class="summary-strip" style="display:grid; grid-template-columns:repeat(4,1fr); border-bottom:0.5px solid var(--border);">
+    <div class="sum-cell" style="padding:12px 16px; border-right:0.5px solid var(--border);">
+      <div style="font-size:10px; color:var(--text-muted);">Total flagged</div>
+      <div style="font-size:20px; font-weight:500; color:#f85149;">{{stats.total}}</div>
+    </div>
+    <div class="sum-cell" style="padding:12px 16px; border-right:0.5px solid var(--border);">
+      <div style="font-size:10px; color:var(--text-muted);">PII</div>
+      <div style="font-size:20px; font-weight:500; color:#f85149;">{{stats.pii}}</div>
+    </div>
+    <div class="sum-cell" style="padding:12px 16px; border-right:0.5px solid var(--border);">
+      <div style="font-size:10px; color:var(--text-muted);">PCI</div>
+      <div style="font-size:20px; font-weight:500; color:var(--accent4);">{{stats.pci}}</div>
+    </div>
+    <div class="sum-cell" style="padding:12px 16px;">
+      <div style="font-size:10px; color:var(--text-muted);">Financial</div>
+      <div style="font-size:20px; font-weight:500; color:#d29922;">{{stats.fin}}</div>
+    </div>
+  </div>
+
+  <div class="search-wrap" style="padding:10px 16px; border-bottom:0.5px solid var(--border);">
+    <input type="text" [(ngModel)]="searchQuery" placeholder="Search table or column..." style="width:100%; font-size:12px; padding:7px 12px; background:rgba(13,17,23,0.5); border:1px solid var(--border); color:#fff; border-radius:4px;">
+  </div>
+
+  <div class="col-header" style="display:grid; grid-template-columns:32px 1fr 110px 120px 80px 74px; gap:6px; padding:7px 16px; border-bottom:0.5px solid var(--border); background:rgba(13,17,23,0.8); font-size:10px; color:var(--text-muted); text-transform:uppercase;">
+    <span></span>
+    <span>Column</span>
+    <span>Category</span>
+    <span>Detection</span>
+    <span>Confidence</span>
+    <span>Risk</span>
+  </div>
+
+  <div>
+    <ng-container *ngFor="let c of filteredCols; let i = index">
+      <div class="s-row" [class.expanded]="openRowIndex === i" (click)="toggleDetail(i)" style="display:grid; grid-template-columns:32px 1fr 110px 120px 80px 74px; gap:6px; align-items:center; padding:9px 16px; border-bottom:0.5px solid var(--border); cursor:pointer; font-size:12px;">
+        <div class="risk-dot" [style.background]="c.risk === 'HIGH' ? '#f85149' : (c.risk === 'MED' ? '#d29922' : '#8b949e')" style="width:8px; height:8px; border-radius:50%; margin:auto;"></div>
+        <div style="display:flex; align-items:center; gap:7px;">
+          <span style="color:var(--text-muted);">{{c.tbl}}.</span><span style="font-family:monospace; font-weight:500;">{{c.col}}</span>
+          <span *ngIf="c.review" style="color:#d29922;">⚠</span>
+        </div>
+        <span class="cat-tag" [ngClass]="'cat-' + c.cat" style="font-size:10px; padding:2px 8px; border-radius:10px; background:rgba(255,255,255,0.1); text-align:center;">{{c.cat}}</span>
+        <span style="font-size:10px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{c.det}}</span>
+        <div style="display:flex; align-items:center; gap:5px;">
+          <div style="width:52px; height:5px; background:var(--border); border-radius:3px; overflow:hidden;">
+            <div [style.width]="(c.conf * 100) + '%'" [style.background]="c.conf >= 0.8 ? '#3fb950' : (c.conf >= 0.6 ? '#d29922' : '#f85149')" style="height:100%;"></div>
+          </div>
+          <span style="font-size:11px; font-family:monospace; color:var(--text-muted);">{{c.conf | number:'1.2-2'}}</span>
+        </div>
+        <span [style.color]="c.risk === 'HIGH' ? '#f85149' : '#d29922'" style="font-size:10px; font-weight:500;">{{c.risk}}</span>
+      </div>
+
+      <div class="det-panel" *ngIf="openRowIndex === i" style="padding:12px 16px; background:rgba(248,81,73,0.05); border-bottom:0.5px solid rgba(248,81,73,0.3);">
+        <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:10px;">
+          <div style="background:rgba(13,17,23,0.8); border:1px solid var(--border); padding:8px 12px; border-radius:4px;">
+            <div style="font-size:10px; color:var(--text-muted); margin-bottom:3px;">Description</div>
+            <div style="font-size:11px;">{{c.desc}}</div>
+          </div>
+          <div style="background:rgba(13,17,23,0.8); border:1px solid var(--border); padding:8px 12px; border-radius:4px;">
+            <div style="font-size:10px; color:var(--text-muted); margin-bottom:3px;">Detection method</div>
+            <div style="font-size:11px; font-family:monospace;">{{c.method}}</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <button class="btn">Masking strategy ↗</button>
+          <button class="btn" *ngIf="c.review">Manual review ↗</button>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+</div>

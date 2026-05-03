@@ -1,0 +1,34 @@
+
+<div class="glass-panel slide-in" style="animation-delay: 0.1s;">
+  <h2 class="gradient-text" style="margin-bottom: 24px;">Configure Job Template</h2>
+  
+  <div class="form-group">
+    <label>Template Name</label>
+    <input type="text" class="form-control" [(ngModel)]="templateName" placeholder="e.g. Strict PII Scan">
+  </div>
+
+  <div class="stages-grid">
+    <div class="stage-card" *ngFor="let stage of stages" [class.active]="stage.enabled">
+      <div class="stage-header">
+        <label class="toggle-switch">
+          <input type="checkbox" [(ngModel)]="stage.enabled">
+          <span class="slider"></span>
+        </label>
+        <span class="stage-name">{{stage.displayName}}</span>
+      </div>
+      
+      <div class="stage-scores" *ngIf="stage.enabled">
+        <div class="score-input">
+          <label>Min Score</label>
+          <input type="number" class="form-control" [(ngModel)]="stage.minScore" step="0.1" min="0" max="1">
+        </div>
+        <div class="score-input">
+          <label>Max Score</label>
+          <input type="number" class="form-control" [(ngModel)]="stage.maxScore" step="0.1" min="0" max="1">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn" style="margin-top: 24px; width: 100%" (click)="saveTemplate()">Create Pipeline Template</button>
+</div>

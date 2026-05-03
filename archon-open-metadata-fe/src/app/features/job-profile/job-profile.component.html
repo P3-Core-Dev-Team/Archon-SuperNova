@@ -1,0 +1,87 @@
+<div class="wrap">
+  <div class="toolbar">
+    <span class="toolbar-title">Detected Relationships</span>
+    <div class="filter-group" style="margin-left: 16px;">
+      <span class="fchip" [class.on]="viewMode === 'grid'" (click)="setViewMode('grid')">Data Grid</span>
+      <span class="fchip" [class.on]="viewMode === 'graph'" (click)="setViewMode('graph')">Graph View (ERD)</span>
+    </div>
+  </div>
+
+  <ng-container *ngIf="viewMode === 'grid'">
+    <div class="toolbar" style="margin-top: 12px;">
+      <span class="count-badge">{{filteredRels.length}} results</span>
+      <div class="filter-group">
+        <span class="fchip" [class.on]="activeFilter === 'all'" (click)="setFilter('all')">All</span>
+        <span class="fchip" [class.on]="activeFilter === 'high'" (click)="setFilter('high')">High ≥0.80</span>
+        <span class="fchip" [class.on]="activeFilter === 'med'" (click)="setFilter('med')">Med 0.60–0.79</span>
+        <span class="fchip" [class.on]="activeFilter === '1:N'" (click)="setFilter('1:N')">1:N</span>
+        <span class="fchip" [class.on]="activeFilter === '1:1'" (click)="setFilter('1:1')">1:1</span>
+      </div>
+    </div>
+
+    <div class="search-wrap">
+      <input type="text" [(ngModel)]="searchQuery" placeholder="Search table or column name...">
+    </div>
+
+  <div class="col-header">
+    <span class="ch">#</span>
+    <span class="ch" (click)="sortBy('pair')">Table pair ↕</span>
+    <span class="ch" (click)="sortBy('score')">Score ↕</span>
+    <span class="ch" (click)="sortBy('card')">Cardinality ↕</span>
+    <span class="ch">Domain</span>
+    <span class="ch">Confidence</span>
+  </div>
+
+  <div id="rel-list">
+    <ng-container *ngFor="let r of filteredRels; let i = index">
+      <div class="rel-row" [class.expanded]="openRowIndex === i" (click)="toggleDetail(i)">
+        <span class="rank">{{i+1}}</span>
+        <div class="pair-cell">
+          <span class="tbl">{{r.a}}</span>
+          <span class="col-chip">{{r.ca}}</span>
+          <span class="arr">→</span>
+          <span class="tbl">{{r.b}}</span>
+          <span class="col-chip">{{r.cb}}</span>
+        </div>
+        <div class="score-cell">
+          <div class="sbar-w">
+            <div class="sbar" [style.width]="(r.score * 100) + '%'" 
+                 [style.background]="r.score >= 0.8 ? 'var(--accent2)' : 'var(--accent3)'"></div>
+          </div>
+          <span class="sval" [style.color]="r.score >= 0.8 ? 'var(--accent2)' : 'var(--accent3)'">{{r.score | number:'1.2-2'}}</span>
+        </div>
+        <span class="card-cell">{{r.card}}</span>
+        <span class="domain-tag">{{r.domain}}</span>
+        <span class="card-tag" [class.tag-high]="r.score >= 0.8" [class.tag-med]="r.score >= 0.6 && r.score < 0.8">
+          {{r.score >= 0.8 ? 'High' : 'Med'}}
+        </span>
+      </div>
+      
+      <div class="detail-panel" [class.open]="openRowIndex === i">
+        <div class="detail-grid">
+          <div class="dcard">
+            <div class="dlabel">Match library</div>
+            <div class="dval">{{r.lib}}</div>
+          </div>
+          <div class="dcard">
+            <div class="dlabel">Raw score</div>
+            <div class="dval">{{r.score | number:'1.3-3'}}</div>
+          </div>
+          <div class="dcard">
+            <div class="dlabel">Cardinality</div>
+            <div class="dval">{{r.card}}</div>
+          </div>
+        </div>
+        <div class="detail-btns">
+          <button class="btn" style="background: rgba(79,142,247,0.2); color: var(--accent);">Sample join ↗</button>
+          <button class="btn" style="background: rgba(79,142,247,0.2); color: var(--accent);">Domain ERD ↗</button>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+  </ng-container>
+
+  <ng-container *ngIf="viewMode === 'graph'">
+    <app-relationship-graph [jobId]="jobId"></app-relationship-graph>
+  </ng-container>
+</div>
