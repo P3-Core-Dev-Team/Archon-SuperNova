@@ -2,22 +2,22 @@
   <div class="kpi-row" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; margin-bottom: 40px; padding-top: 16px;">
     <div class="kpi" style="border: none; padding: 0; box-shadow: none; background: transparent;">
       <div class="kpi-label" style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 8px;">Datasources</div>
-      <div class="kpi-val" style="font-size: 28px; font-weight: 500; margin-bottom: 4px; color: var(--color-text-primary);">{{ datasources.length > 0 ? datasources.length : 12 }}</div>
+      <div class="kpi-val" style="font-size: 28px; font-weight: 500; margin-bottom: 4px; color: var(--color-text-primary);">{{ datasources.length }}</div>
       <div style="font-size: 11px; color: var(--color-text-tertiary);">4 active</div>
     </div>
     <div class="kpi" style="border: none; padding: 0; box-shadow: none; background: transparent;">
       <div class="kpi-label" style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 8px;">Tables profiled</div>
-      <div class="kpi-val" style="font-size: 28px; font-weight: 500; margin-bottom: 4px; color: var(--color-text-primary);">1,847</div>
+      <div class="kpi-val" style="font-size: 28px; font-weight: 500; margin-bottom: 4px; color: var(--color-text-primary);">{{ tablesProfiled || 0 }}</div>
       <div style="font-size: 11px; color: var(--color-text-tertiary);">↑ 128 this week</div>
     </div>
     <div class="kpi" style="border: none; padding: 0; box-shadow: none; background: transparent;">
       <div class="kpi-label" style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 8px;">Relationships</div>
-      <div class="kpi-val" style="font-size: 28px; font-weight: 500; margin-bottom: 4px; color: var(--color-text-primary);">342</div>
+      <div class="kpi-val" style="font-size: 28px; font-weight: 500; margin-bottom: 4px; color: var(--color-text-primary);">{{ relationshipsCount || 0 }}</div>
       <div style="font-size: 11px; color: var(--color-text-tertiary);">across 8 domains</div>
     </div>
     <div class="kpi" style="border: none; padding: 0; box-shadow: none; background: transparent;">
       <div class="kpi-label" style="font-size: 13px; color: var(--color-text-secondary); margin-bottom: 8px;">Sensitive columns</div>
-      <div class="kpi-val" style="font-size: 28px; font-weight: 500; margin-bottom: 4px; color: var(--color-text-primary);">89</div>
+      <div class="kpi-val" style="font-size: 28px; font-weight: 500; margin-bottom: 4px; color: var(--color-text-primary);">{{ sensitiveDataCount || 0 }}</div>
       <div style="font-size: 11px; color: var(--color-text-tertiary);">PII · PHI · Financial</div>
     </div>
   </div>
@@ -34,16 +34,16 @@
           <th>Engine</th>
           <th>Tables</th>
           <th>Last crawl</th>
-          <th>Status</th>
+          <th>Status</th><th></th>
         </tr>
-        <tr *ngFor="let ds of (datasources.length > 0 ? datasources : mockDatasources)">
+        <tr *ngFor="let ds of datasources">
           <td style="font-weight: 500">{{ ds.profileName }}</td>
           <td>{{ ds.dbType }}</td>
-          <td>{{ ds.tables || (ds.dbType === 'PostgreSQL' ? 412 : 840) }}</td>
-          <td>{{ ds.lastCrawl || '2h ago' }}</td>
+          <td>{{ ds.tables || 0 }}</td>
+          <td>{{ ds.lastCrawl || 'N/A' }}</td>
           <td>{{ ds.status || 'Active' }}</td>
         </tr>
-        <tr *ngIf="datasources.length === 0 && mockDatasources.length === 0">
+        <tr *ngIf="datasources.length === 0">
           <td colspan="5" style="text-align:center;padding:40px 20px">
             <div style="font-size:14px;font-weight:500;color:var(--color-text-secondary)">No active connections</div>
           </td>
@@ -106,13 +106,18 @@
           <th>Job ID</th>
           <th>Source</th>
           <th>Stage</th>
-          <th>Status</th>
+          <th>Status</th><th></th>
         </tr>
-        <tr *ngFor="let job of (jobs.length > 0 ? jobs : mockJobs)">
-          <td style="font-weight: 500">{{ job.jobName || job.jobId }}</td>
-          <td>{{ job.source || 'prod-postgres-01' }}</td>
-          <td>{{ job.stage || '6/6' }}</td>
-          <td>{{ job.status || 'Done' }}</td>
+        <tr *ngFor="let job of jobs">
+          <td style="font-weight: 500">{{ job.jobName || 'Unlabeled Job' }}</td>
+          <td>{{ job.source || 'N/A' }}</td>
+          <td>{{ job.stage || 'Pending' }}</td>
+          <td>{{ job.status || 'N/A' }}</td>
+        </tr>
+              <tr *ngIf="jobs.length === 0">
+          <td colspan="4" style="text-align:center;padding:40px 20px">
+            <div style="font-size:14px;font-weight:500;color:var(--color-text-secondary)">No recent jobs</div>
+          </td>
         </tr>
       </table>
     </div>
@@ -121,21 +126,12 @@
         <div style="font-size: 14px; font-weight: 500; color: var(--color-text-secondary);">Recent activity</div>
       </div>
       <div style="display: flex; flex-direction: column; gap: 20px; margin-top: 24px;">
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <div style="font-size: 13px; font-weight: 500;">JOB-0042 completed on prod-postgres-01</div>
-          <div style="font-size: 11px; color: var(--color-text-tertiary);">Today · 14:22 · sarah.r</div>
+        <div *ngFor="let act of recentActivity" style="display: flex; flex-direction: column; gap: 4px;">
+          <div style="font-size: 13px; font-weight: 500;">{{ act.details }}</div>
+          <div style="font-size: 11px; color: var(--color-text-tertiary);">{{ act.timestamp | date:'short' }} · {{ act.username }}</div>
         </div>
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <div style="font-size: 13px; font-weight: 500;">Datasource profile updated — schema filter changed</div>
-          <div style="font-size: 11px; color: var(--color-text-tertiary);">Today · 13:10 · sarah.r</div>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <div style="font-size: 13px; font-weight: 500;">JOB-0041 failed at regex_detection stage</div>
-          <div style="font-size: 11px; color: var(--color-text-tertiary);">Today · 11:32 · system</div>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <div style="font-size: 13px; font-weight: 500;">User james.k added to data-analysts group</div>
-          <div style="font-size: 11px; color: var(--color-text-tertiary);">Yesterday · 16:45 · sarah.r</div>
+        <div *ngIf="recentActivity.length === 0" style="text-align:center;padding:40px 20px">
+          <div style="font-size:14px;font-weight:500;color:var(--color-text-secondary)">No recent activity</div>
         </div>
       </div>
     </div>

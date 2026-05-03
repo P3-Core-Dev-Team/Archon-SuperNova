@@ -6,7 +6,7 @@
 
   <div class="card" *ngIf="!showForm">
     <div style="display:flex;justify-content:flex-start;margin-bottom:14px">
-      <button class="tb-btn primary" (click)="resetForm(); showForm = true">Add template profile</button>
+      <button class="tb-btn primary" (click)="isEditing=false; currentTplId=null; newTpl={name:'', options:[]}; showForm=true">Add template profile</button>
     </div>
     
     <table class="tbl">
@@ -41,12 +41,12 @@
   </div>
 
   <div class="card" *ngIf="showForm" style="max-width: 800px">
-    <div style="font-size:15px;font-weight:500;margin-bottom:16px">{{ editId ? 'Edit' : 'Create' }} Job Template</div>
+    <div style="font-size:15px;font-weight:500;margin-bottom:16px">{{ currentTplId ? 'Edit' : 'Create' }} Job Template</div>
     
     <div class="form-grid" style="margin-bottom:24px">
       <div class="fg" style="grid-column: 1 / -1">
         <label class="fl">Template Name <span style="color:var(--color-text-danger)">*</span></label>
-        <input class="fi" [(ngModel)]="templateName" placeholder="e.g. Strict PII Scan">
+        <input class="fi" [(ngModel)]="newTpl.name" placeholder="e.g. Strict PII Scan">
       </div>
     </div>
 
@@ -57,7 +57,7 @@
         <th>Min Score</th>
         <th>Max Score</th>
       </tr>
-      <tr *ngFor="let stage of stages">
+      <tr *ngFor="let stage of newTpl.options">
         <td style="text-align: center">
           <input type="checkbox" [(ngModel)]="stage.enabled" style="cursor: pointer; width: 16px; height: 16px;">
         </td>
@@ -77,7 +77,7 @@
 
     <div style="display:flex;gap:8px">
       <button class="tb-btn" (click)="showForm = false">Cancel</button>
-      <button class="tb-btn primary" [disabled]="!templateName" (click)="saveTemplate()">{{ editId ? 'Update' : 'Create' }} Template</button>
+      <button class="tb-btn primary" [disabled]="!newTpl.name" (click)="saveTemplate()">{{ currentTplId ? 'Update' : 'Create' }} Template</button>
     </div>
   </div>
 </div>

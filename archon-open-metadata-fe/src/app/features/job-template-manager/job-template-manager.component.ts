@@ -1,76 +1,52 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
-import { ApiService } from '../../core/api.service';
+import { Component, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 
 @Component({
   selector: 'app-job-template-manager',
   templateUrl: './job-template-manager.component.html',
   styleUrls: ['./job-template-manager.component.css']
 })
-export class JobTemplateManagerComponent {
-  @Input() jobTemplates: any[] = [];
-  @Output() saveTplEvt = new EventEmitter<any>();
-  @Output() deleteTplEvt = new EventEmitter<string>();
-  
+export class JobTemplateManagerComponent implements OnInit {
+  jobTemplates: any[] = [];
   showForm = false;
-  templateName = '';
-  editId: string | null = null;
-  
-  stages = [
-    { name: 'STAGE_1_DETECTION', displayName: '1 DETECTION', enabled: true, minScore: 0.8, maxScore: 1.0 },
-    { name: 'STAGE_2_SCORING', displayName: '2 SCORING', enabled: true, minScore: 0.5, maxScore: 1.0 },
-    { name: 'STAGE_3_CARDINALITY', displayName: '3 CARDINALITY', enabled: false, minScore: 0.0, maxScore: 1.0 },
-    { name: 'STAGE_4_PII_SCAN', displayName: '4 PII SCAN', enabled: true, minScore: 0.9, maxScore: 1.0 },
-    { name: 'STAGE_5_GROUPING', displayName: '5 GROUPING', enabled: false, minScore: 0.7, maxScore: 1.0 },
-    { name: 'STAGE_6_GRAPH', displayName: '6 GRAPH', enabled: true, minScore: 0.0, maxScore: 1.0 },
-    { name: 'STAGE_7_CLASSIFICATION', displayName: '7 CLASSIFICATION', enabled: false, minScore: 0.85, maxScore: 1.0 }
-  ];
+  isEditing = false;
+  currentTplId: string | null = null;
+  newTpl: any = { name: '', options: [] };
+  availableStages = ['schema-crawler', 'metadata-extraction', 'relationship-inference', 'data-profiling', 'pii-detection'];
+  private baseUrl = 'http://localhost:8080/api/v1';
 
-  resetForm() {
-    this.templateName = '';
-    this.editId = null;
-    this.stages.forEach(s => {
-      s.enabled = false;
-      s.minScore = 0.5;
-      s.maxScore = 1.0;
-    });
-  }
+  constructor(private http: HttpClient) {}
 
-  editTemplate(tpl: any) {
-    this.resetForm();
-    this.templateName = tpl.name;
-    this.editId = tpl.id;
-    if (tpl.options) {
-      tpl.options.forEach((opt: any) => {
-        const stage = this.stages.find(s => s.name === opt.operationName);
-        if (stage) {
-          stage.enabled = true;
-          stage.minScore = opt.minValue;
-          stage.maxScore = opt.maxValue;
-        }
-      });
-    }
-    this.showForm = true;
-  }
+  ngOnInit() { this.fetchJobTemplates(); }
 
-  deleteTemplate(id: string) {
-    this.deleteTplEvt.emit(id);
+  fetchJobTemplates() {
+    this.http.get<any>(`${this.baseUrl}/job-template-profiles`).subscribe(res => { this.jobTemplates = res._embedded?.jobTemplateProfileDtoList || []; });
   }
 
   saveTemplate() {
-    const options = this.stages
-      .filter(s => s.enabled)
-      .map(s => ({
-        operationName: s.name,
-        minValue: s.minScore,
-        maxValue: s.maxScore
-      }));
+    if (this.isEditing && this.currentTplId) {
+      this.http.put(`${this.baseUrl}/job-template-profiles/${this.currentTplId}`, this.newTpl).subscribe(() => { this.fetchJobTemplates(); this.showForm = false; });
+    } else {
+      this.http.post(`${this.baseUrl}/job-template-profiles`, this.newTpl).subscribe(() => { this.fetchJobTemplates(); this.showForm = false; });
+    }
+  }
 
-    const payload = {
-      id: this.editId,
-      name: this.templateName,
-      options: options
-    };
-    this.saveTplEvt.emit(payload);
-    this.showForm = false;
+  deleteTemplate(id: string) {
+    this.http.delete(`${this.baseUrl}/job-template-profiles/${id}`).subscribe(() => this.fetchJobTemplates());
+  }
+
+  editTemplate(tpl: any) {
+    this.isEditing = true;
+    this.currentTplId = tpl.id;
+    this.newTpl = { ...tpl, options: tpl.options ? [...tpl.options] : [] };
+    this.showForm = true;
+  }
+
+  addStage() {
+    this.newTpl.options.push({ operationName: 'metadata-extraction', minValue: 0, maxValue: 100 });
+  }
+
+  removeStage(idx: number) {
+    this.newTpl.options.splice(idx, 1);
   }
 }

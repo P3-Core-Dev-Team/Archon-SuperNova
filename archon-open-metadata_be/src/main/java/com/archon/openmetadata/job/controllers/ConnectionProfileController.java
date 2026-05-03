@@ -19,6 +19,9 @@ import org.springframework.hateoas.PagedModel;
 import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.archon.openmetadata.common.repositories.SystemAuditLogRepository;
+import com.archon.openmetadata.common.models.SystemAuditLog;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/v1/connection-profiles")
@@ -28,6 +31,7 @@ public class ConnectionProfileController {
 
   private final ConnectionProfileService service;
   private final ModelMapper modelMapper;
+  private final SystemAuditLogRepository auditRepo;
   private final PagedResourcesAssembler<ConnectionProfile> pagedResourcesAssembler;
 
   @GetMapping

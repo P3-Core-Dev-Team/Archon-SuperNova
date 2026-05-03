@@ -25,6 +25,8 @@ export interface Job {
   jobName?: string;
   jobDescription?: string;
   status?: string;
+  auditlogs?: string;
+  expanded?: boolean;
   createdOn?: string;
   updatedOn?: string;
   datasourceProfile?: {
@@ -70,5 +72,7 @@ export interface ApiResponse<T> {
     [key: string]: any;
   };
   status?: string;
+  auditlogs?: string;
+  expanded?: boolean;
   message?: string;
 }

@@ -41,8 +41,8 @@ export class AppComponent implements OnInit {
     if (this.isDarkTheme) {
       document.body.classList.add('dark-theme');
     }
-    this.fetchDatasources();
-    this.fetchJobs();
+    
+    
   }
 
   showToast(message: string, type: 'success' | 'error' = 'error') {
@@ -66,26 +66,8 @@ export class AppComponent implements OnInit {
     return 'An unknown server error occurred.';
   }
 
-  fetchDatasources() {
-    this.http.get<ApiResponse<ConnectionProfile>>(`${this.baseUrl}/v1/connection-profiles`).subscribe(
-      res => this.datasources = res._embedded?.connectionProfileDtoList || [],
-      err => this.showToast('Failed to load connection profiles: ' + this.extractError(err), 'error')
-    );
-  }
 
-  fetchJobTemplates() {
-    this.http.get<any>(`${this.baseUrl}/v1/job-template-profiles`).subscribe(
-      res => this.jobTemplates = res._embedded?.jobTemplateProfileDtoList || [],
-      err => this.showToast('Failed to load job templates', 'error')
-    );
-  }
 
-  fetchJobs() {
-    this.http.get<ApiResponse<Job>>(`${this.baseUrl}/v1/jobs`).subscribe(
-      res => this.jobs = res._embedded?.jobDtoList || [],
-      err => this.showToast('Failed to load jobs: ' + this.extractError(err), 'error')
-    );
-  }
 
   fetchUsers() {
     this.http.get<ApiResponse<User>>(`${this.baseUrl}/v1/users`).subscribe(
@@ -132,10 +114,10 @@ export class AppComponent implements OnInit {
 
   fetchData() {
     // Keep for backward compatibility with inner component triggers if any
-    if (document.getElementById('p-dashboard')?.classList.contains('on')) { this.fetchDatasources(); this.fetchJobs(); }
-    else if (document.getElementById('p-ds-list')?.classList.contains('on')) this.fetchDatasources();
-    else if (document.getElementById('p-jobs-all')?.classList.contains('on')) { this.fetchJobs(); this.fetchDatasources(); this.fetchJobTemplates(); }
-    else if (document.getElementById('p-settings-tpl')?.classList.contains('on')) this.fetchJobTemplates();
+    if (document.getElementById('p-dashboard')?.classList.contains('on')) {   }
+    else if (document.getElementById('p-ds-list')?.classList.contains('on')) 
+    else if (document.getElementById('p-jobs-all')?.classList.contains('on')) {    }
+    else if (document.getElementById('p-settings-tpl')?.classList.contains('on')) 
     else if (document.getElementById('p-admin-users')?.classList.contains('on')) { this.fetchUsers(); this.fetchGroups(); }
     else if (document.getElementById('p-admin-groups')?.classList.contains('on')) this.fetchGroups();
   }
@@ -156,16 +138,16 @@ export class AppComponent implements OnInit {
     
     // Trigger specific APIs based on screen selection
     if (id === 'dashboard') {
-      this.fetchDatasources();
-      this.fetchJobs();
+      
+      
     } else if (id === 'ds-list') {
-      this.fetchDatasources();
+      
     } else if (id === 'jobs-all') {
-      this.fetchJobs();
-      this.fetchDatasources();
-      this.fetchJobTemplates();
+      
+      
+      
     } else if (id === 'settings-tpl') {
-      this.fetchJobTemplates();
+      
     } else if (id === 'settings-system') {
       this.fetchSystemProperties();
     } else if (id === 'system-audit') {
@@ -199,23 +181,6 @@ export class AppComponent implements OnInit {
     }
   }
 
-  testConnection() {
-    const driver = this.newDs.dbType === 'postgres' ? 'postgresql' : this.newDs.dbType;
-    const payload = {
-      profileName: this.newDs.profileName,
-      url: `jdbc:${driver}://${this.newDs.host}:${this.newDs.port}/${this.newDs.databaseName}`,
-      user: this.newDs.username,
-      pass: this.newDs.password
-    };
-    this.http.post<any>(`${this.baseUrl}/v1/connection-profiles/test-connection`, payload).subscribe(
-      res => {
-        if (res.status === 'SUCCESS') {
-          this.testResult = 'Connection successful!';
-          this.showToast('Connection tested successfully.', 'success');
-        } else {
-          this.testResult = 'Connection failed: ' + res.message;
-          this.showToast('Test failed: ' + res.message, 'error');
-        }
       },
       err => {
         this.testResult = 'Connection failed!';
@@ -257,47 +222,7 @@ export class AppComponent implements OnInit {
     }
   }
 
-  deleteJobTemplate(id: string) {
-    this.http.delete(`${this.baseUrl}/v1/job-template-profiles/${id}`).subscribe(
-      res => {
-        this.showToast('Job template deleted.', 'success');
-        this.fetchData();
-      },
-      err => this.showToast('Failed to delete template: ' + this.extractError(err), 'error')
-    );
-  }
 
-  saveDatasource() {
-    const driver = this.newDs.dbType === 'postgres' ? 'postgresql' : this.newDs.dbType;
-    const payload = {
-      profileName: this.newDs.profileName,
-      url: `jdbc:${driver}://${this.newDs.host}:${this.newDs.port}/${this.newDs.databaseName}`,
-      user: this.newDs.username,
-      pass: this.newDs.password,
-      listOfSchemas: this.newDs.listOfSchemas
-    };
-
-    if (this.newDs.id) {
-      this.http.put(`${this.baseUrl}/v1/connection-profiles/${this.newDs.id}`, payload).subscribe(
-        res => {
-          this.showToast('Datasource updated successfully.', 'success');
-          this.fetchData();
-          this.go('ds-list', null, 'Data', 'Datasources');
-          this.resetDsForm();
-        },
-        err => this.showToast('Failed to update datasource: ' + this.extractError(err), 'error')
-      );
-    } else {
-      this.http.post(`${this.baseUrl}/v1/connection-profiles`, payload).subscribe(
-        res => {
-          this.showToast('Datasource saved successfully.', 'success');
-          this.fetchData();
-          this.go('ds-list', null, 'Data', 'Datasources');
-          this.resetDsForm();
-        },
-        err => this.showToast('Failed to save datasource: ' + this.extractError(err), 'error')
-      );
-    }
   }
 
   editDatasource(ds: ConnectionProfile) {
@@ -316,34 +241,6 @@ export class AppComponent implements OnInit {
     this.go('ds-new', null, 'Datasources', 'Edit profile');
   }
 
-  resetDsForm() {
-    this.newDs = { dbType: 'postgres', port: 5432, host: '127.0.0.1', username: 'adsuser', password: 'AdS@3421', listOfSchemas: '' };
-    this.testResult = '';
-  }
 
-  deleteDatasource(id: string | undefined) {
-    if (!id) return;
-    if (confirm('Are you sure you want to delete this datasource?')) {
-      this.http.delete(`${this.baseUrl}/v1/connection-profiles/${id}`).subscribe(
-        () => {
-          this.showToast('Datasource deleted.', 'success');
-          this.fetchData();
-        },
-        err => this.showToast('Failed to delete datasource: ' + this.extractError(err), 'error')
-      );
-    }
-  }
 
-  deleteJob(id: string | undefined) {
-    if (!id) return;
-    if (confirm('Are you sure you want to delete this job?')) {
-      this.http.delete(`${this.baseUrl}/v1/jobs/${id}`).subscribe(
-        () => {
-          this.showToast('Job deleted.', 'success');
-          this.fetchData();
-        },
-        err => this.showToast('Failed to delete job: ' + this.extractError(err), 'error')
-      );
-    }
-  }
 }

@@ -1,26 +1,42 @@
-import { ConnectionProfile, Job, DatasourceForm, User, Group } from '../../core/models/app.models';
-import { Component, Input } from '@angular/core';
+import { Component, OnInit, Output, EventEmitter } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 
 @Component({
   selector: 'app-dashboard',
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.css']
 })
-export class DashboardComponent {
-  @Input() datasources: any[] = [];
-  @Input() jobs: any[] = [];
+export class DashboardComponent implements OnInit {
+  datasources: any[] = [];
+  jobs: any[] = [];
+  tablesProfiled: number = 0;
+  relationshipsCount: number = 0;
+  sensitiveDataCount: number = 0;
+  recentActivity: any[] = [];
+  private baseUrl = 'http://localhost:8080/api/v1';
 
-  mockDatasources = [
-    { profileName: 'prod-postgres-01', dbType: 'PostgreSQL', tables: 412, lastCrawl: '2h ago', status: 'Active' },
-    { profileName: 'warehouse-bq', dbType: 'BigQuery', tables: 840, lastCrawl: '6h ago', status: 'Active' },
-    { profileName: 'legacy-mysql', dbType: 'MySQL', tables: 197, lastCrawl: '3d ago', status: 'Stale' },
-    { profileName: 'snowflake-dwh', dbType: 'Snowflake', tables: 398, lastCrawl: '1h ago', status: 'Active' }
-  ];
+  @Output() viewJobEvt = new EventEmitter<string>();
 
-  mockJobs = [
-    { jobId: 'JOB-0042', source: 'prod-postgres-01', stage: '6/6', status: 'Done' },
-    { jobId: 'JOB-0043', source: 'warehouse-bq', stage: '3/6', status: 'Running' },
-    { jobId: 'JOB-0044', source: 'snowflake-dwh', stage: '4/6', status: 'Running' },
-    { jobId: 'JOB-0041', source: 'legacy-mysql', stage: '2/6', status: 'Failed' }
-  ];
+  constructor(private http: HttpClient) {}
+
+  ngOnInit() {
+    this.fetchDatasources();
+    this.fetchJobs();
+    this.fetchAudits();
+    setInterval(() => { this.fetchJobs(); }, 3000);
+  }
+
+  fetchDatasources() {
+    this.http.get<any>(`${this.baseUrl}/connection-profiles`).subscribe(res => { this.datasources = res._embedded?.connectionProfileDtoList || []; });
+  }
+  fetchJobs() {
+    this.http.get<any>(`${this.baseUrl}/jobs`).subscribe(res => { this.jobs = res._embedded?.jobDtoList || []; });
+  }
+  fetchAudits() {
+    this.http.get<any[]>('http://localhost:8080/api/audits').subscribe(res => { this.recentActivity = res || []; });
+  }
+
+  viewJob(id: string) {
+    this.viewJobEvt.emit(id);
+  }
 }

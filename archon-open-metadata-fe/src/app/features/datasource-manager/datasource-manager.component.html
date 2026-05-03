@@ -1,7 +1,7 @@
 <div id="p-ds-list" class="page">
         <div class="page-header"><div class="page-title">Datasource connections</div></div>
         <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
-          <button class="tb-btn primary" (click)="resetDsForm(); go('ds-new', null, 'Datasources', 'Add profile')">Add profile</button>
+          <button class="tb-btn primary" (click)="resetDsForm(); showForm = true">Add profile</button>
         </div>
         <div class="card">
           <table class="tbl">
@@ -25,7 +25,7 @@
                 <img src="assets/empty-state.png" alt="Empty" style="width:140px;height:auto;margin-bottom:16px;opacity:0.8">
                 <div style="font-size:15px;font-weight:500;color:var(--color-text-primary)">No datasources configured</div>
                 <div style="font-size:13px;color:var(--color-text-tertiary);margin-top:6px;margin-bottom:16px">Get started by adding a connection profile to analyze your data.</div>
-                <button class="tb-btn primary" style="margin:0 auto" (click)="resetDsForm(); go('ds-new', null, 'Datasources', 'Add profile')">Add your first profile</button>
+                <button class="tb-btn primary" style="margin:0 auto" (click)="resetDsForm(); showForm = true">Add your first profile</button>
               </td>
             </tr>
           </table>
@@ -51,8 +51,8 @@
             <div class="fg"><label class="fl">Password <span style="color:var(--color-text-danger)">*</span></label><input class="fi" type="password" [(ngModel)]="newDs.password"/></div>
           </div>
           <div style="display:flex;gap:8px;padding-top:4px">
-            <button class="tb-btn" [disabled]="!isDsFormValid" [style.opacity]="!isDsFormValid ? '0.5' : '1'" (click)="testConnection.emit()">Test connection</button>
-            <button class="tb-btn primary" [disabled]="!isDsFormValid || testResult !== 'Connection successful!'" [style.opacity]="!isDsFormValid || testResult !== 'Connection successful!' ? '0.5' : '1'" (click)="saveDatasource.emit()">&#123;&#123; newDs.id ? 'Update' : 'Save' &#125;&#125; profile</button>
+            <button class="tb-btn" [disabled]="!isDsFormValid" [style.opacity]="!isDsFormValid ? '0.5' : '1'" (click)="testConnection()">Test connection</button>
+            <button class="tb-btn primary" [disabled]="!isDsFormValid || testResult !== 'Connection successful!'" [style.opacity]="!isDsFormValid || testResult !== 'Connection successful!' ? '0.5' : '1'" (click)="saveDatasource()">&#123;&#123; newDs.id ? 'Update' : 'Save' &#125;&#125; profile</button>
           </div>
           <div *ngIf="testResult" style="margin-top:10px;font-size:13px;font-weight:500;"
                [ngStyle]="{'color': testResult.includes('failed') ? 'var(--color-text-danger)' : 'var(--color-text-success)'}">

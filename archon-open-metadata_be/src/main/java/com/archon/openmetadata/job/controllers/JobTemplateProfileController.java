@@ -19,6 +19,9 @@ import org.springframework.hateoas.PagedModel;
 import org.springframework.hateoas.server.mvc.WebMvcLinkBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.archon.openmetadata.common.repositories.SystemAuditLogRepository;
+import com.archon.openmetadata.common.models.SystemAuditLog;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/v1/job-template-profiles")
@@ -28,6 +31,7 @@ public class JobTemplateProfileController {
 
   private final JobTemplateProfileService service;
   private final ModelMapper modelMapper;
+  private final SystemAuditLogRepository auditRepo;
   private final PagedResourcesAssembler<JobTemplateProfile> pagedResourcesAssembler;
 
   @GetMapping
@@ -66,6 +70,13 @@ public class JobTemplateProfileController {
       entity.getOptions().forEach(o -> o.setJobTemplateProfile(entity));
     }
     JobTemplateProfile saved = service.save(entity);
+    SystemAuditLog audit = new SystemAuditLog();
+    audit.setAction("JobTemplate");
+    audit.setDetails("JobTemplate created: " + saved.getName());
+    audit.setTimestamp(LocalDateTime.now());
+    audit.setUsername("system");
+    auditRepo.save(audit);
+
     return ResponseEntity.ok(
         EntityModel.of(
             modelMapper.map(saved, JobTemplateProfileDto.class),

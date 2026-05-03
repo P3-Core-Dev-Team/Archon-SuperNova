@@ -112,10 +112,10 @@
 
       
       <!-- Refactored Module Components -->
-      <app-dashboard [datasources]="datasources" [jobs]="jobs"></app-dashboard>
-      <app-datasource-manager [datasources]="datasources" [newDs]="newDs" [isDsFormValid]="isDsFormValid" [testResult]="testResult" (testConnection)="testConnection()" (saveDatasource)="saveDatasource()" (editDs)="editDatasource($event)" (deleteDs)="deleteDatasource($event)" (resetDs)="resetDsForm()" (goEvt)="go($event.id, $event.target, $event.section, $event.screen)"></app-datasource-manager>
-      <app-job-profile [jobs]="jobs" [datasources]="datasources" [jobTemplates]="jobTemplates" (createJobEvt)="createJob($event)" (deleteJobEvt)="deleteJob($event)"></app-job-profile>
-      <app-job-template-manager [jobTemplates]="jobTemplates" (saveTplEvt)="saveJobTemplate($event)" (deleteTplEvt)="deleteJobTemplate($event)"></app-job-template-manager>
+      <app-dashboard (viewJobEvt)="go('jobs-all', null, 'Jobs', 'Job profiles')"></app-dashboard>
+      <app-datasource-manager></app-datasource-manager>
+      <app-job-profile></app-job-profile>
+      <app-job-template-manager></app-job-template-manager>
       
       
       <div id="p-settings-system" class="page">
