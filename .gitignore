@@ -38,3 +38,4 @@ parquet/
 /archon-open-metadata-design/
 /archon-open-metadata-build-deployment/
 /archon-open-metadata_be/
+.idea
