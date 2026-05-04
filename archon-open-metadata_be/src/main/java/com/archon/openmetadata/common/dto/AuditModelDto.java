@@ -9,4 +9,5 @@ public abstract class AuditModelDto {
   private LocalDateTime updatedAt;
   private String modifiedDetails;
   private String auditUser;
+  private Boolean isActive;
 }

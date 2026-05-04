@@ -12,5 +12,7 @@ import lombok.EqualsAndHashCode;
 public class GroupDto extends AuditModelDto {
   private UUID id;
   private String groupName;
+  private String description;
   private java.util.List<RoleDto> roles;
+  private java.util.List<UserDto> users;
 }

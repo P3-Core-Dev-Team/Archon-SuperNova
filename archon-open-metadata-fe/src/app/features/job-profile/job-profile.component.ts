@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { ConnectionProfile, Job, JobTemplate, ApiResponse } from '../../core/models/app.models';
 
 @Component({
   selector: 'app-job-profile',
@@ -7,11 +8,12 @@ import { HttpClient } from '@angular/common/http';
   styleUrls: ['./job-profile.component.css']
 })
 export class JobProfileComponent implements OnInit {
-  jobs: any[] = [];
-  datasources: any[] = [];
-  jobTemplates: any[] = [];
+  jobs: Job[] = [];
+  datasources: ConnectionProfile[] = [];
+  jobTemplates: JobTemplate[] = [];
   showForm = false;
-  newJob: any = {};
+  newJob: Partial<Job> & { datasourceId?: string, templateId?: string } = {};
+  selectedJob: Job | null = null;
   private baseUrl = 'http://localhost:8080/api/v1';
 
   constructor(private http: HttpClient) {}
@@ -20,23 +22,23 @@ export class JobProfileComponent implements OnInit {
     this.fetchJobs();
     this.fetchDatasources();
     this.fetchJobTemplates();
-    setInterval(() => this.fetchJobs(), 3000);
   }
 
   fetchJobs() {
-    this.http.get<any>(`${this.baseUrl}/jobs`).subscribe(res => { this.jobs = res._embedded?.jobDtoList || []; });
+    this.http.get<ApiResponse<Job>>(`${this.baseUrl}/jobs`).subscribe(res => { this.jobs = res._embedded?.jobDtoList || []; });
   }
   fetchDatasources() {
-    this.http.get<any>(`${this.baseUrl}/connection-profiles`).subscribe(res => { this.datasources = res._embedded?.connectionProfileDtoList || []; });
+    this.http.get<ApiResponse<ConnectionProfile>>(`${this.baseUrl}/connection-profiles`).subscribe(res => { this.datasources = res._embedded?.connectionProfileDtoList || []; });
   }
   fetchJobTemplates() {
-    this.http.get<any>(`${this.baseUrl}/job-template-profiles`).subscribe(res => { this.jobTemplates = res._embedded?.jobTemplateProfileDtoList || []; });
+    this.http.get<ApiResponse<JobTemplate>>(`${this.baseUrl}/job-template-profiles`).subscribe(res => { this.jobTemplates = res._embedded?.jobTemplateProfileDtoList || []; });
   }
   createJob() {
     const payload = { jobName: this.newJob.jobName, datasourceProfile: { id: this.newJob.datasourceId }, jobTemplateProfile: { id: this.newJob.templateId }, status: 'Pending' };
-    this.http.post(`${this.baseUrl}/jobs`, payload).subscribe(() => { this.fetchJobs(); this.showForm = false; });
+    this.http.post<Job>(`${this.baseUrl}/jobs`, payload).subscribe(() => { this.fetchJobs(); this.showForm = false; });
   }
-  deleteJob(id: string) {
-    this.http.delete(`${this.baseUrl}/jobs/${id}`).subscribe(() => this.fetchJobs());
+  deleteJob(id: string | undefined) {
+    if (!id) return;
+    this.http.delete<void>(`${this.baseUrl}/jobs/${id}`).subscribe(() => this.fetchJobs());
   }
 }

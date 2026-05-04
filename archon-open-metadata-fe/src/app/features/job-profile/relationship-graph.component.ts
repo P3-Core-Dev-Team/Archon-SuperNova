@@ -6,6 +6,29 @@ import { DataSet } from 'vis-data/peer';
 import { Edge as VisEdge, Network, Node as VisNode, Options } from 'vis-network/peer';
 import { ApiService } from '../../core/api.service';
 
+export interface GraphNode {
+  id: string;
+  label: string;
+  value?: number;
+}
+
+export interface GraphEdge {
+  source?: string;
+  from?: string;
+  target?: string;
+  to?: string;
+  label?: string;
+  score?: number;
+  confidence?: number;
+  cardinality?: string;
+}
+
+export interface GraphData {
+  schema?: string;
+  nodes?: GraphNode[];
+  edges?: GraphEdge[];
+}
+
 @Component({
   selector: 'app-relationship-graph',
   template: `
@@ -53,10 +76,10 @@ import { ApiService } from '../../core/api.service';
 
     <div class="edge-panel card" *ngIf="selectedEdge">
       <div class="title">Edge detail</div>
-      <div><strong>{{ selectedEdge.from }}</strong> → <strong>{{ selectedEdge.to }}</strong></div>
+      <div><strong>{{ selectedEdge.source || selectedEdge.from }}</strong> → <strong>{{ selectedEdge.target || selectedEdge.to }}</strong></div>
       <div class="muted">{{ selectedEdge.label }}</div>
       <div>Cardinality: <code>{{ selectedEdge.cardinality }}</code></div>
-      <div>Confidence: {{ selectedEdge.confidence | number:'1.3-3' }}</div>
+      <div>Confidence: {{ (selectedEdge.score || selectedEdge.confidence || 0) | number:'1.3-3' }}</div>
     </div>
 
     <div class="error" *ngIf="error">{{ error }}</div>
@@ -93,15 +116,15 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
   visibleEdgeCount = 0;
   loading = true;
   error: string | null = null;
-  selectedEdge: any = null;
+  selectedEdge: GraphEdge | null = null;
   minConfidence = 0;
   hierarchical = false;
 
   network: Network | null = null;
-  private allEdges: any[] = [];
+  private allEdges: GraphEdge[] = [];
   private nodesData = new DataSet<VisNode>();
   private edgesData = new DataSet<VisEdge>();
-  private edgeById = new Map<string, any>();
+  private edgeById = new Map<string, GraphEdge>();
 
   constructor(private api: ApiService) {}
 
@@ -164,23 +187,23 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
     this.loading = true;
     this.error = null;
     this.api.getJobRelationships(this.jobId).subscribe({
-      next: (g: any) => {
+      next: (g: GraphData) => {
         this.schema = g?.schema || 'public';
         this.totalTables = g?.nodes?.length || 0;
         this.totalEdges = g?.edges?.length || 0;
         this.allEdges = g?.edges || [];
         this.paintNodes(g?.nodes || []);
       },
-      error: (err: any) => {
+      error: (err: Error) => {
         this.loading = false;
         this.error = err?.message || 'Failed to load relationship graph.';
       }
     });
   }
 
-  private paintNodes(nodes: any[]): void {
+  private paintNodes(nodes: GraphNode[]): void {
     this.nodesData.clear();
-    this.nodesData.add(nodes.map((n: any) => ({
+    this.nodesData.add(nodes.map((n: GraphNode) => ({
       id: n.id,
       label: n.label,
       value: n.value || 1,
@@ -218,6 +241,7 @@ export class RelationshipGraphComponent implements AfterViewInit, OnChanges, OnD
       const label = this.labelFor(e.cardinality);
       if (label) {
         edge.label = label;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         edge.font = { size: 12, color: '#0d1117', face: 'monospace', background: 'rgba(255,255,255,0.8)', strokeWidth: 0, align: 'middle' } as any;
       }
       visEdges.push(edge);

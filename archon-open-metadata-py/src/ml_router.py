@@ -17,32 +17,32 @@ router = APIRouter()
 
 @router.post("/api/v1/metadata/detect-candidates")
 def stage_candidate_detection(req: BulkSchemaRequest):
-    candidates = CandidateMatcher.detect_candidates(req.tables)
+    candidates = CandidateMatcher.detect_candidates(req.tables, req.minValue, req.maxValue)
     return {"message": "Candidate detection complete", "candidates": candidates}
 
 @router.post("/api/v1/metadata/score-relationships")
-def stage_relationship_scoring(req: dict):
-    scored = RelationshipScorer.score_relationships(req.get("candidates", []))
+def stage_relationship_scoring(req: CandidateResponse):
+    scored = RelationshipScorer.score_relationships(req.candidates, req.minValue, req.maxValue)
     return {"message": "Relationship scoring complete", "candidates": scored}
 
 @router.post("/api/v1/data/extract-cardinality")
 def stage_cardinality(req: CardinalityRequest):
-    relationships = CardinalityExtractor.extract_cardinality(req.connection, req.candidates)
+    relationships = CardinalityExtractor.extract_cardinality(req.connection, req.candidates, req.minValue, req.maxValue)
     return {"message": "Cardinality extraction complete", "relationships": relationships}
 
 @router.post("/api/v1/metadata/detect-sensitive")
 def stage_sensitive_detection(req: BulkSchemaRequest):
-    sensitive_columns = SensitiveColumnAnalyzer.detect_sensitive_columns(req.tables)
+    sensitive_columns = SensitiveColumnAnalyzer.detect_sensitive_columns(req.tables, req.minValue, req.maxValue)
     return {"message": "Saved sensitive columns", "sensitive_columns": sensitive_columns}
 
 @router.post("/api/v1/metadata/group-domains")
 def stage_domain_grouping(req: BulkSchemaRequest):
-    clusters = DomainGrouper.group_domains(req.tables, (req.schemaCrawlerRelationships or []) + (req.mlRelationships or []))
+    clusters = DomainGrouper.group_domains(req.tables, (req.schemaCrawlerRelationships or []) + (req.mlRelationships or []), req.minValue, req.maxValue)
     return {"message": "Saved domain grouping", "clusters": clusters}
 
 @router.post("/api/v1/metadata/classify-entities")
 def stage_entity_classification(req: BulkSchemaRequest):
-    classifications = EntityClassifier.classify_entities(req.tables, (req.schemaCrawlerRelationships or []) + (req.mlRelationships or []))
+    classifications = EntityClassifier.classify_entities(req.tables, (req.schemaCrawlerRelationships or []) + (req.mlRelationships or []), req.minValue, req.maxValue)
     return {"message": "Classification complete", "classifications": classifications}
 
 @router.post("/api/v1/data/sensitive-analysis")

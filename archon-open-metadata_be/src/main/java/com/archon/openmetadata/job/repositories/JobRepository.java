@@ -7,4 +7,8 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface JobRepository extends JpaRepository<Job, UUID>, JpaSpecificationExecutor<Job> {}
+public interface JobRepository extends JpaRepository<Job, UUID>, JpaSpecificationExecutor<Job> {
+    
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"jobTemplateProfile", "jobTemplateProfile.options"})
+    java.util.List<Job> findByStatusIgnoreCase(String status);
+}

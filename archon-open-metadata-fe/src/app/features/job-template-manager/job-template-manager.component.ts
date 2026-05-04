@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { JobTemplate, JobTemplateOption, ApiResponse } from '../../core/models/app.models';
 
 @Component({
   selector: 'app-job-template-manager',
@@ -7,12 +8,22 @@ import { HttpClient } from '@angular/common/http';
   styleUrls: ['./job-template-manager.component.css']
 })
 export class JobTemplateManagerComponent implements OnInit {
-  jobTemplates: any[] = [];
+  jobTemplates: JobTemplate[] = [];
   showForm = false;
   isEditing = false;
   currentTplId: string | null = null;
-  newTpl: any = { name: '', options: [] };
-  availableStages = ['schema-crawler', 'metadata-extraction', 'relationship-inference', 'data-profiling', 'pii-detection'];
+  newTpl: JobTemplate = { name: '', description: '', options: [] };
+  
+  pipelineStages = [
+    { operationName: 'SCHEMA_EXTRACTION', displayName: '1. Schema Extraction (JDBC)', locked: true },
+    { operationName: 'CANDIDATE_GENERATION', displayName: '1.5 ML Candidate Matching', locked: false },
+    { operationName: 'SEMANTIC_SCORING', displayName: '2. Context/Semantic Scoring', locked: false },
+    { operationName: 'CARDINALITY_MAPPING', displayName: '3. Data Cardinality Verification', locked: false },
+    { operationName: 'SENSITIVE_DETECTION', displayName: '4. SpaCy Deep PII Classification', locked: false },
+    { operationName: 'DOMAIN_AGGREGATION', displayName: '5. Domain Vector Aggregation', locked: false },
+    { operationName: 'ERD_GENERATION', displayName: '6. ERD Graph Context Generation', locked: true }
+  ];
+
   private baseUrl = 'http://localhost:8080/api/v1';
 
   constructor(private http: HttpClient) {}
@@ -20,33 +31,73 @@ export class JobTemplateManagerComponent implements OnInit {
   ngOnInit() { this.fetchJobTemplates(); }
 
   fetchJobTemplates() {
-    this.http.get<any>(`${this.baseUrl}/job-template-profiles`).subscribe(res => { this.jobTemplates = res._embedded?.jobTemplateProfileDtoList || []; });
+    this.http.get<ApiResponse<JobTemplate>>(`${this.baseUrl}/job-template-profiles`).subscribe(res => { this.jobTemplates = res._embedded?.jobTemplateProfileDtoList || []; });
   }
 
-  saveTemplate() {
-    if (this.isEditing && this.currentTplId) {
-      this.http.put(`${this.baseUrl}/job-template-profiles/${this.currentTplId}`, this.newTpl).subscribe(() => { this.fetchJobTemplates(); this.showForm = false; });
-    } else {
-      this.http.post(`${this.baseUrl}/job-template-profiles`, this.newTpl).subscribe(() => { this.fetchJobTemplates(); this.showForm = false; });
-    }
-  }
-
-  deleteTemplate(id: string) {
-    this.http.delete(`${this.baseUrl}/job-template-profiles/${id}`).subscribe(() => this.fetchJobTemplates());
-  }
-
-  editTemplate(tpl: any) {
-    this.isEditing = true;
-    this.currentTplId = tpl.id;
-    this.newTpl = { ...tpl, options: tpl.options ? [...tpl.options] : [] };
+  createNew() {
+    this.isEditing = false;
+    this.currentTplId = null;
+    this.newTpl = {
+      name: '',
+      description: '',
+      options: this.pipelineStages.map(s => ({
+        operationName: s.operationName,
+        displayName: s.displayName,
+        locked: s.locked,
+        enabled: s.locked, // Pre-enable locked ones
+        minValue: 0.0,
+        maxValue: 1.0
+      }))
+    };
     this.showForm = true;
   }
 
-  addStage() {
-    this.newTpl.options.push({ operationName: 'metadata-extraction', minValue: 0, maxValue: 100 });
+  saveTemplate() {
+    const payload: JobTemplate = {
+      name: this.newTpl.name,
+      description: this.newTpl.description,
+      // Only send enabled options to backend
+      options: (this.newTpl.options || [])
+        .filter((o: JobTemplateOption) => o.enabled)
+        .map((o: JobTemplateOption) => ({
+          operationName: o.operationName,
+          minValue: o.minValue,
+          maxValue: o.maxValue
+        }))
+    };
+
+    if (this.isEditing && this.currentTplId) {
+      this.http.put<JobTemplate>(`${this.baseUrl}/job-template-profiles/${this.currentTplId}`, payload).subscribe(() => { this.fetchJobTemplates(); this.showForm = false; });
+    } else {
+      this.http.post<JobTemplate>(`${this.baseUrl}/job-template-profiles`, payload).subscribe(() => { this.fetchJobTemplates(); this.showForm = false; });
+    }
   }
 
-  removeStage(idx: number) {
-    this.newTpl.options.splice(idx, 1);
+  deleteTemplate(id: string | undefined) {
+    if (!id) return;
+    this.http.delete<void>(`${this.baseUrl}/job-template-profiles/${id}`).subscribe(() => this.fetchJobTemplates());
+  }
+
+  editTemplate(tpl: JobTemplate) {
+    this.isEditing = true;
+    this.currentTplId = tpl.id || null;
+    
+    // Map existing backend options to our UI layout
+    this.newTpl = {
+      name: tpl.name,
+      description: tpl.description || '',
+      options: this.pipelineStages.map(s => {
+        const existing = tpl.options?.find((o: JobTemplateOption) => o.operationName === s.operationName);
+        return {
+          operationName: s.operationName,
+          displayName: s.displayName,
+          locked: s.locked,
+          enabled: s.locked || !!existing,
+          minValue: existing ? existing.minValue : 0.0,
+          maxValue: existing ? existing.maxValue : 1.0
+        };
+      })
+    };
+    this.showForm = true;
   }
 }

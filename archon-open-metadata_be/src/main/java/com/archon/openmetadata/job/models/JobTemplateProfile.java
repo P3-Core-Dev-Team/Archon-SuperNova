@@ -13,9 +13,7 @@ import org.hibernate.annotations.GenericGenerator;
 
 @Entity
 @JsonIdentityInfo(generator = ObjectIdGenerators.PropertyGenerator.class, property = "id")
-@Table(
-    name = "job_template_profiles",
-    indexes = {@Index(name = "idx_jtp_name", columnList = "name")})
+@Table(name = "job_template_profiles", indexes = { @Index(name = "idx_jtp_name", columnList = "name") })
 @Data
 @EqualsAndHashCode(callSuper = true, exclude = "options")
 @ToString(exclude = "options")
@@ -26,6 +24,7 @@ public class JobTemplateProfile extends AuditModel {
   private UUID id;
 
   private String name;
+  private String description;
 
   @OneToMany(mappedBy = "jobTemplateProfile", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
   private List<JobTemplateOptionRule> options;

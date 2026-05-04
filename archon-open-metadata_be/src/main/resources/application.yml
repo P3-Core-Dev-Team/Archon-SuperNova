@@ -7,7 +7,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
   security:
     user:
       name: admin
@@ -23,3 +23,10 @@ app:
     allowed-headers: "*"
     allowed-methods: "*"
     path-pattern: "/**"
+
+  crypto:
+    secret: "archon-supernova-secret-v1"
+
+  ml:
+    api:
+      url: "http://127.0.0.1:7000/api/v1"

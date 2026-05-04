@@ -17,6 +17,9 @@ import { AdminComponent } from './features/admin/admin.component';
 import { UserProfileComponent } from './features/user-profile/user-profile.component';
 import { JobTemplateManagerComponent } from './features/job-template-manager/job-template-manager.component';
 import { RelationshipGraphComponent } from './features/job-profile/relationship-graph.component';
+import { JobDetailComponent } from './features/job-detail/job-detail.component';
+import { PageHeaderComponent } from './shared/components/page-header/page-header.component';
+import { PaginationComponent } from './shared/components/pagination/pagination.component';
 
 const routes: Routes = [
   { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
@@ -46,7 +49,10 @@ export function HttpLoaderFactory() {
     AdminComponent,
     UserProfileComponent,
     JobTemplateManagerComponent,
-    RelationshipGraphComponent
+    RelationshipGraphComponent,
+    JobDetailComponent,
+    PageHeaderComponent,
+    PaginationComponent
   ],
   imports: [
     BrowserModule,

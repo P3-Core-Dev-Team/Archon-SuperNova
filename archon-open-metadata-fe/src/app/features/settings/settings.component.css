@@ -1,0 +1,107 @@
+.glass-panel {
+  background: var(--color-background-secondary, #f8fafc);
+  border: 1px solid var(--color-border-tertiary, #e2e8f0);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+}
+
+.dark-theme .glass-panel {
+  background: var(--color-background-secondary, #1e293b);
+  border-color: var(--color-border-tertiary, #334155);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+h2.gradient-text {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text-primary, #0f172a);
+  margin-bottom: 8px;
+}
+
+.dark-theme h2.gradient-text {
+  color: var(--color-text-primary, #f8fafc);
+}
+
+h3 {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text-primary, #0f172a);
+  margin-bottom: 8px;
+}
+
+.dark-theme h3 {
+  color: var(--color-text-primary, #f8fafc);
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #475569);
+  margin-bottom: 6px;
+}
+
+.dark-theme .form-group label {
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+.form-control {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-tertiary, #cbd5e1);
+  border-radius: 6px;
+  background: var(--color-background-primary, #ffffff);
+  color: var(--color-text-primary, #0f172a);
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.dark-theme .form-control {
+  background: var(--color-background-primary, #0f172a);
+  border-color: var(--color-border-tertiary, #334155);
+  color: var(--color-text-primary, #f8fafc);
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.2);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn:hover {
+  background: #1d4ed8;
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
