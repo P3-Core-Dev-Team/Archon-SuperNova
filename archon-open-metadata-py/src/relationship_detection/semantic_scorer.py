@@ -12,7 +12,7 @@ class RelationshipScorer:
     on contextual similarity.
     """
     @staticmethod
-    def score_relationships(candidates: list[dict]) -> list[dict]:
+    def score_relationships(candidates: list[dict],minValue: int, maxValue: int) -> list[dict]:
         scored = []
         for cand in candidates:
             col_a = cand.get("col_a", "")
@@ -33,7 +33,7 @@ class RelationshipScorer:
             
             final_score = min(100.0, base_score + semantic_boost)
                 
-            if final_score >= 55.0:
+            if minValue <= final_score <= maxValue:
                 cand["score"] = round(final_score / 100.0, 2)
                 scored.append(cand)
                 

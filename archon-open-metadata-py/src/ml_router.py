@@ -21,12 +21,12 @@ router = APIRouter()
 """
 @router.post("/api/v1/metadata/detect-candidates")
 def stage_candidate_detection(req: BulkSchemaRequest):
-    candidates = CandidateMatcher.detect_candidates(req.tables)
+    candidates = CandidateMatcher.detect_candidates(req.tables,req.minValue,req.maxValue)
     return {"message": "Candidate detection complete", "candidates": candidates}
 
 @router.post("/api/v1/metadata/score-relationships")
 def stage_relationship_scoring(req: dict):
-    scored = RelationshipScorer.score_relationships(req.get("candidates", []))
+    scored = RelationshipScorer.score_relationships(req.get("candidates", []),req.minValue,req.maxValue)
     return {"message": "Relationship scoring complete", "candidates": scored}
 
 """

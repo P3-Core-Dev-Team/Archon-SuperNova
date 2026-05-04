@@ -33,6 +33,13 @@ public class User extends AuditModel {
   @Column(name = "auth_type")
   private String authType;
 
+  @Column(name = "email")
+  private String email;
+
+  @Column(name = "status")
+  private String status;
+
+  private LocalDateTime lastLogin;
   @ManyToMany
   @JoinTable(
       name = "user_group_mappings",

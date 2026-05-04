@@ -32,7 +32,6 @@ public class CryptoKeyController {
     try {
       // 1. Fetch all connection profiles
       List<ConnectionProfile> profiles = connectionProfileRepository.findAll();
-      
       // 2. Re-encrypt with new key
       for (ConnectionProfile cp : profiles) {
         if (cp.getPass() != null) {
@@ -43,15 +42,11 @@ public class CryptoKeyController {
           cp.setPass(newCipher);
         }
       }
-      
       // 3. Save all updated profiles
       connectionProfileRepository.saveAll(profiles);
-      
       // 4. Update the active key in memory
       cryptoUtils.setSecret(newKey);
-      
       log.info("Successfully rotated crypto key and updated {} connection profiles.", profiles.size());
-      
       return ResponseEntity.ok(Map.of(
           "message", "Key rotated successfully.",
           "profilesUpdated", profiles.size(),

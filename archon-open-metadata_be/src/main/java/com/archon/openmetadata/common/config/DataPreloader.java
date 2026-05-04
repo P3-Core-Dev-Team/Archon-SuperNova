@@ -11,6 +11,7 @@ import com.archon.openmetadata.iam.repositories.UserRepository;
 import com.archon.openmetadata.job.models.ConnectionProfile;
 import com.archon.openmetadata.job.models.JobTemplateOptionRule;
 import com.archon.openmetadata.job.models.JobTemplateProfile;
+import com.archon.openmetadata.job.models.OperationType;
 import com.archon.openmetadata.job.repositories.ConnectionProfileRepository;
 import com.archon.openmetadata.job.repositories.JobTemplateOptionRuleRepository;
 import com.archon.openmetadata.job.repositories.JobTemplateProfileRepository;
@@ -97,10 +98,10 @@ public class DataPreloader implements CommandLineRunner {
     // 4. Seed Users
     if (userRepository.count() == 0) {
       log.info("Preloading default users...");
-      saveUser("Admin", "admin@archon.co", "admin123", "Admin", getGroup("ARCHON_OPEN_METADATA_ADMIN"), encoder);
-      saveUser("Developer", "dev@archon.co", "dev123", "Developer", getGroup("ARCHON_OPEN_METADATA_DEVELOPER"), encoder);
-      saveUser("Auditor", "audit@archon.co", "audit123", "Auditor", getGroup("ARCHON_OPEN_METADATA_AUDITOR"), encoder);
-      saveUser("Analyzer", "analyzer@archon.co", "analyzer123", "Analyzer", getGroup("ARCHON_OPEN_METADATA_ANALYZER"), encoder);
+      saveUser("Admin", "admin@archon.co", "admin123", getGroup("ARCHON_OPEN_METADATA_ADMIN"), encoder);
+      saveUser("Developer", "dev@archon.co", "dev123",  getGroup("ARCHON_OPEN_METADATA_DEVELOPER"), encoder);
+      saveUser("Auditor", "audit@archon.co", "audit123",  getGroup("ARCHON_OPEN_METADATA_AUDITOR"), encoder);
+      saveUser("Analyzer", "analyzer@archon.co", "analyzer123",  getGroup("ARCHON_OPEN_METADATA_ANALYZER"), encoder);
     } else {
       log.info("Backfilling missing emails and passwords for existing users...");
       List<User> existingUsers = userRepository.findAll();
@@ -124,44 +125,79 @@ public class DataPreloader implements CommandLineRunner {
       }
     }
 
-    // 5. Seed Connection Profiles
-    if (connectionProfileRepository.count() == 0) {
-      log.info("Preloading default connection profiles...");
-      ConnectionProfile cp = new ConnectionProfile();
-      cp.setProfileName("Production Postgres");
-      cp.setUrl("jdbc:postgresql://db.archon.internal:5432/prod_db");
-      cp.setUser("db_admin");
-      cp.setPass(cryptoUtils.encrypt("db_secret_pass", null));
-      
-      String detailsToHash = cp.getUrl() + "|" + cp.getUser();
-      String hash = org.springframework.util.DigestUtils.md5DigestAsHex(detailsToHash.getBytes());
-      cp.setConnectionHash(hash);
-      
-      connectionProfileRepository.save(cp);
-    }
 
     // 6. Seed Job Template Profiles & Rules
     if (jobTemplateProfileRepository.count() == 0) {
       log.info("Preloading default job templates and rules...");
       
       JobTemplateProfile profile = new JobTemplateProfile();
-      profile.setName("Standard PII Extraction");
-      profile.setDescription("Default template for discovering PII and generating ERDs");
+      profile.setName("Standard Metadata analysis");
+      profile.setDescription("Default template for discovering Relationship, PII and generating ERDs");
       profile = jobTemplateProfileRepository.save(profile);
 
-      JobTemplateOptionRule r1 = new JobTemplateOptionRule();
-      r1.setOperationName("SENSITIVE_DETECTION");
-      r1.setMinValue(0.8f);
-      r1.setMaxValue(1.0f);
-      r1.setJobTemplateProfile(profile);
-      ruleRepository.save(r1);
+      ruleRepository.save(JobTemplateOptionRule.builder()
+              .optionType(OperationType.RELATIONSHIP_DETECTION)
+              .minValue(0.8f)
+              .maxValue(1.0f)
+              .defaultOption(true)
+              .jobTemplateProfile(profile)
+              .build());
 
-      JobTemplateOptionRule r2 = new JobTemplateOptionRule();
-      r2.setOperationName("ERD_GENERATION");
-      r2.setMinValue(0.0f);
-      r2.setMaxValue(1.0f);
-      r2.setJobTemplateProfile(profile);
-      ruleRepository.save(r2);
+      ruleRepository.save(JobTemplateOptionRule.builder()
+              .optionType(OperationType.GRAPH_BUILDING_DETECTION)
+              .minValue(0.8f)
+              .maxValue(1.0f)
+              .defaultOption(true)
+              .jobTemplateProfile(profile)
+              .build());
+
+      ruleRepository.save(JobTemplateOptionRule.builder()
+              .optionType(OperationType.CANDIDATE_FUZZY_MATCHING)
+              .minValue(0.8f)
+              .maxValue(1.0f)
+              .defaultOption(false)
+              .jobTemplateProfile(profile)
+              .build());
+
+      ruleRepository.save(JobTemplateOptionRule.builder()
+              .optionType(OperationType.SEMANTIC_ANALYSIS)
+              .minValue(0.8f)
+              .maxValue(1.0f)
+              .defaultOption(false)
+              .jobTemplateProfile(profile)
+              .build());
+
+      ruleRepository.save(JobTemplateOptionRule.builder()
+              .optionType(OperationType.CARDINALITY_DETECTION_SOURCE_COUNT)
+              .minValue(0.8f)
+              .maxValue(1.0f)
+              .defaultOption(false)
+              .jobTemplateProfile(profile)
+              .build());
+
+      ruleRepository.save(JobTemplateOptionRule.builder()
+              .optionType(OperationType.TABLE_DOMAIN_GROUPING)
+              .minValue(0.8f)
+              .maxValue(1.0f)
+              .defaultOption(false)
+              .jobTemplateProfile(profile)
+              .build());
+
+      ruleRepository.save(JobTemplateOptionRule.builder()
+              .optionType(OperationType.DATA_CLASSIFICATION_TABLE_TYPE)
+              .minValue(0.8f)
+              .maxValue(1.0f)
+              .defaultOption(false)
+              .jobTemplateProfile(profile)
+              .build());
+
+      ruleRepository.save(JobTemplateOptionRule.builder()
+              .optionType(OperationType.SENSITIVE_ANALYSIS_TABLE_DATA)
+              .minValue(0.8f)
+              .maxValue(1.0f)
+              .defaultOption(false)
+              .jobTemplateProfile(profile)
+              .build());
     }
   }
 
@@ -200,13 +236,12 @@ public class DataPreloader implements CommandLineRunner {
     return groupRepository.findAll().stream().filter(g -> g.getGroupName().equals(name)).findFirst().orElse(null);
   }
 
-  private void saveUser(String username, String email, String password, String role, Group group, PasswordEncoder encoder) {
+  private void saveUser(String username, String email, String password, Group group, PasswordEncoder encoder) {
     User user = new User();
     user.setUsername(username);
     user.setEmail(email);
     user.setPassword(encoder.encode(password));
     user.setAuthType("LOCAL");
-    user.setRole(role);
     user.setStatus("Active");
     user.setLastLogin(LocalDateTime.now());
     if (group != null) {
