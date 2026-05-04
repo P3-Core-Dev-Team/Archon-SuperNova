@@ -13,6 +13,7 @@ class ConnectionDetails(BaseModel):
     url: str
     username: str
     password: str
+    databaseName: str
 
 class DiscoveryJobRequest(BaseModel):
     label: str
