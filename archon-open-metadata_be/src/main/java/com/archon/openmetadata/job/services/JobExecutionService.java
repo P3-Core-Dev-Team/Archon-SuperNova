@@ -7,6 +7,7 @@ import com.archon.openmetadata.analysis.dto.GraphContextRequest;
 import com.archon.openmetadata.analysis.services.*;
 import com.archon.openmetadata.job.models.Job;
 import com.archon.openmetadata.job.models.JobTemplateOptionRule;
+import com.archon.openmetadata.job.models.OperationType;
 import com.archon.openmetadata.job.repositories.JobRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,8 +59,8 @@ public class JobExecutionService {
                     ? j.getJobTemplateProfile().getOptions()
                     : List.of();
 
-            List<String> enabledStages = activeRules.stream()
-                    .map(JobTemplateOptionRule::getOperationName)
+            List<OperationType> enabledStages = activeRules.stream()
+                    .map(JobTemplateOptionRule::getOptionType)
                     .toList();
 
             // 1. Mandatory Stage: Schema Extraction
@@ -236,7 +237,7 @@ public class JobExecutionService {
     }
 
     private void applyMinMax(Object dto, String op, List<JobTemplateOptionRule> rules) {
-        rules.stream().filter(r -> op.equals(r.getOperationName())).findFirst().ifPresent(r -> {
+        rules.stream().filter(r -> op.equals(r.getOptionType())).findFirst().ifPresent(r -> {
             if (dto instanceof BulkSchemaRequest) {
                 ((BulkSchemaRequest) dto).setMinValue(r.getMinValue());
                 ((BulkSchemaRequest) dto).setMaxValue(r.getMaxValue());
