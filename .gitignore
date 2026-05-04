@@ -1,2 +1,40 @@
-build/
-*.jar
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+*.tsbuildinfo
+
+# Java
+target/
+*.class
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Local artifacts
+/tmp/
+*.log
+*.pid
+
+# Pipeline outputs & scratch
+reports/
+work_dirs/
+parquet/
+/archon-open-metadata_be/
+/archon-open-metadata-py/
+/archon-open-metadata-fe/
+/archon-open-metadata-design/
+/archon-open-metadata-build-deployment/
+/archon-open-metadata_be/
