@@ -1,0 +1,65 @@
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :bootRunMainClassName
+
+> Task :bootRun
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+[32m :: Spring Boot :: [39m              [2m (v2.7.0)[0;39m
+
+[2m2026-05-04 12:37:08.868[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mc.a.o.ArchonOpenMetadataApplication     [0;39m [2m:[0;39m Starting ArchonOpenMetadataApplication using Java 23.0.2 on adminp3 with PID 30902 (/home/adminp3s/IdeaProjects/Archon-SuperNova/archon-open-metadata_be/build/classes/java/main started by adminp3s in /home/adminp3s/IdeaProjects/Archon-SuperNova/archon-open-metadata_be)
+[2m2026-05-04 12:37:08.869[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mc.a.o.ArchonOpenMetadataApplication     [0;39m [2m:[0;39m No active profile set, falling back to 1 default profile: "default"
+[2m2026-05-04 12:37:09.251[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36m.s.d.r.c.RepositoryConfigurationDelegate[0;39m [2m:[0;39m Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+[2m2026-05-04 12:37:09.299[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36m.s.d.r.c.RepositoryConfigurationDelegate[0;39m [2m:[0;39m Finished Spring Data repository scanning in 44 ms. Found 14 JPA repository interfaces.
+[2m2026-05-04 12:37:09.636[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mo.s.b.w.embedded.tomcat.TomcatWebServer [0;39m [2m:[0;39m Tomcat initialized with port(s): 8080 (http)
+[2m2026-05-04 12:37:09.642[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mo.apache.catalina.core.StandardService  [0;39m [2m:[0;39m Starting service [Tomcat]
+[2m2026-05-04 12:37:09.642[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36morg.apache.catalina.core.StandardEngine [0;39m [2m:[0;39m Starting Servlet engine: [Apache Tomcat/9.0.63]
+[2m2026-05-04 12:37:09.693[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mo.a.c.c.C.[Tomcat].[localhost].[/]      [0;39m [2m:[0;39m Initializing Spring embedded WebApplicationContext
+[2m2026-05-04 12:37:09.693[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mw.s.c.ServletWebServerApplicationContext[0;39m [2m:[0;39m Root WebApplicationContext: initialization completed in 789 ms
+[2m2026-05-04 12:37:09.800[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mo.hibernate.jpa.internal.util.LogHelper [0;39m [2m:[0;39m HHH000204: Processing PersistenceUnitInfo [name: default]
+[2m2026-05-04 12:37:09.825[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36morg.hibernate.Version                   [0;39m [2m:[0;39m HHH000412: Hibernate ORM core version 5.6.9.Final
+[2m2026-05-04 12:37:09.920[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mo.hibernate.annotations.common.Version  [0;39m [2m:[0;39m HCANN000001: Hibernate Commons Annotations {5.1.2.Final}
+[2m2026-05-04 12:37:09.969[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mcom.zaxxer.hikari.HikariDataSource      [0;39m [2m:[0;39m HikariPool-1 - Starting...
+[2m2026-05-04 12:37:10.018[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mcom.zaxxer.hikari.HikariDataSource      [0;39m [2m:[0;39m HikariPool-1 - Start completed.
+[2m2026-05-04 12:37:10.034[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36morg.hibernate.dialect.Dialect           [0;39m [2m:[0;39m HHH000400: Using dialect: org.hibernate.dialect.PostgreSQL10Dialect
+[2m2026-05-04 12:37:10.531[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mo.h.e.t.j.p.i.JtaPlatformInitiator      [0;39m [2m:[0;39m HHH000490: Using JtaPlatform implementation: [org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform]
+[2m2026-05-04 12:37:10.535[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mj.LocalContainerEntityManagerFactoryBean[0;39m [2m:[0;39m Initialized JPA EntityManagerFactory for persistence unit 'default'
+Hibernate: select jobtemplat0_.id as id1_5_, jobtemplat0_.audit_user as audit_us2_5_, jobtemplat0_.created_at as created_3_5_, jobtemplat0_.modified_details as modified4_5_, jobtemplat0_.updated_at as updated_5_5_, jobtemplat0_.name as name6_5_ from job_template_profiles jobtemplat0_
+Hibernate: select options0_.job_template_id as job_temp9_4_0_, options0_.id as id1_4_0_, options0_.id as id1_4_1_, options0_.audit_user as audit_us2_4_1_, options0_.created_at as created_3_4_1_, options0_.modified_details as modified4_4_1_, options0_.updated_at as updated_5_4_1_, options0_.job_template_id as job_temp9_4_1_, options0_.max_value as max_valu6_4_1_, options0_.min_value as min_valu7_4_1_, options0_.operation_name as operatio8_4_1_ from job_template_option_rules options0_ where options0_.job_template_id=?
+Hibernate: select options0_.job_template_id as job_temp9_4_0_, options0_.id as id1_4_0_, options0_.id as id1_4_1_, options0_.audit_user as audit_us2_4_1_, options0_.created_at as created_3_4_1_, options0_.modified_details as modified4_4_1_, options0_.updated_at as updated_5_4_1_, options0_.job_template_id as job_temp9_4_1_, options0_.max_value as max_valu6_4_1_, options0_.min_value as min_valu7_4_1_, options0_.operation_name as operatio8_4_1_ from job_template_option_rules options0_ where options0_.job_template_id=?
+Hibernate: select count(*) as col_0_0_ from users user0_
+[2m2026-05-04 12:37:11.200[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mo.s.s.web.DefaultSecurityFilterChain    [0;39m [2m:[0;39m Will secure any request with [org.springframework.security.web.session.DisableEncodeUrlFilter@6b04689e, org.springframework.security.web.context.request.async.WebAsyncManagerIntegrationFilter@4be5b9b1, org.springframework.security.web.context.SecurityContextPersistenceFilter@8113ea7, org.springframework.security.web.header.HeaderWriterFilter@6a358906, org.springframework.web.filter.CorsFilter@2ad80cf6, org.springframework.security.web.authentication.logout.LogoutFilter@3ecbfba1, org.springframework.security.web.savedrequest.RequestCacheAwareFilter@78e4fa1, org.springframework.security.web.servletapi.SecurityContextHolderAwareRequestFilter@4516c2ef, org.springframework.security.web.authentication.AnonymousAuthenticationFilter@4e212f46, org.springframework.security.web.session.SessionManagementFilter@5923210, org.springframework.security.web.access.ExceptionTranslationFilter@220e1b7b, org.springframework.security.web.access.intercept.FilterSecurityInterceptor@16e5c19f]
+[2m2026-05-04 12:37:11.234[0;39m [33m WARN[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mJpaBaseConfiguration$JpaWebConfiguration[0;39m [2m:[0;39m spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+[2m2026-05-04 12:37:11.453[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mo.s.b.w.embedded.tomcat.TomcatWebServer [0;39m [2m:[0;39m Tomcat started on port(s): 8080 (http) with context path ''
+[2m2026-05-04 12:37:11.459[0;39m [32m INFO[0;39m [35m30902[0;39m [2m---[0;39m [2m[           main][0;39m [36mc.a.o.ArchonOpenMetadataApplication     [0;39m [2m:[0;39m Started ArchonOpenMetadataApplication in 2.787 seconds (JVM running for 2.996)
+
+> Task :bootRun FAILED
+
+[Incubating] Problems report is available at: file:///home/adminp3s/IdeaProjects/Archon-SuperNova/archon-open-metadata_be/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':bootRun'.
+> Process 'command '/usr/lib/jvm/java-23-amazon-corretto/bin/java'' finished with non-zero exit value 137
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 18s
+4 actionable tasks: 2 executed, 2 up-to-date

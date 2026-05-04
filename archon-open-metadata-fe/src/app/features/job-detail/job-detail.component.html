@@ -1,0 +1,175 @@
+<div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 24px;">
+  <div>
+    <h1
+      style="font-size: 24px; font-weight: 500; margin: 0 0 6px 0; color: var(--color-text-primary); display: flex; align-items: center; gap: 12px;">
+      {{ job?.jobName || 'Unnamed Job' }}
+      <span class="badge"
+        [ngClass]="{'b-green': job?.status === 'Done', 'b-blue': job?.status === 'Running', 'b-gray': job?.status === 'Pending', 'b-red': job?.status === 'Failed'}"
+        style="font-size: 12px; padding: 4px 8px;">{{ job?.status }}</span>
+    </h1>
+    <div style="font-size: 13px; color: var(--color-text-secondary); margin-top: 4px;">
+      Datasource: <span class="badge" style="font-weight: 500;">{{ job?.datasourceProfile?.profileName }}</span>
+      &nbsp;|&nbsp; Template: <span style="font-weight: 500;">{{ job?.jobTemplateProfile?.name }}</span>
+    </div>
+  </div>
+  <button class="tb-btn"
+    style="padding: 6px 14px; background: transparent; border: 1px solid var(--color-border-tertiary); color: var(--color-text-primary); border-radius: 4px; cursor: pointer;"
+    (click)="back.emit()">&larr; Back to jobs</button>
+</div>
+
+<div style="display: flex; gap: 4px; border-bottom: 1px solid var(--color-border-tertiary); margin-bottom: 16px;">
+  <button class="nav-item" [class.active]="activeTab === 'console'" (click)="setTab('console')"
+    style="padding: 10px 16px; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer;"
+    [style.border-bottom-color]="activeTab === 'console' ? 'var(--color-primary)' : 'transparent'">
+    Live Console
+    <span class="badge"
+      [ngStyle]="isSocketConnected ? {'background':'rgba(34, 197, 94, 0.1)', 'color':'#22c55e'} : {'background':'rgba(239, 68, 68, 0.1)', 'color': '#ef4444'}"
+      style="margin-left: 8px; font-size: 9px; padding: 2px 4px;">
+      {{ isSocketConnected ? 'LIVE' : 'OFF' }}
+    </span>
+  </button>
+  <button class="nav-item" [class.active]="activeTab === 'tables'" (click)="setTab('tables')"
+    style="padding: 10px 16px; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer;"
+    [style.border-bottom-color]="activeTab === 'tables' ? 'var(--color-primary)' : 'transparent'">Tables
+    Profiled</button>
+  <button class="nav-item" [class.active]="activeTab === 'relationships'" (click)="setTab('relationships')"
+    style="padding: 10px 16px; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer;"
+    [style.border-bottom-color]="activeTab === 'relationships' ? 'var(--color-primary)' : 'transparent'">Relationships</button>
+  <button class="nav-item" [class.active]="activeTab === 'sensitive'" (click)="setTab('sensitive')"
+    style="padding: 10px 16px; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer;"
+    [style.border-bottom-color]="activeTab === 'sensitive' ? 'var(--color-primary)' : 'transparent'">Sensitive
+    Data</button>
+  <button class="nav-item" [class.active]="activeTab === 'groups'" (click)="setTab('groups')"
+    style="padding: 10px 16px; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer;"
+    [style.border-bottom-color]="activeTab === 'groups' ? 'var(--color-primary)' : 'transparent'">Data Groups</button>
+  <button class="nav-item" [class.active]="activeTab === 'erd'" (click)="setTab('erd')"
+    style="padding: 10px 16px; background: transparent; border: none; border-bottom: 2px solid transparent; cursor: pointer;"
+    [style.border-bottom-color]="activeTab === 'erd' ? 'var(--color-primary)' : 'transparent'">ERD Diagram</button>
+  <div style="flex: 1;"></div>
+  <button class="tb-btn" (click)="toggleFullScreen()"
+    style="padding: 6px 12px; margin-bottom: 8px; background: transparent; border: 1px solid var(--color-border-tertiary);">⛶
+    Full Screen</button>
+</div>
+
+<!-- Content Area -->
+<div class="card"
+  [ngStyle]="isFullScreen ? {'position': 'fixed', 'top': '0', 'left': '0', 'width': '100vw', 'height': '100vh', 'z-index': '9999', 'border-radius': '0', 'margin': '0', 'display': 'flex', 'flex-direction': 'column'} : {}"
+  style="padding: 0; overflow: hidden; display: flex; flex-direction: column;">
+
+  <div *ngIf="isFullScreen"
+    style="padding: 12px 16px; border-bottom: 1px solid var(--color-border-tertiary); display: flex; justify-content: space-between; align-items: center; background: var(--color-background-secondary);">
+    <strong style="font-size: 16px;">{{ job?.jobName }} - {{ activeTab | uppercase }}</strong>
+    <button class="tb-btn" (click)="toggleFullScreen()" style="padding: 4px 8px;">Exit Full Screen</button>
+  </div>
+
+  <div *ngIf="activeTab === 'console'"
+    style="padding: 16px; display: flex; flex-direction: column; flex: 1; min-height: 400px; max-height: isFullScreen ? 'none' : '600px';">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <span style="font-size: 14px; font-weight: 500;">Realtime Engine Stream</span>
+      <span class="badge"
+        [ngStyle]="isSocketConnected ? {'background':'rgba(34, 197, 94, 0.1)', 'color':'#22c55e'} : {'background':'rgba(239, 68, 68, 0.1)', 'color': '#ef4444'}">
+        {{ isSocketConnected ? '📡 SSE Connected' : '⚠️ Socket Disconnected' }}
+      </span>
+    </div>
+
+    <div
+      style="background: var(--color-background-primary); border: 1px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 12px; font-family: var(--font-mono); font-size: 12px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 6px;">
+      <div *ngIf="logs.length === 0"
+        style="color: var(--color-text-tertiary); text-align: center; margin-top: 20px; font-family: var(--font-sans);">
+        Waiting for execution logs...
+      </div>
+      <div *ngFor="let log of logs"
+        style="display: flex; gap: 12px; border-bottom: 1px solid var(--color-background-secondary); padding-bottom: 4px;">
+        <span style="color: var(--color-text-tertiary); white-space: nowrap;">[{{ log.time }}]</span>
+        <span
+          [ngStyle]="{'color': log.cls === 'log-err' ? 'var(--color-text-danger)' : (log.stage === 'STG' ? 'var(--color-text-info)' : 'var(--color-text-primary)')}">{{
+          log.msg }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="activeTab === 'tables'" style="flex: 1; overflow-y: auto; max-height: isFullScreen ? 'none' : '600px';">
+    <table class="tbl" style="width: 100%;">
+      <thead style="position: sticky; top: 0; background: var(--color-background-secondary); z-index: 10;">
+        <tr>
+          <th style="padding: 12px 16px;">Table Name</th>
+          <th style="padding: 12px 16px;">Rows Analyzed</th>
+          <th style="padding: 12px 16px;">Columns</th>
+          <th style="padding: 12px 16px;">Table Type</th>
+          <th style="padding: 12px 16px;">Schema</th>
+        </tr>
+      </thead>
+      <tr *ngFor="let t of tables">
+        <td style="padding: 16px; font-weight: 500;">{{ t.tableName }}</td>
+        <td style="padding: 16px;">{{ t.tableSize | number }}</td>
+        <td style="padding: 16px;">{{ t.columns?.length || 0 }}</td>
+        <td style="padding: 16px;">
+          <span class="badge b-blue">{{ t.tableType || 'TABLE' }}</span>
+        </td>
+        <td style="padding: 16px;">{{ t.schemaName || 'public' }}</td>
+      </tr>
+      <tr *ngIf="tables.length === 0">
+        <td colspan="5" style="padding: 32px; text-align: center; color: var(--color-text-tertiary);">No tables
+          discovered yet. Check live console.</td>
+      </tr>
+    </table>
+  </div>
+
+  <div *ngIf="activeTab === 'relationships'"
+    style="flex: 1; overflow-y: auto; max-height: isFullScreen ? 'none' : '600px';">
+    <app-relationship-graph *ngIf="job?.id" [jobId]="job!.id!"></app-relationship-graph>
+    <div *ngIf="!job?.id" style="padding: 32px; text-align: center; color: var(--color-text-tertiary);">Relationships
+      graph unavailable until job finishes processing.</div>
+  </div>
+
+  <div *ngIf="activeTab === 'sensitive'"
+    style="flex: 1; overflow-y: auto; max-height: isFullScreen ? 'none' : '600px';">
+    <table class="tbl" style="width: 100%;">
+      <thead style="position: sticky; top: 0; background: var(--color-background-secondary); z-index: 10;">
+        <tr>
+          <th style="padding: 12px 16px;">Table Name</th>
+          <th style="padding: 12px 16px;">Column Name</th>
+          <th style="padding: 12px 16px;">Data Type Recognized</th>
+          <th style="padding: 12px 16px;">Confidence</th>
+        </tr>
+      </thead>
+      <tr *ngFor="let s of sensitiveData">
+        <td style="padding: 16px; font-weight: 500;">{{ s.tableName }}</td>
+        <td style="padding: 16px; font-family: var(--font-mono); font-size: 13px;">{{ s.columnName }}</td>
+        <td style="padding: 16px;"><span class="badge b-red">{{ s.sensitivityType }}</span></td>
+        <td style="padding: 16px;">{{ (s.sensitivityScore * 100).toFixed(1) }}%</td>
+      </tr>
+      <tr *ngIf="sensitiveData.length === 0">
+        <td colspan="4" style="padding: 32px; text-align: center; color: var(--color-text-tertiary);">No sensitive
+          elements discovered yet.</td>
+      </tr>
+    </table>
+  </div>
+
+  <div *ngIf="activeTab === 'groups'" style="flex: 1; overflow-y: auto; max-height: isFullScreen ? 'none' : '600px';">
+    <table class="tbl" style="width: 100%;">
+      <thead style="position: sticky; top: 0; background: var(--color-background-secondary); z-index: 10;">
+        <tr>
+          <th style="padding: 12px 16px;">Group Name</th>
+          <th style="padding: 12px 16px;">Table Count</th>
+          <th style="padding: 12px 16px;">Description</th>
+        </tr>
+      </thead>
+      <tr *ngFor="let g of dataGroups">
+        <td style="padding: 16px; font-weight: 500;">{{ g.groupName }}</td>
+        <td style="padding: 16px;"><span class="badge b-blue">{{ g.tableCount }}</span></td>
+        <td style="padding: 16px;">{{ g.description }}</td>
+      </tr>
+      <tr *ngIf="dataGroups.length === 0">
+        <td colspan="3" style="padding: 32px; text-align: center; color: var(--color-text-tertiary);">No data groups clustered yet.</td>
+      </tr>
+    </table>
+  </div>
+
+  <div *ngIf="activeTab === 'erd'" style="padding: 16px; flex: 1; min-height: 500px;">
+    <div #networkContainer
+      style="width: 100%; height: 100%; min-height: 500px; border: 1px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); background: var(--color-background-secondary);">
+    </div>
+  </div>
+
+</div>
