@@ -13,6 +13,7 @@ class ConnectionDetails(BaseModel):
     url: str
     username: str
     password: str
+    databaseName: str
 
 class DiscoveryJobRequest(BaseModel):
     label: str
@@ -29,6 +30,8 @@ class BulkSchemaRequest(BaseModel):
     tables: list[SchemaTable]
     schemaCrawlerRelationships: list[dict] | None = None
     mlRelationships: list[dict] | None = None
+    minValue: int
+    maxValue: int
 
 class CardinalityRequest(BaseModel):
     connection: ConnectionDetails
@@ -37,3 +40,5 @@ class CardinalityRequest(BaseModel):
 class ContextGraphRequest(BaseModel):
     relationships: list[dict]
     clusters: list[dict]
+    minValue: int
+    maxValue: int

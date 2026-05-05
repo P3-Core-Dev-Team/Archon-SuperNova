@@ -5,6 +5,8 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import java.util.UUID;
 import javax.persistence.*;
+
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.hibernate.annotations.GenericGenerator;
@@ -16,6 +18,7 @@ import org.hibernate.annotations.GenericGenerator;
     indexes = {@Index(name = "idx_jtor_operation", columnList = "operation_name")})
 @Data
 @EqualsAndHashCode(callSuper = true)
+@Builder
 public class JobTemplateOptionRule extends AuditModel {
   @Id
   @GeneratedValue(generator = "UUID")
@@ -26,12 +29,15 @@ public class JobTemplateOptionRule extends AuditModel {
   @JoinColumn(name = "job_template_id")
   private JobTemplateProfile jobTemplateProfile;
 
+  @Enumerated(EnumType.STRING)
   @Column(name = "operation_name")
-  private String operationName;
+  private OperationType optionType;
 
   @Column(name = "min_value")
   private Float minValue;
 
   @Column(name = "max_value")
   private Float maxValue;
+
+  private boolean defaultOption;
 }

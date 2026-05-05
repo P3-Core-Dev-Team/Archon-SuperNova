@@ -26,6 +26,9 @@ public class Group extends AuditModel {
   @Column(name = "group_name")
   private String groupName;
 
+  @Column(name ="description")
+  private String description;
+
   @ManyToMany
   @JoinTable(
       name = "group_roles",

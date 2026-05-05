@@ -10,7 +10,7 @@ class CandidateMatcher:
     initial foreign key candidates.
     """
     @staticmethod
-    def detect_candidates(tables: list[SchemaTable]) -> list[dict]:
+    def detect_candidates(tables: list[SchemaTable],minValue: int, maxValue: int) -> list[dict]:
         candidates = []
         for t1, t2 in itertools.combinations(tables, 2):
             for c1 in t1.columns:
@@ -31,7 +31,7 @@ class CandidateMatcher:
                     score_sort = fuzz.token_sort_ratio(s1, s2)
                     score = max(score_ratio, score_sort)
                     
-                    if score >= AppConstants.CANDIDATE_MIN_SCORE:
+                    if minValue <= score <= maxValue:
                         candidates.append({
                             "table_a": t1.tableName,
                             "col_a": c1.columnName,

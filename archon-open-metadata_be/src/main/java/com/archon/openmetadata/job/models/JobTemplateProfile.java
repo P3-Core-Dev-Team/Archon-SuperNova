@@ -27,6 +27,8 @@ public class JobTemplateProfile extends AuditModel {
 
   private String name;
 
+  private String description;
+
   @OneToMany(mappedBy = "jobTemplateProfile", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
   private List<JobTemplateOptionRule> options;
 }

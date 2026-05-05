@@ -14,5 +14,5 @@ import lombok.NoArgsConstructor;
 public class SystemProperty {
     @Id
     private String propKey;
-    private String propValue;
+    private Object propValue;
 }
