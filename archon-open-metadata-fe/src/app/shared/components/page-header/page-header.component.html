@@ -1,0 +1,11 @@
+<div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 24px;">
+  <div>
+    <h1 style="font-size: 24px; font-weight: 500; margin: 0 0 6px 0; color: var(--color-text-primary);">{{ title }}</h1>
+    <div *ngIf="subtitle" style="color: var(--color-text-secondary); font-size: 13px;">{{ subtitle }}</div>
+  </div>
+  <button *ngIf="actionText" class="tb-btn primary"
+    style="background: #2563eb; color: white; border: none; padding: 6px 14px; font-weight: 500; font-size: 13px; border-radius: 4px; cursor: pointer;"
+    (click)="onActionClick()">
+    {{ actionText }}
+  </button>
+</div>

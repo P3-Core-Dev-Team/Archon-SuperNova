@@ -1,0 +1,64 @@
+<div id="p-jobs-all" class="page">
+
+<div class="page-header">
+  <div class="page-title">Job profiles</div>
+</div>
+<div class="card" *ngIf="!showForm">
+  <div style="margin-bottom:16px"><button class="tb-btn primary" (click)="showForm = true; newJob = {}">Create new job</button></div>
+  <table class="tbl">
+    <tr><th>Job Name</th><th>Datasource</th><th>Template</th><th>Status</th><th>Actions</th></tr>
+    <ng-container *ngFor="let job of jobs">
+      <tr>
+        <td>{{ job.jobName || 'Unnamed Job' }}</td>
+        <td>{{ job.datasourceProfile?.profileName }}</td>
+        <td>{{ job.jobTemplateProfile?.name }}</td>
+        <td>
+          <div style="display:flex; align-items:center; gap: 8px;">
+            <span class="badge" [ngClass]="{'b-green': job.status === 'Done', 'b-blue': job.status === 'Running', 'b-gray': job.status === 'Pending'}">{{ job.status || 'Pending' }}</span>
+            <div *ngIf="job.status === 'Running'" class="spinner" style="width:12px;height:12px;border:2px solid rgba(0,0,0,0.1);border-top:2px solid #3b82f6;border-radius:50%;animation:spin 1s linear infinite"></div>
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;gap:4px">
+            <button class="tb-btn" style="padding:3px 8px" (click)="job.expanded = !job.expanded">View Logs &rarr;</button>
+            <button class="tb-btn" style="padding:3px 8px;color:var(--color-text-danger);border-color:var(--color-text-danger)" (click)="deleteJob(job.id)">Delete</button>
+          </div>
+        </td>
+      </tr>
+      <tr *ngIf="job.expanded">
+        <td colspan="5" style="background: #0f172a; padding: 16px;">
+          <div style="font-family: monospace; font-size: 12px; color: #10b981; white-space: pre-wrap; line-height: 1.5; min-height: 60px;">{{ job.auditlogs || '> Initializing job sequence...
+> Waiting for agent allocation...' }}</div>
+        </td>
+      </tr>
+    </ng-container>
+    <tr *ngIf="jobs.length === 0">
+      <td colspan="5" style="text-align:center;padding:50px 20px">
+        <div style="font-size:15px;font-weight:500;color:var(--color-text-primary)">No metadata jobs found</div>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div class="card" *ngIf="showForm" style="max-width:560px">
+  <div style="font-size:15px;font-weight:500;margin-bottom:16px">Create New Job</div>
+  <div class="form-grid">
+    <div class="fg"><label class="fl">Job Name</label><input class="fi" [(ngModel)]="newJob.jobName" placeholder="e.g. Daily Sync" /></div>
+    <div class="fg"><label class="fl">Datasource</label>
+      <select class="fi" [(ngModel)]="newJob.datasourceId">
+        <option *ngFor="let ds of datasources" [value]="ds.id">{{ ds.profileName }}</option>
+      </select>
+    </div>
+    <div class="fg"><label class="fl">Job Template</label>
+      <select class="fi" [(ngModel)]="newJob.templateId">
+        <option *ngFor="let tpl of jobTemplates" [value]="tpl.id">{{ tpl.name }}</option>
+      </select>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:16px">
+    <button class="tb-btn" (click)="showForm = false">Cancel</button>
+    <button class="tb-btn primary" [disabled]="!newJob.jobName || !newJob.datasourceId || !newJob.templateId" (click)="createJob()">Create Job</button>
+  </div>
+</div>
+
+</div>

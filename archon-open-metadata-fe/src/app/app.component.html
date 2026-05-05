@@ -1,0 +1,196 @@
+
+<div class="shell">
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5"/><path d="M8 3v5l3 2"/></svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-name">MetaAnalyzer</div>
+        <div class="brand-version">Enterprise · v2.4</div>
+      </div>
+    </div>
+
+    <div class="nav">
+      <div class="nav-group">
+        <div class="nav-item active" (click)="go('dashboard', $event.currentTarget, 'Overview', 'Dashboard')">
+          <span class="nav-icon"><svg viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg></span>
+          <span class="nav-label">Dashboard</span>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-item" (click)="go('ds-list', $event.currentTarget, 'Data', 'Datasources')">
+          <span class="nav-icon"><svg viewBox="0 0 16 16"><ellipse cx="8" cy="4.5" rx="6" ry="2.5"/><path d="M2 4.5v3c0 1.38 2.69 2.5 6 2.5s6-1.12 6-2.5v-3"/><path d="M2 7.5v3c0 1.38 2.69 2.5 6 2.5s6-1.12 6-2.5v-3"/></svg></span>
+          <span class="nav-label">Datasources</span>
+          <span class="nav-expand"><svg viewBox="0 0 12 12"><path d="M4 2l4 4-4 4"/></svg></span>
+        </div>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-item" id="jobs-toggle" (click)="toggle('jobs-sub', $event.currentTarget)">
+          <span class="nav-icon"><svg viewBox="0 0 16 16"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 3V2m6 1V2M2 7h12"/></svg></span>
+          <span class="nav-label">Job profiles</span>
+          <span class="nav-badge info">{{ jobs.length }}</span>
+          <span class="nav-expand" id="jobs-exp"><svg viewBox="0 0 12 12"><path d="M4 2l4 4-4 4"/></svg></span>
+        </div>
+        <div class="nav-child sub" id="jobs-sub">
+          <div class="nav-item" (click)="go('jobs-all', $event.currentTarget, 'Job profiles', 'All jobs')">All jobs</div>
+          <div class="nav-item" (click)="go('jobs-detail', $event.currentTarget, 'Job profiles', 'Job detail')">Job detail</div>
+          <div class="nav-item" (click)="go('jobs-compare', $event.currentTarget, 'Job profiles', 'Compare jobs')">Compare jobs</div>
+          <div class="nav-item" (click)="go('jobs-export', $event.currentTarget, 'Job profiles', 'Export results')">Export results</div>
+        </div>
+      </div>
+
+      <div class="nav-group-label">GOVERNANCE</div>
+      <div class="nav-group">
+        <div class="nav-item" (click)="go('audit-log', $event.currentTarget, 'Governance', 'Audit log')">
+          <span class="nav-icon"><svg viewBox="0 0 16 16"><path d="M4 2h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V4a2 2 0 012-2zm0 4h8M4 10h5"/></svg></span>
+          <span class="nav-label">Audit log</span>
+        </div>
+        <div class="nav-item" (click)="go('sensitive-data', $event.currentTarget, 'Governance', 'Sensitive data')">
+          <span class="nav-icon"><svg viewBox="0 0 16 16"><path d="M8 1L2 3.5v5c0 3.5 3 6.5 6 7.5 3-1 6-4 6-7.5v-5L8 1z"/></svg></span>
+          <span class="nav-label">Sensitive data</span>
+          <span class="nav-badge" style="color: #3b82f6; background: transparent; font-weight: 500">{{ sensitiveDataCount }}</span>
+        </div>
+      </div>
+
+      <div class="nav-group-label">CONFIGURATION</div>
+      <div class="nav-group">
+        <div class="nav-item" id="settings-toggle" (click)="toggle('settings-sub', $event.currentTarget)">
+          <span class="nav-icon"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="3"/><path d="M8 2v1M8 13v1M14 8h-1M3 8H2M12.24 3.76l-.71.71M4.46 11.54l-.71.71M12.24 12.24l-.71-.71M4.46 4.46l-.71-.71"/></svg></span>
+          <span class="nav-label">Settings</span>
+          <span class="nav-expand" id="settings-exp"><svg viewBox="0 0 12 12"><path d="M4 2l4 4-4 4"/></svg></span>
+        </div>
+        <div class="nav-child sub" id="settings-sub">
+          <div class="nav-item" (click)="go('settings-tpl', $event.currentTarget, 'Configuration', 'Job templates')">Job templates</div>
+          <div class="nav-item" (click)="go('settings-system', $event.currentTarget, 'Configuration', 'System')">System</div>
+        </div>
+      </div>
+
+      <div class="nav-group-label">ADMINISTRATION</div>
+      <div class="nav-group">
+        <div class="nav-item" id="admin-toggle" (click)="toggle('admin-sub', $event.currentTarget)">
+          <span class="nav-icon"><svg viewBox="0 0 16 16"><path d="M8 8a3 3 0 100-6 3 3 0 000 6zm0 1c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></span>
+          <span class="nav-label">User management</span>
+          <span class="nav-expand" id="admin-exp"><svg viewBox="0 0 12 12"><path d="M4 2l4 4-4 4"/></svg></span>
+        </div>
+        <div class="nav-child sub" id="admin-sub">
+          <div class="nav-item" (click)="go('admin-users', $event.currentTarget, 'Administration', 'Users')">Users</div>
+          
+          <div class="nav-item" (click)="go('admin-groups', $event.currentTarget, 'Administration', 'Groups & roles')">Groups & roles</div>
+        </div>
+      </div>
+</div>
+
+
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="breadcrumb" id="breadcrumb">
+        <span>Overview</span>
+        <span class="breadcrumb-sep">›</span>
+        <span class="breadcrumb-cur">Dashboard</span>
+      </div>
+      <div class="topbar-right" style="display:flex;align-items:center;gap:16px;margin-left:auto">
+        <button class="theme-toggle-btn" (click)="toggleTheme()" [title]="isDarkTheme ? 'Switch to Light Mode' : 'Switch to Dark Mode'">
+          <svg *ngIf="!isDarkTheme" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          <svg *ngIf="isDarkTheme" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+        </button>
+        <div class="user-tile" style="display:flex;align-items:center;gap:9px;padding:4px 8px;border-radius:var(--border-radius-md);cursor:pointer">
+          <div class="user-meta" style="text-align:right">
+            <div class="user-name" style="font-size:12px;font-weight:500;color:var(--color-text-primary)">SystemAdmin</div>
+            <div class="user-role" style="font-size:11px;color:var(--color-text-tertiary)">System Administrator</div>
+          </div>
+          <div class="avatar" style="width:30px;height:30px;border-radius:50%;background:#1a56db;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:#fff">SA</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content">
+
+      
+      <!-- Refactored Module Components -->
+      <app-dashboard (viewJobEvt)="go('jobs-all', null, 'Jobs', 'Job profiles')"></app-dashboard>
+      <app-datasource-manager></app-datasource-manager>
+      <app-job-profile></app-job-profile>
+      <app-job-template-manager></app-job-template-manager>
+      
+      
+      <div id="p-settings-system" class="page">
+        <div class="page-header">
+          <div class="page-title">System Configuration</div>
+        </div>
+        <div class="card" style="max-width: 600px; margin-bottom: 24px;">
+          <div style="font-size:15px;font-weight:500;margin-bottom:16px">API Configuration</div>
+          <div class="form-grid">
+            <div class="fg" style="grid-column: 1 / -1">
+              <label class="fl">Java Backend URL</label>
+              <input class="fi" value="http://localhost:8080/api/v1" disabled />
+            </div>
+            <div class="fg" style="grid-column: 1 / -1">
+              <label class="fl">Python AI Engine URL</label>
+              <input class="fi" value="http://localhost:8000/api" disabled />
+            </div>
+          </div>
+        </div>
+        <div class="card" style="max-width: 600px">
+          <div style="font-size:15px;font-weight:500;margin-bottom:16px">Data Management</div>
+          <div class="form-grid">
+            <div class="fg" style="grid-column: 1 / -1">
+              <label class="fl">Data Cleanup Time (Retention Days)</label>
+              <input class="fi" type="number" [(ngModel)]="dataCleanupDays" min="1" max="365" />
+            </div>
+          </div>
+          <div style="margin-top: 16px; display:flex; gap: 8px">
+            <button class="tb-btn primary" (click)="saveSystemConfig()">Save Configuration</button>
+          </div>
+        </div>
+      </div>
+
+      
+      <div id="p-system-audit" class="page">
+        <div class="page-header">
+          <div class="page-title">Audit Logs</div>
+        </div>
+        <div class="card">
+          <table class="tbl">
+            <tr>
+              <th>Timestamp</th>
+              <th>User</th>
+              <th>Action</th>
+              <th>Details</th>
+            </tr>
+            <tr *ngFor="let audit of audits">
+              <td style="font-family: monospace; font-size: 11px">{{ audit.timestamp | date:'short' }}</td>
+              <td><span class="badge b-gray">{{ audit.username }}</span></td>
+              <td style="font-weight: 500; font-size: 11px; color: var(--color-text-primary)">{{ audit.action }}</td>
+              <td>{{ audit.details }}</td>
+            </tr>
+            <tr *ngIf="audits.length === 0">
+              <td colspan="4" style="text-align:center;padding:40px 20px">
+                <div style="font-size:15px;font-weight:500;color:var(--color-text-primary)">No audit logs recorded yet.</div>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <app-admin [users]="users" [groups]="groups"></app-admin>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container">
+  <div *ngFor="let toast of toasts" class="toast" [ngClass]="toast.type">
+    <div class="toast-icon">
+      <svg *ngIf="toast.type === 'success'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+      <svg *ngIf="toast.type === 'error'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+    </div>
+    <div class="toast-msg">{{ toast.message }}</div>
+    <button class="toast-close" (click)="removeToast(toast.id)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
+  </div>
+</div>

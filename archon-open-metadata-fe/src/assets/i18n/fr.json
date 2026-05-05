@@ -1,0 +1,33 @@
+{
+  "SETTINGS": {
+    "TITLE": "Paramètres du système",
+    "SUBTITLE": "Gérer les paramètres globaux de l'application, les configurations et la localisation.",
+    "API_CONFIG": "Configuration de l'API",
+    "API_DESC": "Configurer les points de terminaison des services backend.",
+    "JAVA_URL": "URL du Backend Java",
+    "PYTHON_URL": "URL du Pipeline Python",
+    "SAVE_URLS": "Enregistrer les URL",
+    "LOCALIZATION": "Localisation",
+    "LANG_DESC": "Sélectionnez la langue préférée.",
+    "SELECT_LANG": "Choisir la langue",
+    "ENGLISH": "Anglais",
+    "FRENCH": "Français",
+    "CUSTOMIZATION": "Personnalisation",
+    "CUST_DESC": "Configurer les étapes du pipeline et les seuils.",
+    "MANAGE_TEMPLATES": "Gérer les modèles",
+    "LOGS": "Gestion des journaux",
+    "LOGS_DESC": "Effacer les historiques des tâches du système.",
+    "CLEAR_LOGS": "Effacer les journaux"
+  },
+  "SIDEBAR": {
+    "ANALYSIS": "Analyse",
+    "DASHBOARD": "Tableau de bord",
+    "RELATIONSHIPS": "Relations",
+    "SENSITIVE_DATA": "Données Sensibles",
+    "SYSTEM": "Système",
+    "DATASOURCES": "Sources de données",
+    "SETTINGS": "Paramètres",
+    "ADMIN": "Contrôles d'administration",
+    "USER_PROFILE": "Profil Utilisateur"
+  }
+}

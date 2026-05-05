@@ -1,0 +1,922 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sidebar-w:220px;
+  --header-h:52px;
+  --accent:#2563eb;
+  --accent-soft:#eff6ff;
+  --accent-text:#1d4ed8;
+  --surface:var(--color-background-primary);
+  --surface2:var(--color-background-secondary);
+  --border:var(--color-border-tertiary);
+  --border2:var(--color-border-secondary);
+  --text:var(--color-text-primary);
+  --text2:var(--color-text-secondary);
+  --text3:var(--color-text-tertiary);
+  --success-bg:var(--color-background-success);
+  --success-text:var(--color-text-success);
+  --warn-bg:var(--color-background-warning);
+  --warn-text:var(--color-text-warning);
+  --danger-bg:var(--color-background-danger);
+  --danger-text:var(--color-text-danger);
+  --info-bg:var(--color-background-info);
+  --info-text:var(--color-text-info);
+}
+body{font-family:var(--font-sans);font-size:14px;color:var(--text);background:var(--color-background-tertiary)}
+.app{display:flex;height:640px;border:0.5px solid var(--border2);border-radius:var(--border-radius-lg);overflow:hidden;background:var(--surface2)}
+
+/* SIDEBAR */
+.sidebar{width:var(--sidebar-w);background:var(--surface);border-right:0.5px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-logo{height:var(--header-h);display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:0.5px solid var(--border)}
+.logo-icon{width:26px;height:26px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:500;letter-spacing:-0.5px}
+.logo-name{font-size:13px;font-weight:500;color:var(--text)}
+.logo-sub{font-size:10px;color:var(--text3);letter-spacing:0.4px;text-transform:uppercase}
+.sidebar-nav{flex:1;overflow-y:auto;padding:8px 0}
+.nav-section{padding:16px 12px 4px;font-size:10px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:0.6px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:13px;color:var(--text2);border-left:2px solid transparent;transition:all .15s}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--accent-soft);color:var(--accent-text);border-left-color:var(--accent);font-weight:500}
+.nav-item.sub{padding-left:32px;font-size:12px}
+.nav-icon{width:15px;text-align:center;font-size:14px;flex-shrink:0}
+.sidebar-user{padding:12px;border-top:0.5px solid var(--border)}
+.user-row{display:flex;align-items:center;gap:8px;padding:8px 6px;border-radius:var(--border-radius-md);cursor:pointer}
+.user-row:hover{background:var(--surface2)}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--info-bg);color:var(--info-text);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0}
+.user-info{flex:1;min-width:0}
+.user-name{font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-role{font-size:11px;color:var(--text3)}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{height:var(--header-h);background:var(--surface);border-bottom:0.5px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px}
+.topbar-title{font-size:14px;font-weight:500;color:var(--text);flex:1}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500}
+.badge-success{background:var(--success-bg);color:var(--success-text)}
+.badge-warn{background:var(--warn-bg);color:var(--warn-text)}
+.badge-danger{background:var(--danger-bg);color:var(--danger-text)}
+.badge-info{background:var(--info-bg);color:var(--info-text)}
+.badge-gray{background:var(--surface2);color:var(--text2);border:0.5px solid var(--border)}
+.topbar-actions{display:flex;gap:6px;align-items:center}
+.btn{font-size:12px;padding:5px 12px;border-radius:var(--border-radius-md);border:0.5px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.btn:hover{background:var(--surface2)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{opacity:.9}
+.content{flex:1;overflow-y:auto;padding:20px}
+
+/* PAGES */
+.page{display:none}
+.page.active{display:block}
+
+/* GRID */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+
+/* CARDS */
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--border-radius-lg);padding:16px}
+.card-title{font-size:12px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px}
+.card-value{font-size:26px;font-weight:500;color:var(--text)}
+.card-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.section-title{font-size:13px;font-weight:500;color:var(--text);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{text-align:left;padding:8px 10px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);font-size:11px;text-transform:uppercase;letter-spacing:0.3px}
+.tbl td{padding:8px 10px;border-bottom:0.5px solid var(--border);color:var(--text);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--surface2)}
+
+/* PROGRESS */
+.progress-bar{height:6px;border-radius:3px;background:var(--surface2);overflow:hidden;margin-top:4px}
+.progress-fill{height:100%;border-radius:3px;background:var(--accent)}
+
+/* LOG */
+.log-container{background:#0f172a;border-radius:var(--border-radius-md);padding:14px;font-family:var(--font-mono);font-size:11px;height:220px;overflow-y:auto;line-height:1.8}
+.log-line{display:flex;gap:10px}
+.log-ts{color:#64748b;flex-shrink:0}
+.log-info{color:#38bdf8}
+.log-success{color:#4ade80}
+.log-warn{color:#fb923c}
+.log-error{color:#f87171}
+
+/* GRAPH */
+.graph-svg{width:100%;height:260px;background:var(--surface2);border-radius:var(--border-radius-md);border:0.5px solid var(--border)}
+
+/* STAGE PIPELINE */
+.pipeline{display:flex;gap:0;align-items:stretch}
+.stage{flex:1;padding:12px 10px;background:var(--surface);border:0.5px solid var(--border);text-align:center;cursor:pointer;transition:all .15s;position:relative}
+.stage:first-child{border-radius:var(--border-radius-md) 0 0 var(--border-radius-md)}
+.stage:last-child{border-radius:0 var(--border-radius-md) var(--border-radius-md) 0}
+.stage:not(:last-child)::after{content:'›';position:absolute;right:-8px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px;z-index:1}
+.stage.done{background:var(--success-bg)}
+.stage.active-stage{background:var(--info-bg);border-color:var(--accent)}
+.stage.pending{background:var(--surface2)}
+.stage-name{font-size:10px;font-weight:500;color:var(--text);margin-top:4px}
+.stage-icon{font-size:18px}
+
+/* TABS */
+.tabs{display:flex;gap:0;border-bottom:0.5px solid var(--border);margin-bottom:16px}
+.tab{padding:8px 14px;font-size:12px;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-0.5px}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent-text);border-bottom-color:var(--accent);font-weight:500}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* SENSITIVE */
+.sens-tag{display:inline-flex;align-items:center;gap:3px;font-size:11px;padding:2px 7px;border-radius:20px;background:var(--danger-bg);color:var(--danger-text);font-weight:500}
+
+/* FORM */
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px;display:block}
+.form-input{width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--border-radius-md);background:var(--surface);color:var(--text);font-size:13px;font-family:var(--font-sans)}
+.form-select{width:100%;padding:7px 10px;border:0.5px solid var(--border2);border-radius:var(--border-radius-md);background:var(--surface);color:var(--text);font-size:13px;font-family:var(--font-sans)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* TOGGLE */
+.toggle{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.toggle:last-child{border-bottom:none}
+.toggle-info{font-size:13px;color:var(--text)}
+.toggle-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.toggle-switch{width:34px;height:18px;border-radius:20px;background:#d1d5db;cursor:pointer;position:relative;transition:background .2s;flex-shrink:0}
+.toggle-switch.on{background:var(--accent)}
+.toggle-switch::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .2s}
+.toggle-switch.on::after{left:18px}
+
+/* COMPARISON */
+.compare-col{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--border-radius-lg);padding:14px;flex:1}
+.compare-col.selected{border-color:var(--accent);background:var(--accent-soft)}
+
+/* AUDIT */
+.audit-row{display:flex;align-items:flex-start;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.audit-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.audit-body{flex:1;min-width:0}
+.audit-action{font-size:12px;color:var(--text);font-weight:500}
+.audit-meta{font-size:11px;color:var(--text3);margin-top:2px}
+
+/* ROLE CHIP */
+.role-chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:20px;border:0.5px solid var(--border2);color:var(--text2);background:var(--surface)}
+</style>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">MA</div>
+      <div>
+        <div class="logo-name">MetaAnalyzer</div>
+        <div class="logo-sub">v2.4.1</div>
+      </div>
+    </div>
+    <div class="sidebar-nav">
+      <div class="nav-item active" onclick="navigate('dashboard',this)">
+        <span class="nav-icon">◉</span> Dashboard
+      </div>
+      <div class="nav-item" onclick="navigate('datasource',this)">
+        <span class="nav-icon">⬡</span> Datasource
+      </div>
+      <div class="nav-item sub" onclick="navigate('datasource',this)">Add / Update Profile</div>
+      <div class="nav-item" onclick="navigate('jobs',this)">
+        <span class="nav-icon">⊞</span> Job Profiles
+      </div>
+      <div class="nav-item sub" onclick="navigate('job-detail',this)">Individual Job Details</div>
+      <div class="nav-item sub" onclick="navigate('job-compare',this)">Job Comparison</div>
+      <div class="nav-item sub" onclick="navigate('job-export',this)">Export as JSON</div>
+      <div class="nav-item" onclick="navigate('audit',this)">
+        <span class="nav-icon">◷</span> Audit Tracking
+      </div>
+      <div class="nav-section">Settings</div>
+      <div class="nav-item" onclick="navigate('settings',this)">
+        <span class="nav-icon">⚙</span> Settings
+      </div>
+      <div class="nav-item sub" onclick="navigate('job-template',this)">Job Template Profile</div>
+      <div class="nav-section">Access</div>
+      <div class="nav-item" onclick="navigate('admin',this)">
+        <span class="nav-icon">⊛</span> Admin
+      </div>
+      <div class="nav-item sub" onclick="navigate('admin',this)">User Management</div>
+      <div class="nav-item sub" onclick="navigate('admin',this)">Group Management</div>
+      <div class="nav-item" onclick="navigate('profile',this)">
+        <span class="nav-icon">◎</span> User
+      </div>
+      <div class="nav-item sub" onclick="navigate('profile',this)">My Profile</div>
+      <div class="nav-item sub" onclick="navigate('profile',this)">Groups</div>
+    </div>
+    <div class="sidebar-user">
+      <div class="user-row">
+        <div class="avatar">SR</div>
+        <div class="user-info">
+          <div class="user-name">Sarah R.</div>
+          <div class="user-role">Data Engineer · Admin</div>
+        </div>
+        <span style="color:var(--text3);font-size:12px">⚙</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div class="topbar-title" id="page-title">Dashboard</div>
+      <div class="topbar-actions">
+        <span class="badge badge-success">● 3 jobs running</span>
+        <button class="btn btn-primary" onclick="navigate('job-template',null)">+ New Job</button>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div id="page-dashboard" class="page active">
+        <div class="grid4" style="margin-bottom:20px">
+          <div class="card">
+            <div class="card-title">Data Sources</div>
+            <div class="card-value">12</div>
+            <div class="card-sub">4 active connections</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Tables Profiled</div>
+            <div class="card-value">1,847</div>
+            <div class="card-sub">+128 this week</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Relationships</div>
+            <div class="card-value">342</div>
+            <div class="card-sub">Across 8 domains</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Sensitive Columns</div>
+            <div class="card-value" style="color:var(--danger-text)">89</div>
+            <div class="card-sub">PII · PHI · Financial</div>
+          </div>
+        </div>
+
+        <div class="grid2" style="margin-bottom:20px">
+          <div class="card">
+            <div class="section-title">Datasource Profiles <span class="badge badge-info">12 total</span></div>
+            <table class="tbl">
+              <tr><th>Source</th><th>Type</th><th>Tables</th><th>Status</th></tr>
+              <tr><td>prod-postgres-01</td><td><span class="badge badge-gray">PostgreSQL</span></td><td>412</td><td><span class="badge badge-success">Active</span></td></tr>
+              <tr><td>warehouse-bq</td><td><span class="badge badge-gray">BigQuery</span></td><td>840</td><td><span class="badge badge-success">Active</span></td></tr>
+              <tr><td>legacy-mysql</td><td><span class="badge badge-gray">MySQL</span></td><td>197</td><td><span class="badge badge-warn">Stale</span></td></tr>
+              <tr><td>snowflake-dwh</td><td><span class="badge badge-gray">Snowflake</span></td><td>398</td><td><span class="badge badge-success">Active</span></td></tr>
+            </table>
+          </div>
+          <div class="card">
+            <div class="section-title">Table Type Distribution</div>
+            <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+              <div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">Fact Tables</span><span style="font-weight:500">523 (28%)</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:28%;background:#2563eb"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">Dimension Tables</span><span style="font-weight:500">712 (39%)</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:39%;background:#0891b2"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">Staging / Temp</span><span style="font-weight:500">312 (17%)</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:17%;background:#7c3aed"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">Reference / Lookup</span><span style="font-weight:500">300 (16%)</span></div>
+                <div class="progress-bar"><div class="progress-fill" style="width:16%;background:#059669"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Relationship Graph — Domain Level</div>
+          <svg class="graph-svg" viewBox="0 0 560 200">
+            <defs><marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#94a3b8"/></marker></defs>
+            <rect x="20" y="80" width="90" height="38" rx="6" fill="#dbeafe" stroke="#93c5fd" stroke-width="0.5"/>
+            <text x="65" y="103" text-anchor="middle" font-size="11" fill="#1d4ed8" font-weight="500">Finance</text>
+            <rect x="150" y="30" width="90" height="38" rx="6" fill="#d1fae5" stroke="#6ee7b7" stroke-width="0.5"/>
+            <text x="195" y="53" text-anchor="middle" font-size="11" fill="#065f46" font-weight="500">HR</text>
+            <rect x="150" y="130" width="90" height="38" rx="6" fill="#fde68a" stroke="#fbbf24" stroke-width="0.5"/>
+            <text x="195" y="153" text-anchor="middle" font-size="11" fill="#92400e" font-weight="500">Sales</text>
+            <rect x="290" y="80" width="90" height="38" rx="6" fill="#ede9fe" stroke="#c4b5fd" stroke-width="0.5"/>
+            <text x="335" y="103" text-anchor="middle" font-size="11" fill="#5b21b6" font-weight="500">Product</text>
+            <rect x="420" y="50" width="90" height="38" rx="6" fill="#fee2e2" stroke="#fca5a5" stroke-width="0.5"/>
+            <text x="465" y="73" text-anchor="middle" font-size="11" fill="#991b1b" font-weight="500">Analytics</text>
+            <rect x="420" y="110" width="90" height="38" rx="6" fill="#e0f2fe" stroke="#7dd3fc" stroke-width="0.5"/>
+            <text x="465" y="133" text-anchor="middle" font-size="11" fill="#0c4a6e" font-weight="500">Operations</text>
+            <line x1="110" y1="99" x2="150" y2="55" stroke="#94a3b8" stroke-width="0.8" marker-end="url(#arr)"/>
+            <line x1="110" y1="99" x2="150" y2="145" stroke="#94a3b8" stroke-width="0.8" marker-end="url(#arr)"/>
+            <line x1="240" y1="55" x2="290" y2="90" stroke="#94a3b8" stroke-width="0.8" marker-end="url(#arr)"/>
+            <line x1="240" y1="145" x2="290" y2="110" stroke="#94a3b8" stroke-width="0.8" marker-end="url(#arr)"/>
+            <line x1="380" y1="90" x2="420" y2="73" stroke="#94a3b8" stroke-width="0.8" marker-end="url(#arr)"/>
+            <line x1="380" y1="108" x2="420" y2="125" stroke="#94a3b8" stroke-width="0.8" marker-end="url(#arr)"/>
+            <line x1="195" y1="68" x2="195" y2="130" stroke="#94a3b8" stroke-width="0.5" stroke-dasharray="3,3"/>
+            <text x="28" y="182" font-size="10" fill="#94a3b8">● Node = domain  — Edge = cross-domain FK relationship  — Dashed = soft reference</text>
+          </svg>
+        </div>
+      </div>
+
+      <!-- DATASOURCE -->
+      <div id="page-datasource" class="page">
+        <div class="grid2">
+          <div class="card" style="grid-column:1/-1">
+            <div class="section-title">Add / Update Datasource Profile</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Profile Name</label>
+                <input class="form-input" placeholder="e.g. prod-postgres-01" value="prod-postgres-01"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Database Type</label>
+                <select class="form-select"><option>PostgreSQL</option><option>MySQL</option><option>BigQuery</option><option>Snowflake</option><option>Redshift</option></select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Host / Connection String</label>
+                <input class="form-input" placeholder="host:port/database" value="pg-prod.internal:5432/analytics"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Schema Filter (comma separated)</label>
+                <input class="form-input" placeholder="public, finance, hr" value="public, finance"/>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Username</label>
+                <input class="form-input" value="readonly_user"/>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Password</label>
+                <input class="form-input" type="password" value="••••••••••"/>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:4px">
+              <button class="btn">Test Connection</button>
+              <button class="btn btn-primary">Save Profile</button>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="section-title">Existing Profiles</div>
+          <table class="tbl">
+            <tr><th>Profile</th><th>Type</th><th>Host</th><th>Schema</th><th>Tables</th><th>Last Crawl</th><th>Status</th><th></th></tr>
+            <tr><td>prod-postgres-01</td><td><span class="badge badge-gray">PG</span></td><td>pg-prod.internal</td><td>public, finance</td><td>412</td><td>2h ago</td><td><span class="badge badge-success">Active</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px">Edit</button></td></tr>
+            <tr><td>warehouse-bq</td><td><span class="badge badge-gray">BQ</span></td><td>bq://project/ds</td><td>analytics</td><td>840</td><td>6h ago</td><td><span class="badge badge-success">Active</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px">Edit</button></td></tr>
+            <tr><td>legacy-mysql</td><td><span class="badge badge-gray">MY</span></td><td>mysql-legacy.db</td><td>legacy</td><td>197</td><td>3d ago</td><td><span class="badge badge-warn">Stale</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px">Edit</button></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- JOB PROFILES -->
+      <div id="page-jobs" class="page">
+        <div class="grid3" style="margin-bottom:16px">
+          <div class="card">
+            <div class="card-title">Total Jobs</div>
+            <div class="card-value">24</div>
+            <div class="card-sub">8 completed today</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Running</div>
+            <div class="card-value" style="color:var(--info-text)">3</div>
+            <div class="card-sub">avg. 14min remaining</div>
+          </div>
+          <div class="card">
+            <div class="card-title">Failed</div>
+            <div class="card-value" style="color:var(--danger-text)">1</div>
+            <div class="card-sub">Last: 3h ago</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-title">Job Profiles <button class="btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="navigate('job-template',null)">+ Create Job</button></div>
+          <table class="tbl">
+            <tr><th>Job ID</th><th>Datasource</th><th>Template</th><th>Stages</th><th>Tables</th><th>Relationships</th><th>Sensitive Cols</th><th>Started</th><th>Status</th><th></th></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:11px">JOB-0042</td><td>prod-postgres-01</td><td>Full Profile</td><td>6/6</td><td>412</td><td>87</td><td><span class="sens-tag">12 PII</span></td><td>2h ago</td><td><span class="badge badge-success">Done</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px" onclick="navigate('job-detail',null)">View</button></td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:11px">JOB-0043</td><td>warehouse-bq</td><td>Schema Only</td><td>3/6</td><td>840</td><td>—</td><td>—</td><td>1h ago</td><td><span class="badge badge-info">Running</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px" onclick="navigate('job-detail',null)">View</button></td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:11px">JOB-0044</td><td>snowflake-dwh</td><td>Sensitive Scan</td><td>4/6</td><td>398</td><td>120</td><td><span class="sens-tag">8 PHI</span></td><td>45m ago</td><td><span class="badge badge-info">Running</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px" onclick="navigate('job-detail',null)">View</button></td></tr>
+            <tr><td style="font-family:var(--font-mono);font-size:11px">JOB-0041</td><td>legacy-mysql</td><td>Full Profile</td><td>2/6</td><td>197</td><td>—</td><td>—</td><td>3h ago</td><td><span class="badge badge-danger">Failed</span></td><td><button class="btn" style="padding:3px 8px;font-size:11px" onclick="navigate('job-detail',null)">View</button></td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- JOB DETAIL -->
+      <div id="page-job-detail" class="page">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <span style="font-family:var(--font-mono);font-size:12px;color:var(--text2)">JOB-0042</span>
+          <span class="badge badge-success">Completed</span>
+          <span style="flex:1"></span>
+          <button class="btn" onclick="navigate('job-compare',null)">Compare Jobs</button>
+          <button class="btn" onclick="navigate('job-export',null)">Export JSON</button>
+        </div>
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab('jd','tables',this)">Tables</div>
+          <div class="tab" onclick="switchTab('jd','relationships',this)">Relationships</div>
+          <div class="tab" onclick="switchTab('jd','sensitive',this)">Sensitive Columns</div>
+          <div class="tab" onclick="switchTab('jd','table-graph',this)">Table Graph</div>
+          <div class="tab" onclick="switchTab('jd','detail-graph',this)">Detailed Graph</div>
+          <div class="tab" onclick="switchTab('jd','logs',this)">Running Logs</div>
+        </div>
+        <div id="jd-tables" class="tab-panel active">
+          <table class="tbl">
+            <tr><th>Table</th><th>Schema</th><th>Type</th><th>Rows (est.)</th><th>Columns</th><th>Sensitive</th><th>Domain</th></tr>
+            <tr><td>users</td><td>public</td><td><span class="badge badge-gray">Dimension</span></td><td>284,712</td><td>18</td><td><span class="sens-tag">4 PII</span></td><td>HR</td></tr>
+            <tr><td>orders</td><td>public</td><td><span class="badge badge-gray">Fact</span></td><td>1,284,000</td><td>24</td><td>—</td><td>Sales</td></tr>
+            <tr><td>payments</td><td>finance</td><td><span class="badge badge-gray">Fact</span></td><td>982,411</td><td>16</td><td><span class="sens-tag">3 Financial</span></td><td>Finance</td></tr>
+            <tr><td>products</td><td>public</td><td><span class="badge badge-gray">Dimension</span></td><td>12,400</td><td>22</td><td>—</td><td>Product</td></tr>
+            <tr><td>audit_logs</td><td>public</td><td><span class="badge badge-gray">Reference</span></td><td>4,218,000</td><td>12</td><td>—</td><td>Operations</td></tr>
+          </table>
+        </div>
+        <div id="jd-relationships" class="tab-panel">
+          <table class="tbl">
+            <tr><th>Source Table</th><th>Source Col</th><th>Target Table</th><th>Target Col</th><th>Type</th><th>Confidence</th></tr>
+            <tr><td>orders</td><td>user_id</td><td>users</td><td>id</td><td><span class="badge badge-gray">FK</span></td><td><span style="color:var(--success-text);font-weight:500">98%</span></td></tr>
+            <tr><td>payments</td><td>order_id</td><td>orders</td><td>id</td><td><span class="badge badge-gray">FK</span></td><td><span style="color:var(--success-text);font-weight:500">95%</span></td></tr>
+            <tr><td>order_items</td><td>product_id</td><td>products</td><td>id</td><td><span class="badge badge-gray">FK</span></td><td><span style="color:var(--success-text);font-weight:500">99%</span></td></tr>
+            <tr><td>users</td><td>department_id</td><td>departments</td><td>id</td><td><span class="badge badge-gray">Inferred</span></td><td><span style="color:var(--warn-text);font-weight:500">72%</span></td></tr>
+          </table>
+        </div>
+        <div id="jd-sensitive" class="tab-panel">
+          <table class="tbl">
+            <tr><th>Table</th><th>Column</th><th>Detected By</th><th>Category</th><th>Pattern Match</th><th>Action</th></tr>
+            <tr><td>users</td><td>email</td><td>Name Detection</td><td><span class="sens-tag">PII</span></td><td>email_pattern</td><td><button class="btn" style="padding:2px 7px;font-size:11px">Mask</button></td></tr>
+            <tr><td>users</td><td>phone_number</td><td>Regex</td><td><span class="sens-tag">PII</span></td><td>\d{10}</td><td><button class="btn" style="padding:2px 7px;font-size:11px">Mask</button></td></tr>
+            <tr><td>users</td><td>ssn</td><td>Regex</td><td><span class="sens-tag">PII</span></td><td>ssn_regex</td><td><button class="btn" style="padding:2px 7px;font-size:11px">Mask</button></td></tr>
+            <tr><td>payments</td><td>card_number</td><td>Regex + NER</td><td><span class="sens-tag">Financial</span></td><td>cc_pattern</td><td><button class="btn" style="padding:2px 7px;font-size:11px">Mask</button></td></tr>
+            <tr><td>payments</td><td>cvv</td><td>Name Detection</td><td><span class="sens-tag">Financial</span></td><td>cvv_field</td><td><button class="btn" style="padding:2px 7px;font-size:11px">Mask</button></td></tr>
+          </table>
+        </div>
+        <div id="jd-table-graph" class="tab-panel">
+          <svg class="graph-svg" viewBox="0 0 560 230">
+            <defs><marker id="arr2" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#94a3b8"/></marker></defs>
+            <rect x="220" y="10" width="100" height="40" rx="5" fill="#dbeafe" stroke="#93c5fd" stroke-width="0.7"/>
+            <text x="270" y="35" text-anchor="middle" font-size="12" fill="#1e40af" font-weight="500">users</text>
+            <rect x="60" y="100" width="100" height="40" rx="5" fill="#d1fae5" stroke="#6ee7b7" stroke-width="0.7"/>
+            <text x="110" y="125" text-anchor="middle" font-size="12" fill="#065f46" font-weight="500">orders</text>
+            <rect x="380" y="100" width="100" height="40" rx="5" fill="#fde68a" stroke="#fbbf24" stroke-width="0.7"/>
+            <text x="430" y="125" text-anchor="middle" font-size="12" fill="#92400e" font-weight="500">payments</text>
+            <rect x="60" y="180" width="110" height="40" rx="5" fill="#ede9fe" stroke="#c4b5fd" stroke-width="0.7"/>
+            <text x="115" y="205" text-anchor="middle" font-size="12" fill="#5b21b6" font-weight="500">order_items</text>
+            <rect x="220" y="180" width="100" height="40" rx="5" fill="#fee2e2" stroke="#fca5a5" stroke-width="0.7"/>
+            <text x="270" y="205" text-anchor="middle" font-size="12" fill="#991b1b" font-weight="500">products</text>
+            <line x1="220" y1="35" x2="160" y2="100" stroke="#94a3b8" stroke-width="0.8" marker-end="url(#arr2)"/>
+            <line x1="320" y1="35" x2="380" y2="100" stroke="#94a3b8" stroke-width="0.8" marker-end="url(#arr2)"/>
+            <line x1="160" y1="120" x2="380" y2="120" stroke="#94a3b8" stroke-width="0.8" marker-end="url(#arr2)"/>
+            <line x1="110" y1="140" x2="110" y2="180" stroke="#94a3b8" stroke-width="0.8" marker-end="url(#arr2)"/>
+            <line x1="160" y1="200" x2="220" y2="200" stroke="#94a3b8" stroke-width="0.8" marker-end="url(#arr2)"/>
+            <text x="145" y="95" font-size="10" fill="#94a3b8">user_id→id</text>
+            <text x="325" y="95" font-size="10" fill="#94a3b8">order_id→id</text>
+            <text x="210" y="112" font-size="10" fill="#94a3b8">payment</text>
+          </svg>
+        </div>
+        <div id="jd-detail-graph" class="tab-panel">
+          <svg class="graph-svg" viewBox="0 0 560 240" style="height:280px">
+            <defs><marker id="arr3" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#64748b"/></marker></defs>
+            <rect x="10" y="10" width="130" height="110" rx="5" fill="#eff6ff" stroke="#bfdbfe" stroke-width="0.7"/>
+            <text x="75" y="27" text-anchor="middle" font-size="11" fill="#1e3a8a" font-weight="500">users</text>
+            <line x1="10" y1="33" x2="140" y2="33" stroke="#bfdbfe" stroke-width="0.5"/>
+            <text x="18" y="47" font-size="10" fill="#3b82f6">🔑 id (PK)</text>
+            <text x="18" y="60" font-size="10" fill="#64748b">email</text>
+            <text x="18" y="73" font-size="10" fill="#64748b">name</text>
+            <text x="18" y="86" font-size="10" fill="#ef4444">⚠ ssn</text>
+            <text x="18" y="99" font-size="10" fill="#ef4444">⚠ phone</text>
+            <text x="18" y="112" font-size="10" fill="#64748b">created_at</text>
+            <rect x="210" y="10" width="130" height="100" rx="5" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="0.7"/>
+            <text x="275" y="27" text-anchor="middle" font-size="11" fill="#14532d" font-weight="500">orders</text>
+            <line x1="210" y1="33" x2="340" y2="33" stroke="#bbf7d0" stroke-width="0.5"/>
+            <text x="218" y="47" font-size="10" fill="#3b82f6">🔑 id (PK)</text>
+            <text x="218" y="60" font-size="10" fill="#64748b">user_id (FK)</text>
+            <text x="218" y="73" font-size="10" fill="#64748b">total_amount</text>
+            <text x="218" y="86" font-size="10" fill="#64748b">status</text>
+            <text x="218" y="99" font-size="10" fill="#64748b">order_date</text>
+            <rect x="410" y="10" width="130" height="100" rx="5" fill="#fffbeb" stroke="#fde68a" stroke-width="0.7"/>
+            <text x="475" y="27" text-anchor="middle" font-size="11" fill="#78350f" font-weight="500">payments</text>
+            <line x1="410" y1="33" x2="540" y2="33" stroke="#fde68a" stroke-width="0.5"/>
+            <text x="418" y="47" font-size="10" fill="#3b82f6">🔑 id (PK)</text>
+            <text x="418" y="60" font-size="10" fill="#64748b">order_id (FK)</text>
+            <text x="418" y="73" font-size="10" fill="#ef4444">⚠ card_no</text>
+            <text x="418" y="86" font-size="10" fill="#ef4444">⚠ cvv</text>
+            <text x="418" y="99" font-size="10" fill="#64748b">paid_at</text>
+            <line x1="140" y1="60" x2="210" y2="60" stroke="#64748b" stroke-width="0.7" marker-end="url(#arr3)"/>
+            <text x="155" y="55" font-size="9" fill="#94a3b8">user_id</text>
+            <line x1="340" y1="60" x2="410" y2="60" stroke="#64748b" stroke-width="0.7" marker-end="url(#arr3)"/>
+            <text x="355" y="55" font-size="9" fill="#94a3b8">order_id</text>
+            <text x="10" y="145" font-size="10" fill="#ef4444">⚠ = sensitive column</text>
+            <text x="10" y="158" font-size="10" fill="#3b82f6">🔑 = primary key</text>
+            <text x="200" y="145" font-size="10" fill="#94a3b8">Arrow = foreign key relationship</text>
+          </svg>
+        </div>
+        <div id="jd-logs" class="tab-panel">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-size:12px;color:var(--text2)">Last 50 log entries · stored in DB</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn" style="font-size:11px">↓ Download</button>
+              <span class="badge badge-info">● Live</span>
+            </div>
+          </div>
+          <div class="log-container" id="log-box">
+            <div class="log-line"><span class="log-ts">14:22:01</span><span class="log-info">[INFO]</span><span style="color:#e2e8f0"> Stage: schema_crawler — started on prod-postgres-01</span></div>
+            <div class="log-line"><span class="log-ts">14:22:03</span><span class="log-info">[INFO]</span><span style="color:#e2e8f0"> Discovered 412 tables in schemas: public, finance</span></div>
+            <div class="log-line"><span class="log-ts">14:22:08</span><span class="log-success">[OK]  </span><span style="color:#e2e8f0"> schema_crawler complete — 412 tables indexed</span></div>
+            <div class="log-line"><span class="log-ts">14:22:09</span><span class="log-info">[INFO]</span><span style="color:#e2e8f0"> Stage: name_detection — scanning column names</span></div>
+            <div class="log-line"><span class="log-ts">14:22:14</span><span class="log-warn">[WARN]</span><span style="color:#e2e8f0"> Ambiguous column 'ref_id' in table invoices — skipped</span></div>
+            <div class="log-line"><span class="log-ts">14:22:18</span><span class="log-success">[OK]  </span><span style="color:#e2e8f0"> name_detection complete — 34 sensitive candidates flagged</span></div>
+            <div class="log-line"><span class="log-ts">14:22:19</span><span class="log-info">[INFO]</span><span style="color:#e2e8f0"> Stage: regex_detection — applying 28 patterns</span></div>
+            <div class="log-line"><span class="log-ts">14:22:25</span><span class="log-success">[OK]  </span><span style="color:#e2e8f0"> regex_detection — matched 89 columns across 12 tables</span></div>
+            <div class="log-line"><span class="log-ts">14:22:26</span><span class="log-info">[INFO]</span><span style="color:#e2e8f0"> Stage: sensitive_columns — cross-referencing results</span></div>
+            <div class="log-line"><span class="log-ts">14:22:30</span><span class="log-success">[OK]  </span><span style="color:#e2e8f0"> sensitive_columns — 12 PII, 3 Financial confirmed</span></div>
+            <div class="log-line"><span class="log-ts">14:22:31</span><span class="log-info">[INFO]</span><span style="color:#e2e8f0"> Stage: entity_classification — classifying 412 tables</span></div>
+            <div class="log-line"><span class="log-ts">14:22:40</span><span class="log-success">[OK]  </span><span style="color:#e2e8f0"> entity_classification — Fact:142, Dim:190, Ref:80</span></div>
+            <div class="log-line"><span class="log-ts">14:22:41</span><span class="log-info">[INFO]</span><span style="color:#e2e8f0"> Stage: domain_grouping — assigning to 6 domains</span></div>
+            <div class="log-line"><span class="log-ts">14:22:49</span><span class="log-success">[OK]  </span><span style="color:#e2e8f0"> domain_grouping complete — Finance:82, HR:64, Sales:120, Product:90, Ops:56</span></div>
+            <div class="log-line"><span class="log-ts">14:22:50</span><span class="log-success">[DONE]</span><span style="color:#e2e8f0"> JOB-0042 completed successfully in 2m 49s</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- JOB COMPARE -->
+      <div id="page-job-compare" class="page">
+        <div class="card" style="margin-bottom:16px">
+          <div class="section-title">Select Two Jobs to Compare</div>
+          <div style="display:flex;gap:12px;margin-bottom:16px">
+            <select class="form-select" style="flex:1"><option>JOB-0042 — prod-postgres-01 — Done</option><option>JOB-0041</option></select>
+            <div style="display:flex;align-items:center;font-size:18px;color:var(--text3)">⇄</div>
+            <select class="form-select" style="flex:1"><option>JOB-0040 — prod-postgres-01 — Done</option><option>JOB-0039</option></select>
+            <button class="btn btn-primary">Compare</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px">
+          <div class="compare-col selected">
+            <div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:500">JOB-0042</span><span class="badge badge-success">Current</span></div>
+            <table class="tbl">
+              <tr><td style="color:var(--text2)">Tables</td><td style="font-weight:500;text-align:right">412</td></tr>
+              <tr><td style="color:var(--text2)">Relationships</td><td style="font-weight:500;text-align:right">87</td></tr>
+              <tr><td style="color:var(--text2)">Sensitive Cols</td><td style="font-weight:500;text-align:right;color:var(--danger-text)">15</td></tr>
+              <tr><td style="color:var(--text2)">New Tables</td><td style="font-weight:500;text-align:right;color:var(--success-text)">+8</td></tr>
+              <tr><td style="color:var(--text2)">Dropped Tables</td><td style="font-weight:500;text-align:right;color:var(--danger-text)">-2</td></tr>
+              <tr><td style="color:var(--text2)">Duration</td><td style="font-weight:500;text-align:right">2m 49s</td></tr>
+              <tr><td style="color:var(--text2)">Run Date</td><td style="font-weight:500;text-align:right">Today 14:22</td></tr>
+            </table>
+          </div>
+          <div style="display:flex;flex-direction:column;justify-content:center;align-items:center;gap:8px;padding:0 8px">
+            <div style="font-size:11px;color:var(--text3);writing-mode:vertical-lr;transform:rotate(180deg)">DIFF</div>
+            <div style="width:1px;flex:1;background:var(--border)"></div>
+          </div>
+          <div class="compare-col">
+            <div style="display:flex;justify-content:space-between;margin-bottom:10px"><span style="font-size:12px;font-weight:500">JOB-0040</span><span class="badge badge-gray">Previous</span></div>
+            <table class="tbl">
+              <tr><td style="color:var(--text2)">Tables</td><td style="font-weight:500;text-align:right">404</td></tr>
+              <tr><td style="color:var(--text2)">Relationships</td><td style="font-weight:500;text-align:right">82</td></tr>
+              <tr><td style="color:var(--text2)">Sensitive Cols</td><td style="font-weight:500;text-align:right;color:var(--danger-text)">13</td></tr>
+              <tr><td style="color:var(--text2)">New Tables</td><td style="font-weight:500;text-align:right">—</td></tr>
+              <tr><td style="color:var(--text2)">Dropped Tables</td><td style="font-weight:500;text-align:right">—</td></tr>
+              <tr><td style="color:var(--text2)">Duration</td><td style="font-weight:500;text-align:right">3m 12s</td></tr>
+              <tr><td style="color:var(--text2)">Run Date</td><td style="font-weight:500;text-align:right">Yesterday 08:10</td></tr>
+            </table>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="section-title">Schema Changes Detected</div>
+          <table class="tbl">
+            <tr><th>Table</th><th>Change Type</th><th>Column</th><th>Details</th></tr>
+            <tr><td>invoices</td><td><span class="badge badge-success">Added</span></td><td>discount_pct</td><td>NUMERIC(5,2) NOT NULL</td></tr>
+            <tr><td>user_preferences</td><td><span class="badge badge-success">New Table</span></td><td>—</td><td>8 columns, ~42k rows</td></tr>
+            <tr><td>temp_exports</td><td><span class="badge badge-danger">Dropped</span></td><td>—</td><td>Previously 3 columns</td></tr>
+            <tr><td>payments</td><td><span class="badge badge-warn">Modified</span></td><td>card_number</td><td>Type changed: VARCHAR(16)→TEXT</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <!-- JOB EXPORT -->
+      <div id="page-job-export" class="page">
+        <div class="card" style="margin-bottom:16px">
+          <div class="section-title">Export Job as JSON</div>
+          <div class="form-row" style="margin-bottom:12px">
+            <div class="form-group">
+              <label class="form-label">Select Job</label>
+              <select class="form-select"><option>JOB-0042 — prod-postgres-01</option><option>JOB-0043</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Export Scope</label>
+              <select class="form-select"><option>All (Tables + Columns + Relationships)</option><option>Tables Only</option><option>Sensitive Columns Only</option></select>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary">Download JSON</button>
+            <button class="btn">Preview</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-title">JSON Preview</div>
+          <pre style="background:var(--surface2);padding:14px;border-radius:var(--border-radius-md);font-size:11px;font-family:var(--font-mono);color:var(--text);overflow-x:auto;line-height:1.7">{
+  "job_id": "JOB-0042",
+  "datasource": "prod-postgres-01",
+  "run_at": "2026-05-03T14:22:01Z",
+  "status": "completed",
+  "tables": [
+    {
+      "name": "users",
+      "schema": "public",
+      "type": "dimension",
+      "domain": "HR",
+      "row_count": 284712,
+      "columns": [
+        {"name": "id", "type": "BIGINT", "pk": true, "sensitive": false},
+        {"name": "email", "type": "VARCHAR", "pk": false, "sensitive": true, "category": "PII"}
+      ]
+    }
+  ],
+  "relationships": [
+    {"from_table": "orders","from_col": "user_id","to_table": "users","to_col": "id","type": "FK","confidence": 0.98}
+  ]
+}</pre>
+        </div>
+      </div>
+
+      <!-- AUDIT -->
+      <div id="page-audit" class="page">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div style="display:flex;gap:6px">
+            <button class="btn">All Actions</button>
+            <button class="btn">Jobs</button>
+            <button class="btn">Admin</button>
+            <button class="btn">Datasource</button>
+          </div>
+          <button class="btn btn-primary">Export Audit Log</button>
+        </div>
+        <div class="card">
+          <div class="audit-row">
+            <div class="audit-dot" style="background:var(--success-text)"></div>
+            <div class="audit-body">
+              <div class="audit-action">JOB-0042 completed successfully</div>
+              <div class="audit-meta">sarah.r · today 14:22 · Job Execution</div>
+            </div>
+          </div>
+          <div class="audit-row">
+            <div class="audit-dot" style="background:var(--info-text)"></div>
+            <div class="audit-body">
+              <div class="audit-action">Datasource profile "prod-postgres-01" updated — schema filter changed</div>
+              <div class="audit-meta">sarah.r · today 13:10 · Datasource Config</div>
+            </div>
+          </div>
+          <div class="audit-row">
+            <div class="audit-dot" style="background:var(--warn-text)"></div>
+            <div class="audit-body">
+              <div class="audit-action">JOB-0041 failed at stage: regex_detection — connection timeout</div>
+              <div class="audit-meta">system · today 11:32 · Job Execution</div>
+            </div>
+          </div>
+          <div class="audit-row">
+            <div class="audit-dot" style="background:var(--info-text)"></div>
+            <div class="audit-body">
+              <div class="audit-action">New user "james.k" created and assigned to group "data-analysts"</div>
+              <div class="audit-meta">sarah.r · yesterday 16:45 · User Management</div>
+            </div>
+          </div>
+          <div class="audit-row">
+            <div class="audit-dot" style="background:var(--danger-text)"></div>
+            <div class="audit-body">
+              <div class="audit-action">Sensitive column "card_number" masked in datasource "prod-postgres-01"</div>
+              <div class="audit-meta">sarah.r · yesterday 10:20 · Security Action</div>
+            </div>
+          </div>
+          <div class="audit-row">
+            <div class="audit-dot" style="background:var(--info-text)"></div>
+            <div class="audit-body">
+              <div class="audit-action">Job template "Full Profile" created with 6 stages</div>
+              <div class="audit-meta">sarah.r · 2d ago 09:12 · Settings</div>
+            </div>
+          </div>
+          <div class="audit-row" style="border-bottom:none">
+            <div class="audit-dot" style="background:var(--text3)"></div>
+            <div class="audit-body">
+              <div class="audit-action">User "mike.t" group changed from "read-only" to "data-analysts"</div>
+              <div class="audit-meta">sarah.r · 3d ago 14:00 · User Management</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SETTINGS / JOB TEMPLATE -->
+      <div id="page-job-template" class="page">
+        <div class="card" style="margin-bottom:16px">
+          <div class="section-title">Job Template Profile Definition</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Template Name</label>
+              <input class="form-input" placeholder="e.g. Full Profile" value="Full Profile v2"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Description</label>
+              <input class="form-input" placeholder="Brief description..." value="Complete schema + sensitivity scan"/>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="section-title">Pipeline Stages</div>
+          <div class="pipeline" style="margin-bottom:16px">
+            <div class="stage done"><div class="stage-icon">🔍</div><div class="stage-name">Schema Crawler</div></div>
+            <div class="stage done"><div class="stage-icon">🏷</div><div class="stage-name">Name Detection</div></div>
+            <div class="stage active-stage"><div class="stage-icon">⚡</div><div class="stage-name">Regex Detection</div></div>
+            <div class="stage pending"><div class="stage-icon">🔐</div><div class="stage-name">Sensitive Cols</div></div>
+            <div class="stage pending"><div class="stage-icon">📊</div><div class="stage-name">Entity Class.</div></div>
+            <div class="stage pending"><div class="stage-icon">🌐</div><div class="stage-name">Domain Group.</div></div>
+          </div>
+          <div class="card" style="background:var(--surface2);border-style:dashed">
+            <div style="font-size:12px;font-weight:500;color:var(--text);margin-bottom:10px">Configuring: Regex Detection</div>
+            <div class="toggle">
+              <div><div class="toggle-info">Email Pattern</div><div class="toggle-sub">[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+</div></div>
+              <div class="toggle-switch on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle">
+              <div><div class="toggle-info">SSN Pattern</div><div class="toggle-sub">\d{3}-\d{2}-\d{4}</div></div>
+              <div class="toggle-switch on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle">
+              <div><div class="toggle-info">Credit Card Pattern</div><div class="toggle-sub">4[0-9]{12}(?:[0-9]{3})?</div></div>
+              <div class="toggle-switch on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle">
+              <div><div class="toggle-info">Phone Number</div><div class="toggle-sub">\+?[1-9]\d{9,14}</div></div>
+              <div class="toggle-switch" onclick="this.classList.toggle('on')"></div>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary">Save Template</button>
+          <button class="btn">Duplicate</button>
+          <button class="btn" style="color:var(--danger-text);border-color:var(--danger-text)">Clear Job Logs</button>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div id="page-settings" class="page">
+        <div class="grid2">
+          <div class="card">
+            <div class="section-title">System Settings</div>
+            <div class="toggle">
+              <div><div class="toggle-info">Store logs to database</div><div class="toggle-sub">Persist job logs in DB instead of flat files</div></div>
+              <div class="toggle-switch on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle">
+              <div><div class="toggle-info">Real-time log streaming</div><div class="toggle-sub">Stream last 50 entries to UI via WebSocket</div></div>
+              <div class="toggle-switch on" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle">
+              <div><div class="toggle-info">Auto-retry on failure</div><div class="toggle-sub">Retry failed stages up to 3 times</div></div>
+              <div class="toggle-switch" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="toggle">
+              <div><div class="toggle-info">Audit logging</div><div class="toggle-sub">Track all user actions</div></div>
+              <div class="toggle-switch on" onclick="this.classList.toggle('on')"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-title">Job Templates</div>
+            <table class="tbl">
+              <tr><th>Template</th><th>Stages</th><th>Jobs Used</th><th></th></tr>
+              <tr><td>Full Profile</td><td>6</td><td>18</td><td><button class="btn" style="padding:2px 7px;font-size:11px" onclick="navigate('job-template',null)">Edit</button></td></tr>
+              <tr><td>Schema Only</td><td>2</td><td>4</td><td><button class="btn" style="padding:2px 7px;font-size:11px">Edit</button></td></tr>
+              <tr><td>Sensitive Scan</td><td>4</td><td>2</td><td><button class="btn" style="padding:2px 7px;font-size:11px">Edit</button></td></tr>
+            </table>
+            <button class="btn" style="margin-top:10px" onclick="navigate('job-template',null)">+ New Template</button>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="section-title">Maintenance</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn" style="color:var(--danger-text)">Clear Job Log Files</button>
+            <button class="btn">Vacuum DB Logs</button>
+            <button class="btn">Rebuild Index</button>
+            <button class="btn">Export All Settings</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ADMIN -->
+      <div id="page-admin" class="page">
+        <div class="tabs">
+          <div class="tab active" onclick="switchTab('adm','users',this)">Users</div>
+          <div class="tab" onclick="switchTab('adm','groups',this)">Groups</div>
+          <div class="tab" onclick="switchTab('adm','roles',this)">Roles & Permissions</div>
+        </div>
+        <div id="adm-users" class="tab-panel active">
+          <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+            <button class="btn btn-primary">+ Add User</button>
+          </div>
+          <div class="card">
+            <table class="tbl">
+              <tr><th>Name</th><th>Email</th><th>Group</th><th>Role</th><th>Last Login</th><th>Status</th><th></th></tr>
+              <tr><td><div style="display:flex;align-items:center;gap:8px"><div class="avatar">SR</div>Sarah R.</div></td><td>sarah.r@company.com</td><td><span class="role-chip">data-engineers</span></td><td><span class="badge badge-info">Admin</span></td><td>Now</td><td><span class="badge badge-success">Active</span></td><td><button class="btn" style="padding:2px 7px;font-size:11px">Edit</button></td></tr>
+              <tr><td><div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="background:var(--success-bg);color:var(--success-text)">JK</div>James K.</div></td><td>james.k@company.com</td><td><span class="role-chip">data-analysts</span></td><td><span class="badge badge-gray">Analyst</span></td><td>2h ago</td><td><span class="badge badge-success">Active</span></td><td><button class="btn" style="padding:2px 7px;font-size:11px">Edit</button></td></tr>
+              <tr><td><div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="background:var(--warn-bg);color:var(--warn-text)">MT</div>Mike T.</div></td><td>mike.t@company.com</td><td><span class="role-chip">data-analysts</span></td><td><span class="badge badge-gray">Analyst</span></td><td>1d ago</td><td><span class="badge badge-success">Active</span></td><td><button class="btn" style="padding:2px 7px;font-size:11px">Edit</button></td></tr>
+              <tr><td><div style="display:flex;align-items:center;gap:8px"><div class="avatar" style="background:var(--surface2);color:var(--text2)">PL</div>Priya L.</div></td><td>priya.l@company.com</td><td><span class="role-chip">read-only</span></td><td><span class="badge badge-gray">Viewer</span></td><td>5d ago</td><td><span class="badge badge-warn">Inactive</span></td><td><button class="btn" style="padding:2px 7px;font-size:11px">Edit</button></td></tr>
+            </table>
+          </div>
+        </div>
+        <div id="adm-groups" class="tab-panel">
+          <div class="card">
+            <table class="tbl">
+              <tr><th>Group</th><th>Members</th><th>API Access</th><th>Screen Access</th><th></th></tr>
+              <tr><td><strong>data-engineers</strong></td><td>3</td><td>Full</td><td>All pages</td><td><button class="btn" style="padding:2px 7px;font-size:11px">Edit</button></td></tr>
+              <tr><td><strong>data-analysts</strong></td><td>5</td><td>Read + Export</td><td>Dashboard, Jobs, Audit</td><td><button class="btn" style="padding:2px 7px;font-size:11px">Edit</button></td></tr>
+              <tr><td><strong>read-only</strong></td><td>8</td><td>Read Only</td><td>Dashboard only</td><td><button class="btn" style="padding:2px 7px;font-size:11px">Edit</button></td></tr>
+            </table>
+          </div>
+        </div>
+        <div id="adm-roles" class="tab-panel">
+          <div class="card">
+            <table class="tbl">
+              <tr><th>Role</th><th>Screens</th><th>API Endpoints</th><th>Job Actions</th><th>Admin</th></tr>
+              <tr><td><span class="badge badge-info">Admin</span></td><td>All</td><td>All</td><td>Create · Run · Delete</td><td>Yes</td></tr>
+              <tr><td><span class="badge badge-gray">Engineer</span></td><td>All except Admin</td><td>All</td><td>Create · Run</td><td>No</td></tr>
+              <tr><td><span class="badge badge-gray">Analyst</span></td><td>Dashboard, Jobs, Audit</td><td>GET only</td><td>View · Export</td><td>No</td></tr>
+              <tr><td><span class="badge badge-gray">Viewer</span></td><td>Dashboard only</td><td>GET /dashboard</td><td>View</td><td>No</td></tr>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROFILE -->
+      <div id="page-profile" class="page">
+        <div class="grid2">
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px">
+              <div class="avatar" style="width:48px;height:48px;font-size:16px">SR</div>
+              <div>
+                <div style="font-size:15px;font-weight:500;color:var(--text)">Sarah R.</div>
+                <div style="font-size:12px;color:var(--text3)">sarah.r@company.com · Admin</div>
+              </div>
+            </div>
+            <div class="form-group"><label class="form-label">Display Name</label><input class="form-input" value="Sarah R."/></div>
+            <div class="form-group"><label class="form-label">Email</label><input class="form-input" value="sarah.r@company.com"/></div>
+            <button class="btn btn-primary" style="margin-top:4px">Save Changes</button>
+          </div>
+          <div class="card">
+            <div class="section-title">Preferences</div>
+            <div class="form-group">
+              <label class="form-label">Theme</label>
+              <select class="form-select"><option>System Default</option><option>Light</option><option>Dark</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Date Format</label>
+              <select class="form-select"><option>YYYY-MM-DD</option><option>DD/MM/YYYY</option><option>MM/DD/YYYY</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Timezone</label>
+              <select class="form-select"><option>Asia/Kolkata (IST)</option><option>UTC</option><option>America/New_York</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Default Graph View</label>
+              <select class="form-select"><option>Domain Level</option><option>Table Level</option><option>Detailed</option></select>
+            </div>
+            <button class="btn">Save Preferences</button>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="section-title">My Groups</div>
+          <div style="display:flex;gap:8px">
+            <span class="role-chip">data-engineers</span>
+            <span class="role-chip">admin</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div>
+
+<script>
+function navigate(pageId, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const page = document.getElementById('page-' + pageId);
+  if (page) page.classList.add('active');
+  if (el) {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+  }
+  const titles = {
+    dashboard: 'Dashboard',
+    datasource: 'Datasource Profiles',
+    jobs: 'Job Profiles',
+    'job-detail': 'Job Detail — JOB-0042',
+    'job-compare': 'Job Comparison',
+    'job-export': 'Export Job',
+    audit: 'Audit Tracking',
+    settings: 'Settings',
+    'job-template': 'Job Template Profile',
+    admin: 'Admin',
+    profile: 'User Profile'
+  };
+  document.getElementById('page-title').textContent = titles[pageId] || pageId;
+}
+
+function switchTab(prefix, tabId, el) {
+  const panels = document.querySelectorAll('[id^="' + prefix + '-"]');
+  panels.forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById(prefix + '-' + tabId);
+  if (panel) panel.classList.add('active');
+  if (el) {
+    el.closest('.tabs').querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+  }
+}
+</script>

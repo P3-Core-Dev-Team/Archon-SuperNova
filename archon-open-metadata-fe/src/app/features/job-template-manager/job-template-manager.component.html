@@ -1,0 +1,83 @@
+
+<div id="p-settings-tpl" class="page">
+  <div class="page-header">
+    <div class="page-title">Job template profiles</div>
+  </div>
+
+  <div class="card" *ngIf="!showForm">
+    <div style="display:flex;justify-content:flex-start;margin-bottom:14px">
+      <button class="tb-btn primary" (click)="isEditing=false; currentTplId=null; newTpl={name:'', options:[]}; showForm=true">Add template profile</button>
+    </div>
+    
+    <table class="tbl">
+      <tr>
+        <th>Template Name</th>
+        <th>Configured Stages & Rules</th>
+        <th>Actions</th>
+      </tr>
+      <tr *ngFor="let tpl of jobTemplates">
+        <td style="font-weight: 500">{{ tpl.name }}</td>
+        <td>
+          <div style="display:flex; flex-wrap: wrap; gap: 4px;">
+            <span *ngFor="let opt of tpl.options" class="badge b-blue" style="font-size: 10px; padding: 2px 6px;">
+              {{ opt.operationName.toUpperCase().replace('-', ' ') }} ({{ opt.minValue }} - {{ opt.maxValue }})
+            </span>
+            <span *ngIf="!tpl.options || tpl.options.length === 0" style="color: var(--color-text-tertiary); font-style: italic; font-size: 12px">No stages configured</span>
+          </div>
+        </td>
+        <td style="width: 140px">
+          <div style="display:flex;gap:4px">
+            <button class="tb-btn" style="padding:3px 8px" (click)="editTemplate(tpl)">Edit</button>
+            <button class="tb-btn" style="padding:3px 8px;color:var(--color-text-danger);border-color:var(--color-text-danger)" (click)="deleteTemplate(tpl.id)">Delete</button>
+          </div>
+        </td>
+      </tr>
+      <tr *ngIf="jobTemplates.length === 0">
+        <td colspan="3" style="text-align:center;padding:40px 20px">
+          <div style="font-size:15px;font-weight:500;color:var(--color-text-primary)">No job templates found</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="card" *ngIf="showForm" style="max-width: 800px">
+    <div style="font-size:15px;font-weight:500;margin-bottom:16px">{{ currentTplId ? 'Edit' : 'Create' }} Job Template</div>
+    
+    <div class="form-grid" style="margin-bottom:24px">
+      <div class="fg" style="grid-column: 1 / -1">
+        <label class="fl">Template Name <span style="color:var(--color-text-danger)">*</span></label>
+        <input class="fi" [(ngModel)]="newTpl.name" placeholder="e.g. Strict PII Scan">
+      </div>
+    </div>
+
+    <table class="tbl" style="margin-bottom:24px">
+      <tr>
+        <th style="width: 50px">Enable</th>
+        <th>Pipeline Stage</th>
+        <th>Min Score</th>
+        <th>Max Score</th>
+      </tr>
+      <tr *ngFor="let stage of newTpl.options">
+        <td style="text-align: center">
+          <input type="checkbox" [(ngModel)]="stage.enabled" style="cursor: pointer; width: 16px; height: 16px;">
+        </td>
+        <td style="font-weight:500" [style.color]="stage.enabled ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)'">
+          {{ stage.displayName }}
+        </td>
+        <td>
+          <input *ngIf="stage.enabled" class="fi" type="number" [(ngModel)]="stage.minScore" step="0.1" min="0" max="1" style="width: 80px; padding: 4px">
+          <span *ngIf="!stage.enabled" style="color:var(--color-text-tertiary)">-</span>
+        </td>
+        <td>
+          <input *ngIf="stage.enabled" class="fi" type="number" [(ngModel)]="stage.maxScore" step="0.1" min="0" max="1" style="width: 80px; padding: 4px">
+          <span *ngIf="!stage.enabled" style="color:var(--color-text-tertiary)">-</span>
+        </td>
+      </tr>
+    </table>
+
+    <div style="display:flex;gap:8px">
+      <button class="tb-btn" (click)="showForm = false">Cancel</button>
+      <button class="tb-btn primary" [disabled]="!newTpl.name" (click)="saveTemplate()">{{ currentTplId ? 'Update' : 'Create' }} Template</button>
+    </div>
+  </div>
+</div>

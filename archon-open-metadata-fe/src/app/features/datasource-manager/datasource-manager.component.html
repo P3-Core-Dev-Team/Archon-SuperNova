@@ -1,0 +1,64 @@
+<div id="p-ds-list" class="page">
+        <div class="page-header"><div class="page-title">Datasource connections</div></div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+          <button class="tb-btn primary" (click)="resetDsForm(); showForm = true">Add profile</button>
+        </div>
+        <div class="card">
+          <table class="tbl">
+            <tr><th>Profile name</th><th>Engine</th><th>Host</th><th>Database</th><th>Schemas</th><th>Status</th><th>Actions</th></tr>
+            <tr *ngFor="let ds of datasources">
+              <td style="font-weight:500">&#123;&#123; ds.profileName &#125;&#125;</td>
+              <td><span class="badge b-gray">&#123;&#123; ds.dbType &#125;&#125;</span></td>
+              <td style="font-family:var(--font-mono);font-size:11px">&#123;&#123; ds.host &#125;&#125;:&#123;&#123; ds.port &#125;&#125;</td>
+              <td>&#123;&#123; ds.databaseName &#125;&#125;</td>
+              <td>&#123;&#123; ds.listOfSchemas || '-' &#125;&#125;</td>
+              <td><span class="badge b-green">Active</span></td>
+              <td>
+                <div style="display:flex;gap:4px">
+                  <button class="tb-btn" style="padding:3px 8px" (click)="editDatasource(ds)">Edit</button>
+                  <button class="tb-btn" style="padding:3px 8px;color:var(--color-text-danger);border-color:var(--color-text-danger)" (click)="deleteDatasource(ds.id)">Delete</button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="datasources.length === 0">
+              <td colspan="6" style="text-align:center;padding:50px 20px">
+                <img src="assets/empty-state.png" alt="Empty" style="width:140px;height:auto;margin-bottom:16px;opacity:0.8">
+                <div style="font-size:15px;font-weight:500;color:var(--color-text-primary)">No datasources configured</div>
+                <div style="font-size:13px;color:var(--color-text-tertiary);margin-top:6px;margin-bottom:16px">Get started by adding a connection profile to analyze your data.</div>
+                <button class="tb-btn primary" style="margin:0 auto" (click)="resetDsForm(); showForm = true">Add your first profile</button>
+              </td>
+            </tr>
+          </table>
+        </div>
+      </div>
+
+      <div id="p-ds-new" class="page">
+        <div class="page-header"><div class="page-title">&#123;&#123; newDs.id ? 'Edit' : 'Add' &#125;&#125; datasource profile</div></div>
+        <div class="card" style="max-width:560px">
+          <div class="form-grid" style="margin-bottom:12px">
+            <div class="fg"><label class="fl">Profile name <span style="color:var(--color-text-danger)">*</span></label><input class="fi" [(ngModel)]="newDs.profileName" /></div>
+            <div class="fg"><label class="fl">Engine</label>
+              <select class="fi" [(ngModel)]="newDs.dbType">
+                <option value="postgres">PostgreSQL</option>
+                <option value="mysql">MySQL</option>
+              </select>
+            </div>
+            <div class="fg"><label class="fl">Host <span style="color:var(--color-text-danger)">*</span></label><input class="fi" [(ngModel)]="newDs.host"/></div>
+            <div class="fg"><label class="fl">Port <span style="color:var(--color-text-danger)">*</span></label><input class="fi" type="number" [(ngModel)]="newDs.port"/></div>
+            <div class="fg"><label class="fl">Database <span style="color:var(--color-text-danger)">*</span></label><input class="fi" [(ngModel)]="newDs.databaseName"/></div>
+            <div class="fg"><label class="fl">Schemas (Comma separated)</label><input class="fi" placeholder="e.g. public, metadata" [(ngModel)]="newDs.listOfSchemas"/></div>
+            <div class="fg"><label class="fl">Username <span style="color:var(--color-text-danger)">*</span></label><input class="fi" [(ngModel)]="newDs.username"/></div>
+            <div class="fg"><label class="fl">Password <span style="color:var(--color-text-danger)">*</span></label><input class="fi" type="password" [(ngModel)]="newDs.password"/></div>
+          </div>
+          <div style="display:flex;gap:8px;padding-top:4px">
+            <button class="tb-btn" [disabled]="!isDsFormValid" [style.opacity]="!isDsFormValid ? '0.5' : '1'" (click)="testConnection()">Test connection</button>
+            <button class="tb-btn primary" [disabled]="!isDsFormValid || testResult !== 'Connection successful!'" [style.opacity]="!isDsFormValid || testResult !== 'Connection successful!' ? '0.5' : '1'" (click)="saveDatasource()">&#123;&#123; newDs.id ? 'Update' : 'Save' &#125;&#125; profile</button>
+          </div>
+          <div *ngIf="testResult" style="margin-top:10px;font-size:13px;font-weight:500;"
+               [ngStyle]="{'color': testResult.includes('failed') ? 'var(--color-text-danger)' : 'var(--color-text-success)'}">
+            &#123;&#123; testResult &#125;&#125;
+          </div>
+        </div>
+      </div>
+
+      

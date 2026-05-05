@@ -1,0 +1,53 @@
+
+<div class="glass-panel slide-in">
+  <h2 class="gradient-text">{{ 'SETTINGS.TITLE' | translate }}</h2>
+  <p style="color: var(--text-muted); margin-top: 8px;">{{ 'SETTINGS.SUBTITLE' | translate }}</p>
+  
+  <div class="grid-2" style="margin-top: 32px;">
+    <!-- API URL Configuration -->
+    <div class="glass-panel" style="background: rgba(15,23,42,0.4)">
+      <h3>{{ 'SETTINGS.API_CONFIG' | translate }}</h3>
+      <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">{{ 'SETTINGS.API_DESC' | translate }}</p>
+      
+      <div class="form-group">
+        <label>{{ 'SETTINGS.JAVA_URL' | translate }}</label>
+        <input type="text" class="form-control" [(ngModel)]="javaApiUrl" placeholder="http://localhost:8080/api/v1">
+      </div>
+      
+      <div class="form-group">
+        <label>{{ 'SETTINGS.PYTHON_URL' | translate }}</label>
+        <input type="text" class="form-control" [(ngModel)]="pythonApiUrl" placeholder="http://localhost:8000/api">
+      </div>
+
+      <button class="btn" (click)="saveUrls()">{{ 'SETTINGS.SAVE_URLS' | translate }}</button>
+    </div>
+
+    <!-- Language Configuration -->
+    <div class="glass-panel" style="background: rgba(15,23,42,0.4)">
+      <h3>{{ 'SETTINGS.LOCALIZATION' | translate }}</h3>
+      <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">{{ 'SETTINGS.LANG_DESC' | translate }}</p>
+      
+      <div class="form-group">
+        <label>{{ 'SETTINGS.SELECT_LANG' | translate }}</label>
+        <select class="form-control" [(ngModel)]="currentLanguage" (ngModelChange)="changeLanguage($event)">
+          <option value="en">{{ 'SETTINGS.ENGLISH' | translate }}</option>
+          <option value="fr">{{ 'SETTINGS.FRENCH' | translate }}</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Existing Job Templates block -->
+    <div class="glass-panel" style="background: rgba(15,23,42,0.4)">
+      <h3>{{ 'SETTINGS.CUSTOMIZATION' | translate }}</h3>
+      <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">{{ 'SETTINGS.CUST_DESC' | translate }}</p>
+      <button routerLink="/settings/job-templates" class="btn">{{ 'SETTINGS.MANAGE_TEMPLATES' | translate }}</button>
+    </div>
+    
+    <!-- Existing Log Management block -->
+    <div class="glass-panel" style="background: rgba(15,23,42,0.4)">
+      <h3>{{ 'SETTINGS.LOGS' | translate }}</h3>
+      <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">{{ 'SETTINGS.LOGS_DESC' | translate }}</p>
+      <button class="btn" style="background: #ef4444; box-shadow: none;">{{ 'SETTINGS.CLEAR_LOGS' | translate }}</button>
+    </div>
+  </div>
+</div>

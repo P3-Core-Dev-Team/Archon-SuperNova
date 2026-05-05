@@ -1,0 +1,11 @@
+<div *ngIf="totalItems > 0" style="display: flex; justify-content: space-between; align-items: center; padding: 24px 0; font-size: 13px; color: var(--color-text-secondary);">
+  <div>Showing {{ startItem }} to {{ endItem }} of {{ totalItems }} entries</div>
+  <div style="display: flex; gap: 6px;">
+    <button (click)="prevPage()" [disabled]="currentPage === 1" 
+      style="padding: 6px 14px; background: transparent; border: 1px solid var(--color-border-tertiary); color: var(--color-text-primary); border-radius: 4px; cursor: pointer;" 
+      [style.opacity]="currentPage === 1 ? '0.5' : '1'">Previous</button>
+    <button (click)="nextPage()" [disabled]="currentPage === totalPages" 
+      style="padding: 6px 14px; background: transparent; border: 1px solid var(--color-border-tertiary); color: var(--color-text-primary); border-radius: 4px; cursor: pointer;" 
+      [style.opacity]="currentPage === totalPages ? '0.5' : '1'">Next</button>
+  </div>
+</div>

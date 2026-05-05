@@ -1,0 +1,71 @@
+
+> archon-open-metadata-fe@0.0.0 build
+> ng build
+
+- Generating browser application bundles (phase: setup)...
+✔ Browser application bundle generation complete.
+✔ Browser application bundle generation complete.
+
+Warning: /home/adminp3s/IdeaProjects/Archon-SuperNova/archon-open-metadata-fe/src/app/features/job-profile/job-profile.component.css exceeded maximum budget. Budget 2.00 kB was not met by 1.25 kB with a total of 3.25 kB.
+
+
+
+Error: src/app/features/datasource-manager/datasource-manager.component.html:19:161 - error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+
+19                   <button class="tb-btn" style="padding:3px 8px;color:var(--color-text-danger);border-color:var(--color-text-danger)" (click)="deleteDatasource(ds.id)">Delete</button>
+                                                                                                                                                                   ~~~~~
+
+  src/app/features/datasource-manager/datasource-manager.component.ts:7:16
+    7   templateUrl: './datasource-manager.component.html',
+                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Error occurs in the template of component DatasourceManagerComponent.
+
+
+Error: src/app/features/datasource-manager/datasource-manager.component.html:54:120 - error TS2348: Value of type 'EventEmitter<void>' is not callable. Did you mean to include 'new'?
+
+54             <button class="tb-btn" [disabled]="!isDsFormValid" [style.opacity]="!isDsFormValid ? '0.5' : '1'" (click)="testConnection()">Test connection</button>
+                                                                                                                          ~~~~~~~~~~~~~~
+
+  src/app/features/datasource-manager/datasource-manager.component.ts:7:16
+    7   templateUrl: './datasource-manager.component.html',
+                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Error occurs in the template of component DatasourceManagerComponent.
+
+
+Error: src/app/features/datasource-manager/datasource-manager.component.html:55:214 - error TS2348: Value of type 'EventEmitter<void>' is not callable. Did you mean to include 'new'?
+
+55             <button class="tb-btn primary" [disabled]="!isDsFormValid || testResult !== 'Connection successful!'" [style.opacity]="!isDsFormValid || testResult !== 'Connection successful!' ? '0.5' : '1'" (click)="saveDatasource()">&#123;&#123; newDs.id ? 'Update' : 'Save' &#125;&#125; profile</button>
+                                                                                                                                                                                                                        ~~~~~~~~~~~~~~
+
+  src/app/features/datasource-manager/datasource-manager.component.ts:7:16
+    7   templateUrl: './datasource-manager.component.html',
+                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Error occurs in the template of component DatasourceManagerComponent.
+
+
+Error: src/app/features/job-profile/job-profile.component.html:14:154 - error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+
+14                   <button class="tb-btn" style="padding:3px 8px;color:var(--color-text-danger);border-color:var(--color-text-danger)" (click)="deleteJob(job.id)">Delete</button>
+                                                                                                                                                            ~~~~~~
+
+  src/app/features/job-profile/job-profile.component.ts:7:16
+    7   templateUrl: './job-profile.component.html',
+                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Error occurs in the template of component JobProfileComponent.
+
+
+Error: src/app/features/job-profile/job-profile.component.ts:10:14 - error TS2420: Class 'JobProfileComponent' incorrectly implements interface 'OnInit'.
+  Property 'ngOnInit' is missing in type 'JobProfileComponent' but required in type 'OnInit'.
+
+10 export class JobProfileComponent implements OnInit {
+                ~~~~~~~~~~~~~~~~~~~
+
+  node_modules/@angular/core/index.d.ts:6454:5
+    6454     ngOnInit(): void;
+             ~~~~~~~~~~~~~~~~~
+    'ngOnInit' is declared here.
+
+
+

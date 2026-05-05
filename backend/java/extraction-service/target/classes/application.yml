@@ -1,0 +1,96 @@
+spring:
+  # Virtual threads (spring.threads.virtual.enabled) require Java 21+;
+  # this build targets Java 17 so the flag is omitted. Tomcat's platform
+  # thread pool (server.tomcat.threads.max) handles concurrency instead.
+  application:
+    name: discovery-extraction-service
+
+server:
+  port: 8080
+  shutdown: graceful
+
+extraction:
+  # Bearer token. With auth-disabled=false (default) the service refuses to
+  # start if EXTRACTION_SERVICE_TOKEN is unset or blank - see
+  # ApplicationProperties.validate(). No insecure default is provided.
+  auth-token: ${EXTRACTION_SERVICE_TOKEN:}
+  auth-disabled: ${EXTRACTION_AUTH_DISABLED:false}
+
+  storage:
+    type: local
+    local:
+      base-path: ${STORAGE_PATH:/data/parquet}
+
+  source-throttle:
+    max-concurrent: 8
+    max-wait-minutes: 10
+
+  # Flat defaults per the addendum (lines 394-454). Per-source overrides
+  # are a future enhancement noted in DISCOVERY_PIPELINE_V2 section 5.5.
+  pool-defaults:
+    max-size: 10
+    connection-timeout-ms: 30000
+    idle-timeout-ms: 1800000
+    max-lifetime-ms: 3600000
+    idle-eviction-minutes: 30
+
+  parquet:
+    default-compression: zstd
+    default-compression-level: 3
+    default-row-group-size: 100000
+    default-page-size: 1048576
+
+resilience4j:
+  bulkhead:
+    instances:
+      source-extraction:
+        max-concurrent-calls: 8
+        max-wait-duration: 10m
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  config: classpath:logback-spring.xml
+  level:
+    root: INFO
+    com.discovery.extraction: INFO
+    org.apache.parquet: WARN
+    org.apache.hadoop: WARN
+    org.apache.arrow: WARN
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+extraction:
+  auth-disabled: true
+
+management:
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.discovery.extraction: DEBUG

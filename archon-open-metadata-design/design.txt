@@ -1,0 +1,40 @@
+I'm building a end-to-end project with metadata analysis.
+I have user module, group and role module to define the screen and api level restriction.
+I need to have dashbaord page to show datata sour profile, table, relationship and table types, senstive columns.
+I have jobtemplate profile defintionpage to choose the profile with stages such as schema craweler, name detection, regex detection, sensitive columns,
+stage-entity-classification, /stage-domain-grouping
+I have job creation workflow to select the datsouce profile and choose jobtemplate profile.
+Show running logs in ui to show see emitter with last 50 records. 
+Show a graph with relationship with table level and detailed level and context domain level.
+
+Note:
+Store job logs into system instead of logs folder. keep running logs into database/ retrieval.
+
+Build a profressional system with multiple user friendly 
+
+Sidebar panel menu:
+1. Dasboard
+2. Datsource
+    - add profile /update
+3. Job profile
+   -> individual job with details
+      1. tables
+      2. relationship
+      3. sensitiev colume
+      4. table level grapgh with details relationship view
+      5. detailed grapgh
+   -> Job level compasion
+      1. comparwe two jobs into comparsion list
+    -> export as json with table, column along with relationship     
+4. Audit trracking for action and logs
+    > export 
+5. Setting (main menu)
+    -> Customization menu to create job template profile
+    -> Clear job logs folder
+6. Admin
+    -> User add and update user with group
+    -> Group management  
+7. User
+    -> User profile -> theme, date view preference, 
+    -> Groups 
+

@@ -32,3 +32,10 @@ target/
 reports/
 work_dirs/
 parquet/
+/archon-open-metadata_be/
+/archon-open-metadata-py/
+/archon-open-metadata-fe/
+/archon-open-metadata-design/
+/archon-open-metadata-build-deployment/
+/archon-open-metadata_be/
+.idea

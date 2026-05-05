@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "archon-open-metadata-py"
+version = "1.0.0"
+description = "Unified Data Pipeline and NLP Engine"
+requires-python = ">=3.11"
+dependencies = [
+    # API & Orchestration
+    "fastapi>=0.109.2",
+    "uvicorn>=0.27.0",
+    "pydantic>=2.5",
+    "requests>=2.31.0",
+    
+    # Data Engineering Pipeline (from backend/python)
+    "pyarrow>=15",
+    "duckdb>=0.10",
+    "SQLAlchemy>=2.0",
+    "psycopg2-binary>=2.9",
+    "pandas>=2.2",
+    
+    # Metadata Engine & NLP ML Models (from metadata_engine_py)
+    "rapidfuzz>=3.6.1",
+    "spacy>=3.7.2",
+    "scikit-learn>=1.4.0",
+    "networkx>=3.2.1",
+    "presidio-analyzer>=2.2.35",
+    "sentence-transformers>=2.3.1"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
