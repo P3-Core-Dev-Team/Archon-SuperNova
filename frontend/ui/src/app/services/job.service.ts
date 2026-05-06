@@ -79,6 +79,50 @@ export class JobService {
   // also writes here, so the panel works even if B1 hasn't wired the click yet.
   selectedTable = signal<string | null>(null);
 
+  /**
+   * Focal-trail visited inside the relationships-tab graph.  Each entry
+   * is a table the user drilled into; the LAST entry is the current
+   * focal.  Earlier entries render as predecessor cards in the focal
+   * map with the path edges (a → b → z) drawn as a highlighted chain
+   * inside the canvas itself — no breadcrumb strip.
+   *
+   * Capped at 8 hops so the chain stays visible on screen.
+   */
+  focalTrail = signal<string[]>([]);
+
+  /** Push a new focal table onto the trail.
+   *
+   *   * If the table is already in the trail at index ``i``, the trail
+   *     is truncated to ``[0..i]`` (jumping back to a prior focal
+   *     collapses the future).
+   *   * Otherwise the table is appended.  The cap (8) drops the oldest
+   *     hop when exceeded — like a fixed-size deque.
+   */
+  pushFocal(name: string): void {
+    if (!name) return;
+    const trail = this.focalTrail();
+    const idx = trail.indexOf(name);
+    if (idx >= 0) {
+      // Re-clicking an existing focal collapses forward history.
+      this.focalTrail.set(trail.slice(0, idx + 1));
+      return;
+    }
+    const next = [...trail, name];
+    if (next.length > 8) next.shift();
+    this.focalTrail.set(next);
+  }
+
+  /** Cut the trail to a specific index (inclusive) — used when the
+   * user clicks an earlier trail card to jump back. */
+  truncateFocal(index: number): void {
+    const trail = this.focalTrail();
+    if (index < 0 || index >= trail.length) return;
+    this.focalTrail.set(trail.slice(0, index + 1));
+  }
+
+  /** Wipe the trail (returning to overview, switching jobs, etc.). */
+  clearFocal(): void { this.focalTrail.set([]); }
+
   // Fetch the API token from /api/auth/token exactly once at construction.
   // shareReplay(1) means any number of callers subscribing BEFORE or AFTER
   // the request completes will each receive the resolved value, so Submit /

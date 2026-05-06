@@ -189,8 +189,11 @@ interface FkRow {
                  [attr.height]="mapContentSize().h"
                  xmlns="http://www.w3.org/2000/svg">
               @for (e of mapEdges(); track e.id) {
-                <g class="map-edge-group" [class.dimmed]="hoveredCardId() && !isEdgeAdjacentToHover(e)">
+                <g class="map-edge-group"
+                   [class.dimmed]="hoveredCardId() && !isEdgeAdjacentToHover(e)"
+                   [class.trail]="e.isTrail">
                   <path class="map-edge"
+                        [class.trail]="e.isTrail"
                         [attr.d]="e.path"
                         [attr.stroke]="e.color"
                         [attr.stroke-dasharray]="e.dashArray || null"
@@ -213,14 +216,21 @@ interface FkRow {
                           [attr.x]="e.midX"
                           [attr.y]="e.midY"
                           text-anchor="middle"
-                          [attr.fill]="'#c9d1d9'">{{ e.joinLabel }}</text>
+                          [attr.fill]="e.isTrail ? '#f0b429' : '#c9d1d9'">{{ e.joinLabel }}</text>
                   }
-                  @if (e.confLabel) {
+                  @if (e.confLabel && !e.isTrail) {
                     <text class="map-edge-conf"
                           [attr.x]="e.midX"
                           [attr.y]="e.midY + 12"
                           text-anchor="middle"
                           [attr.fill]="confLabelColor(e.confidence)">{{ e.confLabel }}</text>
+                  }
+                  @if (e.isTrail && e.trailLabel) {
+                    <text class="map-trail-label"
+                          [attr.x]="e.midX"
+                          [attr.y]="e.midY + 14"
+                          text-anchor="middle"
+                          [attr.fill]="'#f0b429'">{{ e.trailLabel }}</text>
                   }
                 </g>
               }
@@ -229,6 +239,7 @@ interface FkRow {
             @for (n of mapCards(); track n.id) {
               <div class="map-card"
                    [class.focal]="n.id === tableName()"
+                   [class.trail]="n.isTrail"
                    [class.dragging]="cardDrag?.cardId === n.id && cardDrag?.hasMoved"
                    [class.dim]="hoveredCardId() && hoveredCardId() !== n.id && !isCardAdjacentToHover(n.id)"
                    [style.left.px]="n.x"
@@ -237,6 +248,12 @@ interface FkRow {
                    (mouseenter)="hoveredCardId.set(n.id)"
                    (mouseleave)="hoveredCardId.set(null)"
                    (mousedown)="onCardMouseDown($event, n)">
+                @if (n.isTrail) {
+                  <span class="trail-step-badge"
+                        [title]="'Click to jump back to this point in your trail'">
+                    {{ n.trailIndex + 1 }}
+                  </span>
+                }
                 <div class="card-head">
                   <span class="card-table mono">{{ n.label }}</span>
                   @if (n.module) { <span class="card-module">{{ n.module }}</span> }
@@ -547,6 +564,25 @@ interface FkRow {
       fill: none;
       stroke-width: 1.6;
     }
+    /* Trail edges: thicker gold stroke + subtle drop shadow so the
+       drill-down path stands out as a single connected thread on top of
+       the regular FK-relationship edges. */
+    .map-edge.trail {
+      stroke-width: 3.2;
+      filter: drop-shadow(0 0 3px rgba(240, 180, 41, 0.55));
+    }
+    .map-edge-group.trail { opacity: 1 !important; }
+    .map-trail-label {
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      pointer-events: none;
+      paint-order: stroke;
+      stroke: #0d1117;
+      stroke-width: 4px;
+      stroke-linejoin: round;
+    }
     .map-glyph {
       font-family: ui-monospace, SFMono-Regular, monospace;
       font-size: 13px;
@@ -616,6 +652,33 @@ interface FkRow {
     .map-card.focal {
       border: 2px solid #58a6ff;
       padding: 9px 11px;  /* compensate for thicker border */
+    }
+    /* Trail predecessor cards — gold border so the chain reads as one
+       visual unit alongside the matching gold path edges.  The numbered
+       badge in the corner shows the user's hop order (1, 2, 3 …). */
+    .map-card.trail {
+      border: 2px solid #f0b429;
+      padding: 9px 11px;
+      background: linear-gradient(180deg, rgba(240, 180, 41, 0.08) 0%, #161b22 60%);
+    }
+    .map-card.trail:hover { border-color: #ffd166; }
+    .trail-step-badge {
+      position: absolute;
+      top: -10px;
+      left: -10px;
+      width: 22px;
+      height: 22px;
+      background: #f0b429;
+      color: #0d1117;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+      z-index: 2;
     }
     .map-card.dim { opacity: 0.35; }
     /* Active-drag visuals: lift the card slightly and disable the smooth
@@ -1315,12 +1378,28 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
     () => `translate(${this.mapPanX()}px, ${this.mapPanY()}px) scale(${this.mapZoom()})`,
   );
 
+  /** Trail predecessors — every focal table the user visited BEFORE
+   * the current one.  Rendered as a left-to-right chain of cards on
+   * the canvas with highlighted "path" edges between consecutive
+   * trail entries, so the user sees their drill-down history baked
+   * into the graph itself (no breadcrumb strip required). */
+  private trailPredecessors = computed<string[]>(() => {
+    const trail = this.jobsSvc.focalTrail();
+    const focal = this.tableName();
+    // Drop the LAST entry if it equals the focal — that's the focal
+    // itself and is already laid out at the canvas centre.
+    const idx = trail.lastIndexOf(focal);
+    return idx >= 0 ? trail.slice(0, idx) : trail;
+  });
+
   /** Pure auto-layout output (radial).  Doesn't include user drag-offsets;
    * those are layered on in ``mapCards``.  Splitting the two so a re-fit
    * after window resize keeps using the radial coordinates while the
    * dragged-card overrides survive. */
-  private mapLayoutCards = computed<{ id: string; label: string; rows: number; fieldCount: number; relCount: number; module: string | null; width: number; height: number; x: number; y: number; }[]>(() => {
+  private mapLayoutCards = computed<{ id: string; label: string; rows: number; fieldCount: number; relCount: number; module: string | null; width: number; height: number; x: number; y: number; isTrail: boolean; trailIndex: number; }[]>(() => {
     const focal = this.tableName();
+    const trailPred = this.trailPredecessors();
+    const trailSet = new Set(trailPred);
     // Use the confidence-filtered FK set so neighbour cards that no
     // longer have any surviving edge fall out of the layout — keeps
     // orphans off the canvas when the slider is dragged high.
@@ -1330,6 +1409,9 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
     for (const f of out) neighbours.add(f.parentTable);
     for (const f of inb) neighbours.add(f.childTable);
     neighbours.delete(focal);
+    // Predecessors get their own slot on the left — exclude them from
+    // the radial neighbour ring so they don't get drawn twice.
+    for (const t of trailSet) neighbours.delete(t);
 
     // Per-table relationship count (using all edges, not just edges
     // adjacent to the focal — gives a sense of how connected each
@@ -1356,9 +1438,10 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
     const CARD_W = 240;
     const CARD_H = 100;
 
-    const list: { id: string; label: string; rows: number; fieldCount: number; relCount: number; module: string | null; width: number; height: number; x: number; y: number; }[] = [];
+    const list: { id: string; label: string; rows: number; fieldCount: number; relCount: number; module: string | null; width: number; height: number; x: number; y: number; isTrail: boolean; trailIndex: number; }[] = [];
 
-    // Focal at origin, neighbours around it.
+    // Focal at origin, predecessors stacked horizontally to the LEFT,
+    // remaining neighbours fanning out radially on the right half.
     list.push({
       id: focal,
       label: focal,
@@ -1369,7 +1452,35 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
       width: CARD_W,
       height: CARD_H,
       x: 0, y: 0,
+      isTrail: false,
+      trailIndex: -1,
     });
+
+    // === Trail predecessors: chain to the LEFT of focal at y=0 ======
+    // a → b → focal renders as [a card] → [b card] → [focal card] all
+    // on the same horizontal line, with path-edges drawn distinctly in
+    // mapEdges().  The chain is laid out in trail-order so the oldest
+    // hop is leftmost.
+    const TRAIL_STEP = CARD_W + 120;       // gap between predecessor cards
+    const trailLen = trailPred.length;
+    for (let ti = 0; ti < trailLen; ti++) {
+      const tName = trailPred[ti];
+      const distFromFocal = trailLen - ti; // 1, 2, 3 …
+      list.push({
+        id: tName,
+        label: tName,
+        rows: rowCount(tName),
+        fieldCount: colCount.get(tName) ?? 0,
+        relCount: relCount.get(tName) ?? 0,
+        module: this.moduleBadge(tName),
+        width: CARD_W,
+        height: CARD_H,
+        x: -distFromFocal * TRAIL_STEP,
+        y: 0,
+        isTrail: true,
+        trailIndex: ti,
+      });
+    }
 
     const N = neighbours.size;
     if (N > 0) {
@@ -1377,10 +1488,18 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
       // Radius scales with neighbour count so cards never overlap on the
       // circumference: circumference ≥ N * cardDiag * 1.05.
       const radius = Math.max(280, (N * cardDiag * 1.05) / (2 * Math.PI) + 60);
-      const startAngle = -Math.PI / 2; // top
+      // When a trail exists, lay neighbours on the right HALF (-π/2 to π/2)
+      // so they never collide with the predecessor chain coming in from
+      // the left.  Without a trail, fall back to the full circle.
+      const halfArc = trailLen > 0;
+      const arcStart = halfArc ? -Math.PI / 2 : -Math.PI / 2;
+      const arcSpan  = halfArc ?  Math.PI    :  2 * Math.PI;
       let i = 0;
       for (const nb of neighbours) {
-        const angle = startAngle + (2 * Math.PI * i) / N;
+        const t = N === 1 ? 0.5 : (i / (N - 1));
+        const angle = halfArc
+          ? arcStart + arcSpan * t       // even spread across the half-arc
+          : arcStart + (arcSpan * i) / N;
         const x = Math.cos(angle) * radius;
         const y = Math.sin(angle) * radius;
         list.push({
@@ -1393,6 +1512,8 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
           width: CARD_W,
           height: CARD_H,
           x, y,
+          isTrail: false,
+          trailIndex: -1,
         });
         i++;
       }
@@ -1415,7 +1536,7 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
   /** Render-time card list = auto-layout positions + per-card user
    * drag-offsets.  Edges depend on this so they re-route the moment a
    * drag updates ``cardOffsets``. */
-  mapCards = computed<{ id: string; label: string; rows: number; fieldCount: number; relCount: number; module: string | null; width: number; height: number; x: number; y: number; }[]>(() => {
+  mapCards = computed<{ id: string; label: string; rows: number; fieldCount: number; relCount: number; module: string | null; width: number; height: number; x: number; y: number; isTrail: boolean; trailIndex: number; }[]>(() => {
     const layout = this.mapLayoutCards();
     const offsets = this.cardOffsets();
     return layout.map(c => {
@@ -1460,6 +1581,12 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
       confLabel: string;
       dashArray: string;
       strokeOpacity: number;
+      /** True when the edge is part of the user's drill-down trail
+       * (e.g. a→b→focal).  Trail edges render with a thicker gold
+       * stroke and a "step N" label so the path is unmistakable in
+       * the canvas. */
+      isTrail: boolean;
+      trailLabel: string;
     }
     interface Proto {
       id: string;
@@ -1467,6 +1594,8 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
       to:   { id: string; x: number; y: number; width: number; height: number };
       fk: FkRow;
       relType: RelType;
+      isTrail?: boolean;
+      trailStep?: number;
     }
 
     const protos: Proto[] = [];
@@ -1495,6 +1624,47 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
         to: focalCard,
         fk: f,
         relType: this.classifyRelType(f),
+      });
+    }
+
+    // === Trail path edges ===========================================
+    // For trail [a, b, focal] add edges a→b and b→focal so the user's
+    // drill-down chain is drawn as a connected gold path on the canvas.
+    // When a real FK between consecutive trail tables exists in the
+    // discovery graph we use it (so the joining-column label is real);
+    // otherwise we synthesise a phantom edge with a UNKNOWN cardinality
+    // so the user still sees the chain.
+    const trailPred = this.trailPredecessors();
+    const trailChain = [...trailPred, focal];
+    for (let i = 0; i + 1 < trailChain.length; i++) {
+      const aId = trailChain[i];
+      const bId = trailChain[i + 1];
+      const aCard = cardById.get(aId);
+      const bCard = cardById.get(bId);
+      if (!aCard || !bCard) continue;
+      // Look up an actual FK row from allEdges() between these tables
+      // so the join label is meaningful when one exists.
+      const fk = this.allEdges().find(
+        e => (e.from === aId && e.to === bId) || (e.from === bId && e.to === aId),
+      );
+      const parsedFk: FkRow = fk
+        ? this.parseEdge(fk)
+        : {
+            childTable: aId,
+            childCol: '',
+            parentTable: bId,
+            parentCol: '',
+            cardinality: null,
+            confidence: null,
+          };
+      protos.push({
+        id: `mt${pid++}`,
+        from: aCard,
+        to: bCard,
+        fk: parsedFk,
+        relType: this.classifyRelType(parsedFk),
+        isTrail: true,
+        trailStep: i + 1,
       });
     }
 
@@ -1600,9 +1770,17 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
         :                0.55;
       const confLabel = conf == null ? '' : conf.toFixed(2);
 
+      // Trail edges override colour/opacity/dash so the drill-down
+      // path stands out as a single connected gold thread regardless
+      // of underlying FK confidence.
+      const isTrail = !!p.isTrail;
+      const trailLabel = isTrail ? `step ${p.trailStep}` : '';
+      const edgeColor = isTrail ? '#f0b429' : this.relTypeColor(p.relType);
+      const edgeDash = isTrail ? '' : dashArray;
+      const edgeOpacity = isTrail ? 1.0 : strokeOpacity;
       edges.push({
         id: p.id,
-        color: this.relTypeColor(p.relType),
+        color: edgeColor,
         joinLabel: join,
         path: route.path,
         midX, midY,
@@ -1616,8 +1794,10 @@ export class TableCardPageComponent implements OnInit, OnChanges, AfterViewInit 
         toTable:   p.to.id,
         confidence: conf,
         confLabel,
-        dashArray,
-        strokeOpacity,
+        dashArray: edgeDash,
+        strokeOpacity: edgeOpacity,
+        isTrail,
+        trailLabel,
       });
     }
     return edges;

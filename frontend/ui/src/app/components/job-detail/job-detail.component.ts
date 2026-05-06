@@ -414,6 +414,7 @@ export class JobDetailComponent implements OnInit, OnDestroy {
     // --- Relationships-tab URL sync ---------------------------------
     // Hydrate from ?tab + ?table + ?view, then write back on changes
     // (browser back/forward stays consistent with the on-screen toggle).
+    let didSeedTrail = false;
     this.qpSub = this.route.queryParamMap.subscribe(qp => {
       const t = qp.get('tab');
       if (t === 'relationships' || t === 'clusters' || t === 'pii' || t === 'dq' || t === 'log') {
@@ -428,6 +429,15 @@ export class JobDetailComponent implements OnInit, OnDestroy {
         } else {
           this.relMode.set(view === 'table' ? 'table' : 'map');
         }
+        // Seed the focal trail once on first relationships-tab hydration
+        // so a page reload preserves the user's deep-link as the trail
+        // root.  Subsequent qp ticks are URL-driven; the in-memory trail
+        // is the source of truth past the initial load.
+        if (!didSeedTrail) {
+          didSeedTrail = true;
+          this.jobsSvc.clearFocal();
+          if (tbl) this.jobsSvc.pushFocal(tbl);
+        }
       }
     });
 
@@ -441,6 +451,10 @@ export class JobDetailComponent implements OnInit, OnDestroy {
         this.selectedTable.set(t);
         this.relMode.set('map');
         this.pushQueryParams();
+        // Append the new focal to the in-graph trail.  The map view
+        // reads ``focalTrail`` to render predecessor cards + the
+        // highlighted path edges between consecutive trail tables.
+        this.jobsSvc.pushFocal(t);
       }
     });
   }
@@ -470,6 +484,11 @@ export class JobDetailComponent implements OnInit, OnDestroy {
     if (t === this.tab()) return;
     this.tab.set(t);
     this.pushQueryParams();
+    // Leaving the Relationships tab clears the in-graph focal trail
+    // so re-entering starts fresh.
+    if (t !== 'relationships') {
+      this.jobsSvc.clearFocal();
+    }
   }
 
   /** Three-state Relationships-mode toggle handler. */
@@ -477,7 +496,11 @@ export class JobDetailComponent implements OnInit, OnDestroy {
     if (mode === this.relMode()) return;
     if (mode !== 'overview' && !this.selectedTable()) return; // disabled
     this.relMode.set(mode);
-    if (mode === 'overview') this.selectedTable.set(null);
+    if (mode === 'overview') {
+      this.selectedTable.set(null);
+      // Returning to overview collapses the in-graph trail.
+      this.jobsSvc.clearFocal();
+    }
     this.pushQueryParams();
   }
 
@@ -487,6 +510,11 @@ export class JobDetailComponent implements OnInit, OnDestroy {
     this.selectedTable.set(ev.table);
     this.relMode.set(ev.view);
     this.pushQueryParams();
+    // Neighbour-click drill: append the new focal to the trail so the
+    // map renders the path-of-clicks visually inside the canvas.  The
+    // dedup-and-truncate logic inside pushFocal collapses re-clicks on
+    // an existing trail member.
+    this.jobsSvc.pushFocal(ev.table);
   }
 
   ngOnDestroy(): void {
