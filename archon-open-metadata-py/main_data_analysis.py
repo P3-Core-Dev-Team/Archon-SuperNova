@@ -99,7 +99,9 @@ app.add_middleware(
 )
 
 from src import ml_router
+from src import ml_data_router
 app.include_router(ml_router.router)
+app.include_router(ml_data_router.router)
 
 # --- FIX-B4: dev shared-secret guard ---------------------------------------
 # Tiny dependency that requires the X-Discovery-Token header on POST /api/jobs.
