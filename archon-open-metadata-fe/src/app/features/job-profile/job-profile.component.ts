@@ -25,17 +25,37 @@ export class JobProfileComponent implements OnInit {
   }
 
   fetchJobs() {
-    this.http.get<ApiResponse<Job>>(`${this.baseUrl}/jobs`).subscribe(res => { this.jobs = res._embedded?.jobDtoList || []; });
+    this.http.get<ApiResponse<Job>>(`${this.baseUrl}/jobs`).subscribe(res => { 
+      const e = res._embedded;
+      this.jobs = e ? (e.jobDtoList || e['jobs'] || Object.values(e)[0] as Job[]) : []; 
+    });
   }
   fetchDatasources() {
-    this.http.get<ApiResponse<ConnectionProfile>>(`${this.baseUrl}/connection-profiles`).subscribe(res => { this.datasources = res._embedded?.connectionProfileDtoList || []; });
+    this.http.get<ApiResponse<ConnectionProfile>>(`${this.baseUrl}/connection-profiles`).subscribe(res => { 
+      const e = res._embedded;
+      this.datasources = e ? (e.connectionProfileDtoList || e['connectionProfiles'] || Object.values(e)[0] as ConnectionProfile[]) : []; 
+    });
   }
   fetchJobTemplates() {
-    this.http.get<ApiResponse<JobTemplate>>(`${this.baseUrl}/job-template-profiles`).subscribe(res => { this.jobTemplates = res._embedded?.jobTemplateProfileDtoList || []; });
+    this.http.get<ApiResponse<JobTemplate>>(`${this.baseUrl}/job-template-profiles`).subscribe(res => { 
+      const e = res._embedded;
+      this.jobTemplates = e ? (e.jobTemplateProfileDtoList || e['jobTemplates'] || Object.values(e)[0] as JobTemplate[]) : []; 
+    });
   }
   createJob() {
-    const payload = { jobName: this.newJob.jobName, datasourceProfile: { id: this.newJob.datasourceId }, jobTemplateProfile: { id: this.newJob.templateId }, status: 'Pending' };
-    this.http.post<Job>(`${this.baseUrl}/jobs`, payload).subscribe(() => { this.fetchJobs(); this.showForm = false; });
+    const ds = this.datasources.find(d => d.id === this.newJob.datasourceId);
+    const payload = { 
+      jobName: this.newJob.jobName, 
+      datasourceProfile: { id: this.newJob.datasourceId }, 
+      jobTemplateProfile: { id: this.newJob.templateId }, 
+      listOfSchemas: ds ? ds.listOfSchemas : '',
+      status: 'Pending' 
+    };
+    this.http.post<Job>(`${this.baseUrl}/jobs`, payload).subscribe(() => { 
+      this.fetchJobs(); 
+      this.showForm = false; 
+      this.newJob = {};
+    });
   }
   deleteJob(id: string | undefined) {
     if (!id) return;

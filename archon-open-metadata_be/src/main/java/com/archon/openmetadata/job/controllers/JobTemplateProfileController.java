@@ -105,7 +105,9 @@ public class JobTemplateProfileController {
     if (dto.getOptions() != null) {
         for (com.archon.openmetadata.job.dto.JobTemplateOptionRuleDto optDto : dto.getOptions()) {
             com.archon.openmetadata.job.models.JobTemplateOptionRule rule = new com.archon.openmetadata.job.models.JobTemplateOptionRule();
-            rule.setOperationName(optDto.getOperationName());
+            if (optDto.getOperationName() != null) {
+                rule.setOptionType(com.archon.openmetadata.job.models.OperationType.valueOf(optDto.getOperationName()));
+            }
             rule.setMinValue(optDto.getMinValue());
             rule.setMaxValue(optDto.getMaxValue());
             rule.setJobTemplateProfile(entity);

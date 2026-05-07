@@ -30,6 +30,16 @@ public class ConnectionProfile extends AuditModel {
 
   private String url;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "db_type")
+  private DatabaseType dbType;
+
+  private String host;
+  private Integer port;
+
+  @Column(name = "database_name")
+  private String databaseName;
+
   @Column(name = "db_user")
   private String user;
 

@@ -12,12 +12,9 @@ import lombok.EqualsAndHashCode;
 public class UserDto extends AuditModelDto {
   private UUID id;
   private String username;
-  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
   private String password;
   private String email;
-  private String role;
   private String status;
-  private java.time.LocalDateTime lastLogin;
   private java.time.LocalDateTime lastAttemptPassword;
   private String authType;
   private java.util.List<GroupDto> groups;

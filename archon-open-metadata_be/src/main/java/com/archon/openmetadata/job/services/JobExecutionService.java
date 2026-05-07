@@ -9,6 +9,7 @@ import com.archon.openmetadata.job.models.Job;
 import com.archon.openmetadata.job.models.JobTemplateOptionRule;
 import com.archon.openmetadata.job.models.OperationType;
 import com.archon.openmetadata.job.repositories.JobRepository;
+import com.archon.openmetadata.metadata.services.DomainGroupService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,7 +17,16 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import com.archon.openmetadata.metadata.models.TableEntity;
+import com.archon.openmetadata.metadata.models.RelationshipEntity;
+import com.archon.openmetadata.metadata.services.TableEntityService;
+import com.archon.openmetadata.metadata.services.RelationshipService;
+import com.archon.openmetadata.metadata.services.SchemaEntityService;
+import com.archon.openmetadata.job.models.Job;
 
 @Service
 @RequiredArgsConstructor
@@ -31,32 +41,33 @@ public class JobExecutionService {
     private final GraphContextService graphContext;
     private final EntityClassificationService entityClassification;
     private final SseBroadcasterService sse;
-    private final com.archon.openmetadata.metadata.services.TableEntityService tableService;
-    private final com.archon.openmetadata.metadata.services.ColumnEntityService columnService;
-    private final com.archon.openmetadata.metadata.services.RelationshipService relationshipService;
-    private final com.archon.openmetadata.metadata.services.DomainGroupService domainGroupService;
+    private final DomainGroupService domainGroupService;
+    private final SchemaExtractionService schemaExtractionService;
+    private final TableEntityService tableService;
+    private final RelationshipService relationshipService;
 
-    @Scheduled(fixedRate = 10000) // Poll every 10 seconds
+    @org.springframework.transaction.annotation.Transactional
+    @Scheduled(fixedRate = 60000) // Poll every 10 seconds
     public void processJobs() {
-        List<Job> pending = repo.findByStatusIgnoreCase("Pending");
+        List<Job> pending = repo.findWithProfilesByStatusIgnoreCase("Pending");
 
         for (Job j : pending) {
             executePipeline(j);
         }
     }
 
-    private void executePipeline(Job j) {
-        log.info("Starting execution for Job ID: {} ({})", j.getId(), j.getJobName());
-        j.setStatus("Running");
-        j.setStartTime(LocalDateTime.now());
-        StringBuilder auditLog = new StringBuilder("Job Started at " + j.getStartTime() + "\n");
-        repo.save(j);
-        sse.broadcast(j.getId(), "status", "Running");
-        sse.broadcast(j.getId(), "log", "Job Started at " + j.getStartTime());
+    private void executePipeline(Job job) {
+        log.info("Starting execution for Job ID: {} ({})", job.getId(), job.getJobName());
+        job.setStatus("Running");
+        job.setStartTime(LocalDateTime.now());
+        StringBuilder auditLog = new StringBuilder("Job Started at " + job.getStartTime() + "\n");
+        repo.save(job);
+        sse.broadcast(job.getId(), "status", "Running");
+        sse.broadcast(job.getId(), "log", "Job Started at " + job.getStartTime());
 
         try {
-            List<JobTemplateOptionRule> activeRules = j.getJobTemplateProfile() != null
-                    ? j.getJobTemplateProfile().getOptions()
+            List<JobTemplateOptionRule> activeRules = job.getJobTemplateProfile() != null
+                    ? job.getJobTemplateProfile().getOptions()
                     : List.of();
 
             List<OperationType> enabledStages = activeRules.stream()
@@ -64,179 +75,147 @@ public class JobExecutionService {
                     .toList();
 
             // 1. Mandatory Stage: Schema Extraction
-            sse.broadcast(j.getId(), "stage", "SCHEMA_EXTRACTION");
-            sse.broadcast(j.getId(), "log", "[Stage] SCHEMA_EXTRACTION: Executing core JDBC extraction...");
-            // Generate professional mock metadata and save to DB
-            String[] tableNames = { "CRM_CUSTOMERS", "ERP_SALES_HEADER", "ERP_SALES_ITEMS", "MDM_PRODUCTS",
-                    "SYS_CONFIG" };
-            String[][] columnNames = {
-                    { "CUST_ID", "FIRST_NAME", "LAST_NAME", "EMAIL", "PHONE_NUMBER", "SSN", "DATE_OF_BIRTH" },
-                    { "ORDER_ID", "ORDER_DATE", "CUST_ID", "TOTAL_AMOUNT", "STATUS_CODE", "PROMO_CODE" },
-                    { "ITEM_ID", "ORDER_ID", "PRODUCT_ID", "QUANTITY", "UNIT_PRICE", "DISCOUNT_VAL" },
-                    { "PRODUCT_ID", "SKU_CODE", "PROD_NAME", "CATEGORY_ID", "REORDER_LEVEL", "SUPPLIER_ID" },
-                    { "CONFIG_KEY", "CONFIG_VAL", "UPDATED_BY", "UPDATE_TIMESTAMP" }
-            };
-            Long[] sizes = { 15240L, 85600L, 245000L, 1200L, 45L };
-            String[] types = { "MASTER", "TRANSACTION", "TRANSACTION", "MASTER", "CONFIG" };
+            sse.broadcast(job.getId(), "stage", "SCHEMA_EXTRACTION");
+            sse.broadcast(job.getId(), "log", "[Stage] SCHEMA_EXTRACTION: Executing core JDBC extraction...");
+            
+            schemaExtractionService.crawlAndSaveSchema(job.getId(), job.getDatasourceProfile());
 
-            for (int i = 0; i < tableNames.length; i++) {
-                com.archon.openmetadata.metadata.models.TableEntity tbl = new com.archon.openmetadata.metadata.models.TableEntity();
-                tbl.setJob(j);
-                tbl.setTableName(tableNames[i]);
-                tbl.setTableSize(sizes[i]);
-                tbl.setTableType(types[i]);
-                tbl.setSchemaName("PROD_APP");
-                tbl = tableService.save(tbl);
+            int pageSize = 50;
+            int pageNum = 0;
+            Page<TableEntity> tablePage;
 
-                for (String cname : columnNames[i]) {
-                    com.archon.openmetadata.metadata.models.ColumnEntity col = new com.archon.openmetadata.metadata.models.ColumnEntity();
-                    col.setTable(tbl);
-                    col.setColumnName(cname);
-                    col.setColumnType(cname.contains("ID") || cname.contains("VAL") ? "INTEGER" : "VARCHAR");
+            do {
+                tablePage = tableService.findAll(
+                        (root, query, cb) -> cb.equal(root.get("job").get("id"), job.getId()),
+                        PageRequest.of(pageNum, pageSize)
+                );
 
-                    // Mock some sensitive data
-                    if (cname.equals("SSN") || cname.equals("EMAIL") || cname.equals("PHONE_NUMBER")
-                            || cname.equals("DATE_OF_BIRTH")) {
-                        col.setIsSensitive(true);
-                        col.setSensitivityType(cname.equals("SSN") ? "PII_SSN"
-                                : (cname.equals("EMAIL") ? "PII_EMAIL" : "PII_CONTACT"));
-                        col.setSensitivityScore(0.98);
-                    } else {
-                        col.setIsSensitive(false);
-                    }
-                    columnService.save(col);
+                if (!tablePage.isEmpty()) {
+                    List<RelationshipEntity> relationships = relationshipService.findAll(
+                            (root, query, cb) -> cb.equal(root.get("job").get("id"), job.getId()),
+                            Pageable.unpaged()
+                    ).getContent();
+
+                    BulkSchemaRequest bsr = schemaExtractionService.buildBulkSchemRequestWithRelationships(
+                            job.getId(), tablePage.getContent(), relationships);
+                    startAnalysisWithStagesLevel(job, enabledStages, auditLog, bsr, activeRules);
                 }
+                pageNum++;
+            } while (tablePage.hasNext());
 
-                if (tableNames[i].equals("CRM_CUSTOMERS")) {
-                    // Save one cluster for this table
-                    com.archon.openmetadata.metadata.models.DomainGroupEntity cluster = new com.archon.openmetadata.metadata.models.DomainGroupEntity();
-                    cluster.setJob(j);
-                    cluster.setGroupName("Customer Intelligence");
-                    cluster.setTableCount(1);
-                    cluster.setDescription("Tables containing sensitive customer PII and demographic data.");
-                    domainGroupService.save(cluster);
-                }
-            }
-
-            // Mock one relationship
-            com.archon.openmetadata.metadata.models.Relationship rel = new com.archon.openmetadata.metadata.models.Relationship();
-            rel.setJob(j);
-            rel.setCardinality("1:N");
-            rel.setScore(0.95f);
-            relationshipService.save(rel);
-
-            BulkSchemaRequest dummyRequest = new BulkSchemaRequest(); // Mock request
-            dummyRequest.setTables(new java.util.ArrayList<>());
-            dummyRequest.setExistingRelationships(new java.util.ArrayList<>());
-            log.info("Executing Schema Extraction...");
-            Thread.sleep(2000); // Simulate time
-
-            CandidateResponse candidateRes = new CandidateResponse();
-            candidateRes.setCandidates(new java.util.ArrayList<>());
-
-            // 2. Candidate Generation
-            if (enabledStages.contains("CANDIDATE_GENERATION")) {
-                sse.broadcast(j.getId(), "stage", "CANDIDATE_GENERATION");
-                sse.broadcast(j.getId(), "log", "[Stage] CANDIDATE_GENERATION: Fetching ML candidates...");
-                auditLog.append("[Stage] CANDIDATE_GENERATION: Fetching ML candidates...\n");
-                log.info("Executing CANDIDATE_GENERATION via FastAPI...");
-                applyMinMax(dummyRequest, "CANDIDATE_GENERATION", activeRules);
-                candidateRes = candidateGen.generateCandidates(dummyRequest);
-                if (candidateRes == null) {
-                    candidateRes = new CandidateResponse();
-                    candidateRes.setCandidates(new java.util.ArrayList<>());
-                }
-                Thread.sleep(2000);
-            }
-
-            // 3. Semantic Scoring
-            if (enabledStages.contains("SEMANTIC_SCORING")) {
-                sse.broadcast(j.getId(), "stage", "SEMANTIC_SCORING");
-                sse.broadcast(j.getId(), "log", "[Stage] SEMANTIC_SCORING: Context evaluation...");
-                auditLog.append("[Stage] SEMANTIC_SCORING: Context evaluation...\n");
-                log.info("Executing SEMANTIC_SCORING via FastAPI...");
-                applyMinMax(candidateRes, "SEMANTIC_SCORING", activeRules);
-                semanticScoring.evaluateRelationships(candidateRes);
-                Thread.sleep(2000);
-            }
-
-            // 4. Cardinality Mapping
-            if (enabledStages.contains("CARDINALITY_MAPPING")) {
-                sse.broadcast(j.getId(), "stage", "CARDINALITY_MAPPING");
-                sse.broadcast(j.getId(), "log", "[Stage] CARDINALITY_MAPPING: Resolving cardinality bounds...");
-                auditLog.append("[Stage] CARDINALITY_MAPPING: Resolving cardinality bounds...\n");
-                log.info("Executing CARDINALITY_MAPPING via FastAPI...");
-                CardinalityRequest cardReq = new CardinalityRequest();
-                cardReq.setCandidates(new java.util.ArrayList<>());
-                applyMinMax(cardReq, "CARDINALITY_MAPPING", activeRules);
-                cardinalityRes.resolveCardinalities(cardReq);
-                Thread.sleep(2000);
-            }
-
-            // 5. Sensitive Detection
-            if (enabledStages.contains("SENSITIVE_DETECTION")) {
-                sse.broadcast(j.getId(), "stage", "SENSITIVE_DETECTION");
-                sse.broadcast(j.getId(), "log", "[Stage] SENSITIVE_DETECTION: Scanning for PII with SpaCy...");
-                auditLog.append("[Stage] SENSITIVE_DETECTION: Scanning for PII with SpaCy...\n");
-                log.info("Executing SENSITIVE_DETECTION via FastAPI...");
-                applyMinMax(dummyRequest, "SENSITIVE_DETECTION", activeRules);
-                sensitiveDetection.detectSensitiveEntities(dummyRequest);
-                Thread.sleep(2000);
-            }
-
-            // 6. Domain Aggregation
-            if (enabledStages.contains("DOMAIN_AGGREGATION")) {
-                sse.broadcast(j.getId(), "stage", "DOMAIN_AGGREGATION");
-                sse.broadcast(j.getId(), "log", "[Stage] DOMAIN_AGGREGATION: Clustering domain vectors...");
-                auditLog.append("[Stage] DOMAIN_AGGREGATION: Clustering domain vectors...\n");
-                log.info("Executing DOMAIN_AGGREGATION via FastAPI...");
-                applyMinMax(dummyRequest, "DOMAIN_AGGREGATION", activeRules);
-                domainGrouping.extractDomainGroups(dummyRequest);
-                Thread.sleep(2000);
-            }
-
-            // 7. Mandatory Stage: ERD / Graph Generation
-            sse.broadcast(j.getId(), "stage", "ERD_GENERATION");
-            sse.broadcast(j.getId(), "log", "[Stage] ERD_GENERATION: Compiling Final Graph Matrix...");
-            auditLog.append("[Stage] ERD_GENERATION: Compiling Final Graph Matrix...\n");
-            log.info("Executing ERD_GENERATION via FastAPI...");
-            GraphContextRequest graphReq = new GraphContextRequest();
-            graphReq.setRelationships(new java.util.ArrayList<>());
-            graphReq.setClusters(new java.util.ArrayList<>());
-            applyMinMax(graphReq, "ERD_GENERATION", activeRules);
-            graphContext.generateContextGraph(graphReq);
-            Thread.sleep(2000);
-
-            // 8. Entity Classification
-            if (enabledStages.contains("ENTITY_CLASSIFICATION")) {
-                sse.broadcast(j.getId(), "stage", "ENTITY_CLASSIFICATION");
-                sse.broadcast(j.getId(), "log", "[Stage] ENTITY_CLASSIFICATION: Determining entity boundaries...");
-                auditLog.append("[Stage] ENTITY_CLASSIFICATION: Determining entity boundaries...\n");
-                log.info("Executing ENTITY_CLASSIFICATION via FastAPI...");
-                applyMinMax(dummyRequest, "ENTITY_CLASSIFICATION", activeRules);
-                entityClassification.classifyEntities(dummyRequest);
-                Thread.sleep(2000);
-            }
-
-            sse.broadcast(j.getId(), "log", "Job Completed Successfully at " + LocalDateTime.now());
+            sse.broadcast(job.getId(), "log", "Job Completed Successfully at " + LocalDateTime.now());
             auditLog.append("Job Completed Successfully at " + LocalDateTime.now() + "\n");
-            j.setStatus("Done");
-            sse.broadcast(j.getId(), "status", "Done");
+            job.setStatus("Done");
+            sse.broadcast(job.getId(), "status", "Done");
         } catch (Exception e) {
-            log.error("Pipeline failure for Job ID: {}", j.getId(), e);
-            sse.broadcast(j.getId(), "log", "FATAL ERROR: " + e.getMessage());
+            log.error("Pipeline failure for Job ID: {}", job.getId(), e);
+            sse.broadcast(job.getId(), "log", "FATAL ERROR: " + e.getMessage());
             auditLog.append("FATAL ERROR: ").append(e.getMessage()).append("\n");
-            j.setStatus("Failed");
-            sse.broadcast(j.getId(), "status", "Failed");
+            job.setStatus("Failed");
+            sse.broadcast(job.getId(), "status", "Failed");
         } finally {
-            j.setEndTime(LocalDateTime.now());
-            j.setAuditlogs(auditLog.toString());
-            repo.save(j);
-            sse.complete(j.getId());
+            job.setEndTime(LocalDateTime.now());
+            job.setAuditlogs(auditLog.toString());
+            repo.save(job);
+            sse.complete(job.getId());
         }
     }
 
-    private void applyMinMax(Object dto, String op, List<JobTemplateOptionRule> rules) {
+    private void startAnalysisWithStagesLevel(Job job, List<OperationType> enabledStages,
+                                              StringBuilder auditLog,
+                                              BulkSchemaRequest schemaRequest,
+                                              List<JobTemplateOptionRule> activeRules) throws InterruptedException {
+        log.info("Executing Schema Extraction...");
+
+        CandidateResponse candidateRes = new CandidateResponse();
+        candidateRes.setCandidates(new java.util.ArrayList<>());
+
+        // 2. Candidate Generation
+        if (enabledStages.contains(OperationType.CANDIDATE_FUZZY_MATCHING)) {
+            sse.broadcast(job.getId(), "stage", "CANDIDATE_GENERATION");
+            sse.broadcast(job.getId(), "log", "[Stage] CANDIDATE_GENERATION: Fetching ML candidates...");
+            auditLog.append("[Stage] CANDIDATE_GENERATION: Fetching ML candidates...\n");
+            log.info("Executing CANDIDATE_GENERATION via FastAPI...");
+            applyMinMax(schemaRequest, OperationType.CANDIDATE_FUZZY_MATCHING, activeRules);
+            candidateRes = candidateGen.generateCandidates(schemaRequest);
+            if (candidateRes == null) {
+                candidateRes = new CandidateResponse();
+                candidateRes.setCandidates(new java.util.ArrayList<>());
+            }
+            Thread.sleep(2000);
+        }
+
+        // 3. Semantic Scoring
+        if (enabledStages.contains(OperationType.SEMANTIC_ANALYSIS)) {
+            sse.broadcast(job.getId(), "stage", "SEMANTIC_SCORING");
+            sse.broadcast(job.getId(), "log", "[Stage] SEMANTIC_SCORING: Context evaluation...");
+            auditLog.append("[Stage] SEMANTIC_SCORING: Context evaluation...\n");
+            log.info("Executing SEMANTIC_SCORING via FastAPI...");
+            applyMinMax(candidateRes, OperationType.SEMANTIC_ANALYSIS, activeRules);
+            semanticScoring.evaluateRelationships(candidateRes);
+            Thread.sleep(2000);
+        }
+
+        // 4. Cardinality Mapping
+        if (enabledStages.contains(OperationType.CARDINALITY_DETECTION_SOURCE_COUNT)) {
+            sse.broadcast(job.getId(), "stage", "CARDINALITY_MAPPING");
+            sse.broadcast(job.getId(), "log", "[Stage] CARDINALITY_MAPPING: Resolving cardinality bounds...");
+            auditLog.append("[Stage] CARDINALITY_MAPPING: Resolving cardinality bounds...\n");
+            log.info("Executing CARDINALITY_MAPPING via FastAPI...");
+            CardinalityRequest cardReq = new CardinalityRequest();
+            cardReq.setCandidates(new java.util.ArrayList<>());
+            applyMinMax(cardReq, OperationType.CARDINALITY_DETECTION_SOURCE_COUNT, activeRules);
+            cardinalityRes.resolveCardinalities(cardReq);
+            Thread.sleep(2000);
+        }
+
+        // 5. Sensitive Detection
+        if (enabledStages.contains(OperationType.SENSITIVE_ANALYSIS_TABLE_DATA)) {
+            sse.broadcast(job.getId(), "stage", "SENSITIVE_DETECTION");
+            sse.broadcast(job.getId(), "log", "[Stage] SENSITIVE_DETECTION: Scanning for PII with SpaCy...");
+            auditLog.append("[Stage] SENSITIVE_DETECTION: Scanning for PII with SpaCy...\n");
+            log.info("Executing SENSITIVE_DETECTION via FastAPI...");
+            applyMinMax(schemaRequest, OperationType.SENSITIVE_ANALYSIS_TABLE_DATA, activeRules);
+            sensitiveDetection.detectSensitiveEntities(schemaRequest);
+            Thread.sleep(2000);
+        }
+
+        // 6. Domain Aggregation
+        if (enabledStages.contains(OperationType.TABLE_DOMAIN_GROUPING)) {
+            sse.broadcast(job.getId(), "stage", "DOMAIN_AGGREGATION");
+            sse.broadcast(job.getId(), "log", "[Stage] DOMAIN_AGGREGATION: Clustering domain vectors...");
+            auditLog.append("[Stage] DOMAIN_AGGREGATION: Clustering domain vectors...\n");
+            log.info("Executing DOMAIN_AGGREGATION via FastAPI...");
+            applyMinMax(schemaRequest, OperationType.TABLE_DOMAIN_GROUPING, activeRules);
+            domainGrouping.extractDomainGroups(schemaRequest);
+            Thread.sleep(2000);
+        }
+
+        // 7. Mandatory Stage: ERD / Graph Generation
+        sse.broadcast(job.getId(), "stage", "ERD_GENERATION");
+        sse.broadcast(job.getId(), "log", "[Stage] ERD_GENERATION: Compiling Final Graph Matrix...");
+        auditLog.append("[Stage] ERD_GENERATION: Compiling Final Graph Matrix...\n");
+        log.info("Executing ERD_GENERATION via FastAPI...");
+        GraphContextRequest graphReq = new GraphContextRequest();
+        graphReq.setRelationships(new java.util.ArrayList<>());
+        graphReq.setClusters(new java.util.ArrayList<>());
+        applyMinMax(graphReq, OperationType.GRAPH_BUILDING_DETECTION, activeRules);
+        graphContext.generateContextGraph(graphReq);
+        Thread.sleep(2000);
+
+        // 8. Entity Classification
+        if (enabledStages.contains(OperationType.DATA_CLASSIFICATION_TABLE_TYPE)) {
+            sse.broadcast(job.getId(), "stage", "ENTITY_CLASSIFICATION");
+            sse.broadcast(job.getId(), "log", "[Stage] ENTITY_CLASSIFICATION: Determining entity boundaries...");
+            auditLog.append("[Stage] ENTITY_CLASSIFICATION: Determining entity boundaries...\n");
+            log.info("Executing ENTITY_CLASSIFICATION via FastAPI...");
+            applyMinMax(schemaRequest, OperationType.DATA_CLASSIFICATION_TABLE_TYPE, activeRules);
+            entityClassification.classifyEntities(schemaRequest);
+            Thread.sleep(2000);
+        }
+    }
+
+    private void applyMinMax(Object dto, OperationType op, List<JobTemplateOptionRule> rules) {
         rules.stream().filter(r -> op.equals(r.getOptionType())).findFirst().ifPresent(r -> {
             if (dto instanceof BulkSchemaRequest) {
                 ((BulkSchemaRequest) dto).setMinValue(r.getMinValue());

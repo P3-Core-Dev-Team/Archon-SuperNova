@@ -65,8 +65,10 @@
             [(ngModel)]="newDs.profileName" /></div>
         <div class="fg"><label class="fl">Engine</label>
           <select class="fi" [(ngModel)]="newDs.dbType">
-            <option value="postgres">PostgreSQL</option>
-            <option value="mysql">MySQL</option>
+            <option value="POSTGRESQL">PostgreSQL</option>
+            <option value="MYSQL">MySQL</option>
+            <option value="ORACLE">Oracle</option>
+            <option value="SQLSERVER">SQL Server</option>
           </select>
         </div>
         <div class="fg"><label class="fl">Host <span style="color:var(--color-text-danger)">*</span></label><input

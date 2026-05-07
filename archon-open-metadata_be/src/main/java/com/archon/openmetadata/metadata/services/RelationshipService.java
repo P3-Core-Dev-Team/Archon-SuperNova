@@ -1,20 +1,21 @@
 package com.archon.openmetadata.metadata.services;
 
-import com.archon.openmetadata.metadata.models.Relationship;
+import com.archon.openmetadata.metadata.models.RelationshipEntity;
 import java.util.List;
 import java.util.UUID;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
 public interface RelationshipService {
-  Relationship save(Relationship entity);
+  RelationshipEntity save(RelationshipEntity entity);
 
-  Relationship findById(UUID id);
+  RelationshipEntity findById(UUID id);
 
-  List<Relationship> findAll();
+  List<RelationshipEntity> findAll();
 
-  Page<Relationship> findAll(Specification<Relationship> spec, Pageable pageable);
+  Page<RelationshipEntity> findAll(Specification<RelationshipEntity> spec, Pageable pageable);
 
   void deleteById(UUID id);
 }

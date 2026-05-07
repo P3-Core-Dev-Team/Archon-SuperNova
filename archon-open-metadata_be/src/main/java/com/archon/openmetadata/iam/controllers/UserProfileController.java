@@ -85,7 +85,6 @@ public class UserProfileController {
         dto.setId(user.getId());
         dto.setUsername(user.getUsername());
         dto.setEmail(user.getEmail());
-        dto.setRole(user.getRole());
         dto.setStatus(user.getStatus());
         dto.setGroups(user.getGroups() != null ? user.getGroups().stream().map(g -> {
             com.archon.openmetadata.iam.dto.GroupDto gd = new com.archon.openmetadata.iam.dto.GroupDto();

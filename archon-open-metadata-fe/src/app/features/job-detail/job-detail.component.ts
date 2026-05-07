@@ -53,48 +53,45 @@ export class JobDetailComponent implements OnInit, AfterViewInit, OnDestroy {
     this.isFullScreen = !this.isFullScreen;
   }
 
-  fetchData() {
+  fetchData(tab?: string) {
     if (!this.job?.id) return;
     
-    // Fetch tables
-    this.http.post<any>(`${this.api.baseUrl}/tables/search`, { jobId: this.job.id }).subscribe({
-      next: (res) => {
-        this.tables = res?._embedded?.tableEntityDtoList || [];
-      },
-      error: () => this.tables = []
-    });
+    // Default to activeTab if no tab passed
+    const targetTab = tab || this.activeTab;
 
-    // Fetch relationships
-    this.api.getJobRelationships(this.job.id).subscribe({
-      next: (res) => {
-        if (res && res._embedded && res._embedded.relationshipDtoList) {
-          this.relationships = res._embedded.relationshipDtoList;
-        } else if (res && res.edges) {
-          this.relationships = res.edges; // Fallback for old mock structure
-        }
-      },
-      error: () => this.relationships = []
-    });
+    // Fetch tables only for 'tables' tab or initial load
+    if (targetTab === 'tables' || !tab) {
+      this.http.post<any>(`${this.api.baseUrl}/tables/search`, { jobId: this.job.id }).subscribe({
+        next: (res) => {
+          this.tables = res?._embedded?.tableEntityDtoList || [];
+        },
+        error: () => this.tables = []
+      });
+    }
 
-    // Fetch sensitive data
-    this.api.getJobSensitiveData(this.job.id).subscribe({
-      next: (res) => {
-        if (res && res._embedded && res._embedded.columnEntityDtoList) {
-          this.sensitiveData = res._embedded.columnEntityDtoList;
-        }
-      },
-      error: () => this.sensitiveData = []
-    });
+    // Fetch sensitive data only for 'sensitive' tab or initial load
+    if (targetTab === 'sensitive' || !tab) {
+      this.api.getJobSensitiveData(this.job.id).subscribe({
+        next: (res) => {
+          if (res && res._embedded && res._embedded.columnEntityDtoList) {
+            this.sensitiveData = res._embedded.columnEntityDtoList;
+          }
+        },
+        error: () => this.sensitiveData = []
+      });
+    }
 
-    // Fetch data groups
-    this.api.getJobDataGroups(this.job.id).subscribe({
-      next: (res) => {
-        if (res && res._embedded && res._embedded.domainGroupDtoList) {
-          this.dataGroups = res._embedded.domainGroupDtoList;
-        }
-      },
-      error: () => this.dataGroups = []
-    });
+    // Fetch data groups only for 'groups' tab or initial load
+    if (targetTab === 'groups' || !tab) {
+      this.api.getJobDataGroups(this.job.id).subscribe({
+        next: (res) => {
+          if (res && res._embedded && res._embedded.domainGroupDtoList) {
+            this.dataGroups = res._embedded.domainGroupDtoList;
+          }
+        },
+        error: () => this.dataGroups = []
+      });
+    }
   }
 
   connectSse() {
@@ -149,6 +146,7 @@ export class JobDetailComponent implements OnInit, AfterViewInit, OnDestroy {
 
   setTab(tab: string) {
     this.activeTab = tab;
+    this.fetchData();
     if (tab === 'erd') {
       setTimeout(() => this.initGraph(), 100);
     }

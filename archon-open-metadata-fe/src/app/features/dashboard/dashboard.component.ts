@@ -19,10 +19,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   sensitiveDataCount: number = 0;
   recentActivity: AuditLog[] = [];
   tableTypeDistribution: { [key: string]: number } = {};
-  
+
   private pollInterval: ReturnType<typeof setInterval> | null = null;
   private chartInstance: Chart | null = null;
-  
+
   @ViewChild('typeChart') chartCanvas!: ElementRef;
 
   constructor(private http: HttpClient, private router: Router) {}
@@ -52,17 +52,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.relationshipsCount = res.relationshipsCount || 0;
       this.sensitiveDataCount = res.sensitiveDataCount || 0;
       this.tableTypeDistribution = res.tableTypeDistribution || {};
-      
+
       this.updateChart();
     });
   }
 
   updateChart() {
     if (!this.chartCanvas) return;
-    
+
     const labels = Object.keys(this.tableTypeDistribution);
     const data = Object.values(this.tableTypeDistribution);
-    
+
     if (this.chartInstance) {
       this.chartInstance.data.labels = labels;
       this.chartInstance.data.datasets[0].data = data as number[];

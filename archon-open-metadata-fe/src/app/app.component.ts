@@ -1,10 +1,6 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { ConnectionProfile, Job, DatasourceForm, ApiResponse, User, Group } from './core/models/app.models';
-
-
-
-
 
 @Component({
   selector: 'app-root',
@@ -12,10 +8,10 @@ import { ConnectionProfile, Job, DatasourceForm, ApiResponse, User, Group } from
   styleUrls: []
 })
 export class AppComponent implements OnInit {
-
   private baseUrl = 'http://localhost:8080/api';
   datasources: ConnectionProfile[] = [];
   jobs: Job[] = [];
+  sidebarCollapsed: boolean = false;
   sensitiveDataCount: number = 0;
   audits: any[] = [];
   dataCleanupDays: number = 30;
@@ -23,7 +19,7 @@ export class AppComponent implements OnInit {
   users: User[] = [];
   groups: Group[] = [];
   newDs: DatasourceForm = {
-    dbType: 'postgres',
+    dbType: 'PostgreSQL',
     port: 5432,
     host: '127.0.0.1',
     username: 'adsuser',
@@ -36,7 +32,6 @@ export class AppComponent implements OnInit {
   }
   testResult: string = '';
   isDarkTheme: boolean = false;
-  sidebarCollapsed: boolean = false;
   toasts: { id: number, message: string, type: string }[] = [];
   private toastIdCounter = 0;
 
@@ -118,7 +113,15 @@ export class AppComponent implements OnInit {
     );
   }
 
-
+  fetchData() {
+    // Keep for backward compatibility with inner component triggers if any
+    if (document.getElementById('p-dashboard')?.classList.contains('on')) { }
+    else if (document.getElementById('p-ds-list')?.classList.contains('on')) { }
+    else if (document.getElementById('p-jobs-all')?.classList.contains('on')) { }
+    else if (document.getElementById('p-settings-tpl')?.classList.contains('on')) { }
+    else if (document.getElementById('p-admin-users')?.classList.contains('on')) { this.fetchUsers(); this.fetchGroups(); }
+    else if (document.getElementById('p-admin-groups')?.classList.contains('on')) { this.fetchGroups(); }
+  }
 
   go(id: string, navEl: any, section: string, screen: string) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
@@ -177,5 +180,53 @@ export class AppComponent implements OnInit {
       document.body.classList.remove('dark-theme');
       localStorage.setItem('theme', 'light');
     }
+  }
+
+  createJob(payload: any) {
+    this.http.post(`${this.baseUrl}/v1/jobs`, payload).subscribe(
+      res => {
+        this.showToast('Job created successfully.', 'success');
+        this.fetchData();
+        this.go('jobs-all', null, 'Job profiles', 'All jobs');
+      },
+      err => this.showToast('Failed to create job: ' + this.extractError(err), 'error')
+    );
+  }
+
+
+  saveJobTemplate(payload: any) {
+    if (payload.id) {
+      this.http.put(`${this.baseUrl}/v1/job-template-profiles/${payload.id}`, payload).subscribe(
+        res => {
+          this.showToast('Job template updated successfully.', 'success');
+          this.fetchData();
+        },
+        err => this.showToast('Failed to update job template: ' + this.extractError(err), 'error')
+      );
+    } else {
+      this.http.post(`${this.baseUrl}/v1/job-template-profiles`, payload).subscribe(
+        res => {
+          this.showToast('Job template created successfully.', 'success');
+          this.fetchData();
+        },
+        err => this.showToast('Failed to create job template: ' + this.extractError(err), 'error')
+      );
+    }
+  }
+
+  editDatasource(ds: ConnectionProfile) {
+    this.newDs = {
+      id: ds.id,
+      profileName: ds.profileName,
+      dbType: ds.dbType || 'PostgreSQL',
+      host: ds.host,
+      port: typeof ds.port === 'string' ? parseInt(ds.port, 10) : (ds.port || 5432),
+      databaseName: ds.databaseName,
+      listOfSchemas: ds.listOfSchemas,
+      username: ds.user,
+      password: ds.pass
+    };
+    this.testResult = '';
+    this.go('ds-new', null, 'Datasources', 'Edit profile');
   }
 }

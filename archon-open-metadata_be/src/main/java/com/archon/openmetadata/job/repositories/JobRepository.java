@@ -10,7 +10,8 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface JobRepository extends JpaRepository<Job, UUID>, JpaSpecificationExecutor<Job> {
+    List<Job> findByStatusIgnoreCase(String status);
 
-    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"jobTemplateProfile", "jobTemplateProfile.options"})
-    java.util.List<Job> findByStatusIgnoreCase(String status);
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"datasourceProfile", "jobTemplateProfile", "jobTemplateProfile.options"})
+    List<Job> findWithProfilesByStatusIgnoreCase(String status);
 }

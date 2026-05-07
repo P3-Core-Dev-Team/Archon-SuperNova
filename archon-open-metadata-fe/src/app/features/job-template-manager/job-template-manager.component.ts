@@ -16,12 +16,13 @@ export class JobTemplateManagerComponent implements OnInit {
   
   pipelineStages = [
     { operationName: 'SCHEMA_EXTRACTION', displayName: '1. Schema Extraction (JDBC)', locked: true },
-    { operationName: 'CANDIDATE_GENERATION', displayName: '1.5 ML Candidate Matching', locked: false },
-    { operationName: 'SEMANTIC_SCORING', displayName: '2. Context/Semantic Scoring', locked: false },
-    { operationName: 'CARDINALITY_MAPPING', displayName: '3. Data Cardinality Verification', locked: false },
-    { operationName: 'SENSITIVE_DETECTION', displayName: '4. SpaCy Deep PII Classification', locked: false },
-    { operationName: 'DOMAIN_AGGREGATION', displayName: '5. Domain Vector Aggregation', locked: false },
-    { operationName: 'ERD_GENERATION', displayName: '6. ERD Graph Context Generation', locked: true }
+    { operationName: 'CANDIDATE_FUZZY_MATCHING', displayName: '1.5 ML Candidate Matching', locked: false },
+    { operationName: 'SEMANTIC_ANALYSIS', displayName: '2. Context/Semantic Scoring', locked: false },
+    { operationName: 'CARDINALITY_DETECTION_SOURCE_COUNT', displayName: '3. Data Cardinality Verification', locked: false },
+    { operationName: 'SENSITIVE_ANALYSIS_TABLE_DATA', displayName: '4. SpaCy Deep PII Classification', locked: false },
+    { operationName: 'TABLE_DOMAIN_GROUPING', displayName: '5. Domain Vector Aggregation', locked: false },
+    { operationName: 'GRAPH_BUILDING_DETECTION', displayName: '6. ERD Graph Context Generation', locked: true },
+    { operationName: 'DATA_CLASSIFICATION_TABLE_TYPE', displayName: '7. Entity Classification', locked: false }
   ];
 
   private baseUrl = 'http://localhost:8080/api/v1';

@@ -23,10 +23,6 @@ app:
     allowed-headers: "*"
     allowed-methods: "*"
     path-pattern: "/**"
-
-  crypto:
-    secret: "archon-supernova-secret-v1"
-
   ml:
     api:
-      url: "http://127.0.0.1:7000/api/v1"
+      url: https://localhost:8000

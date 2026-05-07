@@ -1,6 +1,7 @@
 package com.archon.openmetadata.common.models;
 import javax.persistence.Entity;
 import javax.persistence.Id;
+import javax.persistence.Lob;
 import javax.persistence.Table;
 import lombok.Data;
 import lombok.AllArgsConstructor;
@@ -14,5 +15,6 @@ import lombok.NoArgsConstructor;
 public class SystemProperty {
     @Id
     private String propKey;
+    @Lob
     private Object propValue;
 }

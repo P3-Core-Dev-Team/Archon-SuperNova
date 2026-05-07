@@ -64,7 +64,18 @@ public class ConnectionProfileController {
   @PostMapping
   public ResponseEntity<EntityModel<ConnectionProfileDto>> create(
       @RequestBody ConnectionProfileDto dto) {
-    ConnectionProfile saved = service.save(modelMapper.map(dto, ConnectionProfile.class));
+    ConnectionProfile entity = modelMapper.map(dto, ConnectionProfile.class);
+    entity.setDbType(dto.getDbType());
+    entity.setHost(dto.getHost());
+    entity.setPort(dto.getPort());
+    entity.setDatabaseName(dto.getDatabaseName());
+    
+    if (dto.getDbType() != null && dto.getHost() != null && dto.getPort() != null && dto.getDatabaseName() != null) {
+        String url = dto.getDbType().generateUrl(dto.getHost(), dto.getPort(), dto.getDatabaseName());
+        entity.setUrl(url);
+    }
+
+    ConnectionProfile saved = service.save(entity);
     return ResponseEntity.ok(
         EntityModel.of(
             modelMapper.map(saved, ConnectionProfileDto.class),
@@ -78,7 +89,18 @@ public class ConnectionProfileController {
   public ResponseEntity<EntityModel<ConnectionProfileDto>> update(
       @PathVariable UUID id, @RequestBody ConnectionProfileDto dto) {
     dto.setId(id);
-    ConnectionProfile updated = service.save(modelMapper.map(dto, ConnectionProfile.class));
+    ConnectionProfile entity = modelMapper.map(dto, ConnectionProfile.class);
+    entity.setDbType(dto.getDbType());
+    entity.setHost(dto.getHost());
+    entity.setPort(dto.getPort());
+    entity.setDatabaseName(dto.getDatabaseName());
+    
+    if (dto.getDbType() != null && dto.getHost() != null && dto.getPort() != null && dto.getDatabaseName() != null) {
+        String url = dto.getDbType().generateUrl(dto.getHost(), dto.getPort(), dto.getDatabaseName());
+        entity.setUrl(url);
+    }
+
+    ConnectionProfile updated = service.save(entity);
     return ResponseEntity.ok(
         EntityModel.of(
             modelMapper.map(updated, ConnectionProfileDto.class),
@@ -127,5 +149,14 @@ public class ConnectionProfileController {
                             WebMvcLinkBuilder.methodOn(ConnectionProfileController.class)
                                 .getById(entity.getId()))
                         .withSelfRel())));
+  }
+
+  @PostMapping("/test")
+  public ResponseEntity<java.util.Map<String, Object>> testConnection(@RequestBody ConnectionProfileDto dto) {
+    boolean success = service.testConnection(dto);
+    java.util.Map<String, Object> response = new java.util.HashMap<>();
+    response.put("success", success);
+    response.put("message", success ? "Connection successful!" : "Connection failed!");
+    return ResponseEntity.ok(response);
   }
 }

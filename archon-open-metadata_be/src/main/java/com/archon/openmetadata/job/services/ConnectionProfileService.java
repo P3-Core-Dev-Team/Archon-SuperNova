@@ -1,5 +1,6 @@
 package com.archon.openmetadata.job.services;
 
+import com.archon.openmetadata.job.dto.ConnectionProfileDto;
 import com.archon.openmetadata.job.models.ConnectionProfile;
 import java.util.List;
 import java.util.UUID;
@@ -17,4 +18,6 @@ public interface ConnectionProfileService {
   Page<ConnectionProfile> findAll(Specification<ConnectionProfile> spec, Pageable pageable);
 
   void deleteById(UUID id);
+
+  boolean testConnection(ConnectionProfileDto entity);
 }

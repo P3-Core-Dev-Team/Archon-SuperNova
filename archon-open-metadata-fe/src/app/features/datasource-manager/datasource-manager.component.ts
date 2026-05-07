@@ -9,7 +9,7 @@ import { ConnectionProfile, DatasourceForm, ApiResponse } from '../../core/model
 })
 export class DatasourceManagerComponent implements OnInit {
   datasources: ConnectionProfile[] = [];
-  newDs: DatasourceForm = { dbType: 'PostgreSQL', port: 5432, host: '127.0.0.1' };
+  newDs: DatasourceForm = { dbType: 'POSTGRESQL', port: 5432, host: '127.0.0.1' };
   showForm = false;
   testResult: string = '';
   private baseUrl = 'http://localhost:8080/api/v1';
@@ -26,31 +26,24 @@ export class DatasourceManagerComponent implements OnInit {
     this.http.get<ApiResponse<ConnectionProfile>>(`${this.baseUrl}/connection-profiles`).subscribe(res => {
       const list = res._embedded?.connectionProfileDtoList || [];
       this.datasources = list.map((ds: ConnectionProfile) => {
-        let dbType = ''; let host = ''; let port: number | string = ''; let databaseName = '';
-        if (ds.url) {
-          try {
-            const parts = ds.url.split('://');
-            if (parts.length > 1) {
-              dbType = parts[0].replace('jdbc:', '');
-              const hostPortDb = parts[1].split('/');
-              databaseName = hostPortDb[1] || '';
-              const hostPort = hostPortDb[0].split(':');
-              host = hostPort[0];
-              port = hostPort[1] || '';
-            }
-          } catch (e) { }
-        }
+        let dbType = ds.dbType || ''; 
+        let host = ds.host || ''; 
+        let port: number | string = ds.port || ''; 
+        let databaseName = ds.databaseName || '';
         return { ...ds, dbType, host, port, databaseName };
       });
     });
   }
 
   saveDatasource() {
-    const payload: ConnectionProfile = {
+    const payload: any = {
       profileName: this.newDs.profileName,
-      url: `jdbc:${this.newDs.dbType || 'postgresql'}://${this.newDs.host}:${this.newDs.port}/${this.newDs.databaseName}`,
+      dbType: this.newDs.dbType || 'POSTGRESQL',
+      host: this.newDs.host,
+      port: Number(this.newDs.port),
+      databaseName: this.newDs.databaseName,
       user: this.newDs.username,
-      pass: this.newDs.password,
+      pass: btoa(this.newDs.password || ''),
       listOfSchemas: this.newDs.listOfSchemas
     };
 
@@ -69,15 +62,20 @@ export class DatasourceManagerComponent implements OnInit {
   }
 
   editDatasource(ds: ConnectionProfile) {
+    let decodedPass = ds.pass;
+    if (ds.pass) {
+      try { decodedPass = atob(ds.pass); } catch (e) { decodedPass = ds.pass; }
+    }
+
     this.newDs = {
       id: ds.id,
       profileName: ds.profileName,
-      dbType: ds.dbType || 'PostgreSQL',
+      dbType: ds.dbType || 'POSTGRESQL',
       host: ds.host || '127.0.0.1',
       port: typeof ds.port === 'number' ? ds.port : parseInt(ds.port as string) || 5432,
       databaseName: ds.databaseName || '',
       username: ds.user || '',
-      password: ds.pass || '',
+      password: decodedPass || '',
       listOfSchemas: ds.listOfSchemas || ''
     };
     this.testResult = '';
@@ -85,11 +83,24 @@ export class DatasourceManagerComponent implements OnInit {
   }
 
   resetDsForm() {
-    this.newDs = { dbType: 'postgresql', port: 5432, host: '127.0.0.1' };
+    this.newDs = { dbType: 'POSTGRESQL', port: 5432, host: '127.0.0.1' };
     this.testResult = '';
   }
 
   testConnection() {
-    this.testResult = 'Connection successful!';
+    this.testResult = 'Testing...';
+    const payload: any = {
+      dbType: this.newDs.dbType || 'POSTGRESQL',
+      host: this.newDs.host,
+      port: Number(this.newDs.port),
+      databaseName: this.newDs.databaseName,
+      user: this.newDs.username,
+      pass: btoa(this.newDs.password || '')
+    };
+
+    this.http.post<any>(`${this.baseUrl}/connection-profiles/test`, payload).subscribe({
+      next: (res) => { this.testResult = res.success ? 'Connection successful!' : 'Connection failed!'; },
+      error: (err) => { this.testResult = 'Connection failed!'; }
+    });
   }
 }

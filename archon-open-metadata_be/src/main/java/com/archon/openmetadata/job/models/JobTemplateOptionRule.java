@@ -9,6 +9,8 @@ import javax.persistence.*;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import org.hibernate.annotations.GenericGenerator;
 
 @Entity
@@ -19,6 +21,8 @@ import org.hibernate.annotations.GenericGenerator;
 @Data
 @EqualsAndHashCode(callSuper = true)
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class JobTemplateOptionRule extends AuditModel {
   @Id
   @GeneratedValue(generator = "UUID")
