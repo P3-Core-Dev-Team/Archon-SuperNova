@@ -44,6 +44,15 @@ export class ApiService {
   }
 
   getJobRelationships(jobId: string): Observable<any> {
-    return this.http.get(`${this.pythonApiUrl}/jobs/${jobId}/relationships`);
+    return this.http.post(`${this.baseUrl}/relationships/search`, { jobId });
+  }
+
+  getJobSensitiveData(jobId: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/columns/search`, { jobId, isSensitive: true });
+  }
+
+  getJobDataGroups(jobId: string): Observable<any> {
+    // Assuming there is a DomainClusterController or similar, or we just mock for now
+    return this.http.post(`${this.baseUrl}/datagroups/search`, { jobId });
   }
 }

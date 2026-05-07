@@ -12,5 +12,6 @@ import lombok.EqualsAndHashCode;
 public class JobTemplateProfileDto extends AuditModelDto {
   private UUID id;
   private String name;
+  private String description;
   private java.util.List<JobTemplateOptionRuleDto> options;
 }

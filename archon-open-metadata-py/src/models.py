@@ -30,18 +30,25 @@ class BulkSchemaRequest(BaseModel):
     tables: list[SchemaTable]
     schemaCrawlerRelationships: list[dict] | None = None
     mlRelationships: list[dict] | None = None
-    minValue: int
-    maxValue: int
+    minValue: float | None = None
+    maxValue: float | None = None
+
+class CandidateResponse(BaseModel):
+    candidates: list[dict]
+    minValue: float | None = None
+    maxValue: float | None = None
 
 class CardinalityRequest(BaseModel):
-    connection: ConnectionDetails
+    connection: ConnectionDetails | None = None
     candidates: list[dict]
+    minValue: float | None = None
+    maxValue: float | None = None
 
 class ContextGraphRequest(BaseModel):
     relationships: list[dict]
     clusters: list[dict]
-    minValue: int
-    maxValue: int
+    minValue: float | None = None
+    maxValue: float | None = None
 
 
 # === data_based requests =================================================

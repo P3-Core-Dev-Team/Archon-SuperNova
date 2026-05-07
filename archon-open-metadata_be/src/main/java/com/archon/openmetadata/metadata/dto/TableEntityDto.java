@@ -18,4 +18,5 @@ public class TableEntityDto extends AuditModelDto {
   private String tableType;
   private String schemaName;
   private String datasourceName;
+  private java.util.List<ColumnEntityDto> columns;
 }

@@ -103,6 +103,12 @@ public class ColumnEntityController {
                     criteriaBuilder.like(
                         root.get("id").as(String.class), "%" + filterBean.getSearchText() + "%"));
               }
+              if (filterBean.getJobId() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("table").get("job").get("id"), filterBean.getJobId()));
+              }
+              if (filterBean.getIsSensitive() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("isSensitive"), filterBean.getIsSensitive()));
+              }
 
               if (predicates.isEmpty()) {
                 return criteriaBuilder.conjunction();

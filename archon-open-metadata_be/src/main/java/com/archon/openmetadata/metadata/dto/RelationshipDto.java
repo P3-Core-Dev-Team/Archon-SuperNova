@@ -18,4 +18,10 @@ public class RelationshipDto extends AuditModelDto {
   private ColumnEntityDto targetColumn;
   private String cardinality;
   private Float score;
+
+  // Flattened fields for UI integration
+  private String sourceTableName;
+  private String targetTableName;
+  private String sourceColumnName;
+  private String targetColumnName;
 }

@@ -1,52 +1,88 @@
-<div id="p-admin-users" class="page">
-  <div class="page-header">
-    <div class="page-title">User Management</div>
-  </div>
-  <div class="card">
-    <table class="tbl">
-      <tr>
-        <th>Username</th>
-        <th>Auth Type</th>
-        <th>Groups</th>
-        <th>Status</th>
-      </tr>
-      <tr *ngFor="let user of users">
-        <td style="font-weight:500">&#123;&#123; user.username &#125;&#125;</td>
-        <td><span class="badge b-gray">&#123;&#123; user.authType === 'LOCAL' ? 'InMemory' : user.authType
-            &#125;&#125;</span></td>
-        <td>&#123;&#123; user.groups?.length ? user.groups![0].groupName : 'None' &#125;&#125;</td>
-        <td><span class="badge b-green">Active</span></td>
-      </tr>
-      <tr *ngIf="users.length === 0">
-        <td colspan="4" style="text-align:center;padding:40px 20px">
-          <div style="font-size:15px;font-weight:500;color:var(--color-text-primary)">No users found</div>
-        </td>
-      </tr>
-    </table>
-  </div>
-</div>
+<div>
+  <app-page-header 
+    title="Users & Groups Management" 
+    subtitle="Manage platform users and group assignments" 
+    [actionText]="activeTab === 'users' ? '+ Add user' : '+ Add group'">
+  </app-page-header>
 
-<div id="p-admin-groups" class="page">
-  <div class="page-header">
-    <div class="page-title">Group Management</div>
+  
+  <div style="display: flex; gap: 24px; border-bottom: 1px solid var(--color-border-tertiary); margin-bottom: 24px;">
+    <div [class.active]="activeTab === 'users'" (click)="setTab('users')" style="padding: 12px 4px; cursor: pointer; font-weight: 500; font-size: 14px; border-bottom: 2px solid transparent;" [style.color]="activeTab === 'users' ? 'var(--color-brand)' : 'var(--color-text-secondary)'" [style.border-bottom-color]="activeTab === 'users' ? 'var(--color-brand)' : 'transparent'">Users</div>
+    <div [class.active]="activeTab === 'groups'" (click)="setTab('groups')" style="padding: 12px 4px; cursor: pointer; font-weight: 500; font-size: 14px; border-bottom: 2px solid transparent;" [style.color]="activeTab === 'groups' ? 'var(--color-brand)' : 'var(--color-text-secondary)'" [style.border-bottom-color]="activeTab === 'groups' ? 'var(--color-brand)' : 'transparent'">Groups</div>
   </div>
-  <div class="card">
-    <table class="tbl">
-      <tr>
-        <th>Group Name</th>
-        <th>Roles</th>
-        <th>Status</th>
-      </tr>
-      <tr *ngFor="let group of groups">
-        <td style="font-weight:500">&#123;&#123; group.groupName &#125;&#125;</td>
-        <td>&#123;&#123; group.roles?.length ? group.roles![0].roleName : 'None' &#125;&#125;</td>
-        <td><span class="badge b-green">Active</span></td>
-      </tr>
-      <tr *ngIf="groups.length === 0">
-        <td colspan="3" style="text-align:center;padding:40px 20px">
-          <div style="font-size:15px;font-weight:500;color:var(--color-text-primary)">No groups found</div>
-        </td>
-      </tr>
-    </table>
+
+  <div *ngIf="activeTab === 'users'" class="card" style="padding: 0; overflow-x: auto;">
+    <div style="min-width: 800px;">
+      <table class="tbl" style="width: 100%;">
+        <tr>
+          <th style="padding: 12px 16px;">Name</th>
+          <th style="padding: 12px 16px;">Email</th>
+          <th style="padding: 12px 16px;">Group</th>
+          <th style="padding: 12px 16px;">Last login</th>
+          <th style="padding: 12px 16px;">Status</th>
+          <th style="padding: 12px 16px; text-align: center;">Actions</th>
+        </tr>
+        <tr *ngFor="let user of paginatedUsers">
+          <td style="padding: 16px; display: flex; align-items: center; gap: 12px;">
+            <div [style.background]="user.color" style="width: 28px; height: 28px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; letter-spacing: 0.5px; flex-shrink: 0;">
+              {{ user.initials }}
+            </div>
+            <span style="font-weight: 500; white-space: nowrap;">{{ user.name }}</span>
+          </td>
+          <td style="padding: 16px; white-space: nowrap;">{{ user.email }}</td>
+          <td style="padding: 16px; white-space: nowrap;">{{ user.group }}</td>
+          <td style="padding: 16px; white-space: nowrap;">{{ user.lastLogin | date:'mediumDate' }}</td>
+          <td style="padding: 16px;"><span class="badge" [ngClass]="{'b-green': user.status === 'Active', 'b-gray': user.status !== 'Active'}">{{ user.status }}</span></td>
+          <td style="padding: 16px; text-align: center;">
+            <div style="display:flex; gap:8px; justify-content: center;">
+              <button class="tb-btn" style="padding:4px 10px; background: transparent; border: 1px solid var(--color-border-tertiary); white-space: nowrap;">Edit</button>
+              <button class="tb-btn" style="padding:4px 10px; color:var(--color-text-danger); border: 1px solid var(--color-text-danger); background: transparent; white-space: nowrap;">Delete</button>
+            </div>
+          </td>
+        </tr>
+        <tr *ngIf="paginatedUsers.length === 0">
+          <td colspan="6" style="text-align:center;padding:50px 20px">
+            <div style="font-size:15px;font-weight:500;color:var(--color-text-primary)">No users found</div>
+          </td>
+        </tr>
+      </table>
+    </div>
   </div>
+  
+
+  <!-- Groups Table -->
+  <div *ngIf="activeTab === 'groups'" class="card" style="padding: 0; overflow-x: auto;">
+    <div style="min-width: 800px;">
+      <table class="tbl" style="width: 100%;">
+        <tr>
+          <th style="padding: 12px 16px;">Group Name</th>
+          <th style="padding: 12px 16px;">Description</th>
+          <th style="padding: 12px 16px;">Users</th>
+          <th style="padding: 12px 16px; text-align: center;">Actions</th>
+        </tr>
+        <tr *ngFor="let group of groups">
+          <td style="padding: 16px; font-weight: 500;">{{ group.name }}</td>
+          <td style="padding: 16px; color: var(--color-text-secondary);">{{ group.description }}</td>
+          <td style="padding: 16px;">{{ group.usersCount }}</td>
+          <td style="padding: 16px; text-align: center;">
+            <div *ngIf="!group.isSystem" style="display:flex; gap:8px; justify-content: center;">
+              <button class="tb-btn" style="padding:4px 10px; background: transparent; border: 1px solid var(--color-border-tertiary); white-space: nowrap;">Edit</button>
+              <button class="tb-btn" style="padding:4px 10px; color:var(--color-text-danger); border: 1px solid var(--color-text-danger); background: transparent; white-space: nowrap;">Delete</button>
+            </div>
+            <span *ngIf="group.isSystem" style="font-size: 11px; color: var(--color-text-tertiary); text-transform: uppercase; letter-spacing: 0.5px;">System Managed</span>
+          </td>
+        </tr>
+        <tr *ngIf="groups.length === 0">
+          <td colspan="5" style="text-align:center;padding:50px 20px">No groups found</td>
+        </tr>
+      </table>
+    </div>
+  </div>
+
+  <app-pagination *ngIf="activeTab === 'users'" 
+    [currentPage]="currentPage" 
+    [pageSize]="pageSize" 
+    [totalItems]="totalItems" 
+    (pageChange)="currentPage = $event">
+  </app-pagination>
 </div>

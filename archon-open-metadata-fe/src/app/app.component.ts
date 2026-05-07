@@ -1,6 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { ConnectionProfile, Job, DatasourceForm, ApiResponse, User, Group } from './core/models/app.models';
+
+
+
+
 
 @Component({
   selector: 'app-root',
@@ -8,6 +12,7 @@ import { ConnectionProfile, Job, DatasourceForm, ApiResponse, User, Group } from
   styleUrls: []
 })
 export class AppComponent implements OnInit {
+
   private baseUrl = 'http://localhost:8080/api';
   datasources: ConnectionProfile[] = [];
   jobs: Job[] = [];
@@ -31,6 +36,7 @@ export class AppComponent implements OnInit {
   }
   testResult: string = '';
   isDarkTheme: boolean = false;
+  sidebarCollapsed: boolean = false;
   toasts: { id: number, message: string, type: string }[] = [];
   private toastIdCounter = 0;
 
@@ -41,8 +47,8 @@ export class AppComponent implements OnInit {
     if (this.isDarkTheme) {
       document.body.classList.add('dark-theme');
     }
-    
-    
+
+
   }
 
   showToast(message: string, type: 'success' | 'error' = 'error') {
@@ -76,7 +82,7 @@ export class AppComponent implements OnInit {
     );
   }
 
-      fetchSystemProperties() {
+  fetchSystemProperties() {
     this.http.get<any[]>(`${this.baseUrl}/system-properties`).subscribe(
       res => {
         const prop = res.find((p: any) => p.propKey === 'dataCleanupDays');
@@ -112,15 +118,7 @@ export class AppComponent implements OnInit {
     );
   }
 
-  fetchData() {
-    // Keep for backward compatibility with inner component triggers if any
-    if (document.getElementById('p-dashboard')?.classList.contains('on')) {   }
-    else if (document.getElementById('p-ds-list')?.classList.contains('on')) 
-    else if (document.getElementById('p-jobs-all')?.classList.contains('on')) {    }
-    else if (document.getElementById('p-settings-tpl')?.classList.contains('on')) 
-    else if (document.getElementById('p-admin-users')?.classList.contains('on')) { this.fetchUsers(); this.fetchGroups(); }
-    else if (document.getElementById('p-admin-groups')?.classList.contains('on')) this.fetchGroups();
-  }
+
 
   go(id: string, navEl: any, section: string, screen: string) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('on'));
@@ -135,19 +133,19 @@ export class AppComponent implements OnInit {
     if (breadcrumb) {
       breadcrumb.innerHTML = `<span>${section}</span><span class="breadcrumb-sep">›</span><span class="breadcrumb-cur">${screen}</span>`;
     }
-    
+
     // Trigger specific APIs based on screen selection
     if (id === 'dashboard') {
-      
-      
+
+
     } else if (id === 'ds-list') {
-      
+
     } else if (id === 'jobs-all') {
-      
-      
-      
+
+
+
     } else if (id === 'settings-tpl') {
-      
+
     } else if (id === 'settings-system') {
       this.fetchSystemProperties();
     } else if (id === 'system-audit') {
@@ -180,67 +178,4 @@ export class AppComponent implements OnInit {
       localStorage.setItem('theme', 'light');
     }
   }
-
-      },
-      err => {
-        this.testResult = 'Connection failed!';
-        this.showToast('Connection failed: ' + this.extractError(err), 'error');
-      }
-    );
-  }
-
-  
-  createJob(payload: any) {
-    this.http.post(`${this.baseUrl}/v1/jobs`, payload).subscribe(
-      res => {
-        this.showToast('Job created successfully.', 'success');
-        this.fetchData();
-        this.go('jobs-all', null, 'Job profiles', 'All jobs');
-      },
-      err => this.showToast('Failed to create job: ' + this.extractError(err), 'error')
-    );
-  }
-
-  
-  saveJobTemplate(payload: any) {
-    if (payload.id) {
-      this.http.put(`${this.baseUrl}/v1/job-template-profiles/${payload.id}`, payload).subscribe(
-        res => {
-          this.showToast('Job template updated successfully.', 'success');
-          this.fetchData();
-        },
-        err => this.showToast('Failed to update job template: ' + this.extractError(err), 'error')
-      );
-    } else {
-      this.http.post(`${this.baseUrl}/v1/job-template-profiles`, payload).subscribe(
-        res => {
-          this.showToast('Job template created successfully.', 'success');
-          this.fetchData();
-        },
-        err => this.showToast('Failed to create job template: ' + this.extractError(err), 'error')
-      );
-    }
-  }
-
-
-  }
-
-  editDatasource(ds: ConnectionProfile) {
-    this.newDs = {
-      id: ds.id,
-      profileName: ds.profileName,
-      dbType: ds.dbType || 'postgres',
-      host: ds.host,
-      port: typeof ds.port === 'string' ? parseInt(ds.port, 10) : (ds.port || 5432),
-      databaseName: ds.databaseName,
-      listOfSchemas: ds.listOfSchemas,
-      username: ds.user,
-      password: ds.pass
-    };
-    this.testResult = '';
-    this.go('ds-new', null, 'Datasources', 'Edit profile');
-  }
-
-
-
 }

@@ -21,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import com.archon.openmetadata.common.repositories.SystemAuditLogRepository;
 import com.archon.openmetadata.common.models.SystemAuditLog;
+import org.springframework.beans.factory.annotation.Autowired;
 import java.time.LocalDateTime;
 
 @RestController
@@ -121,5 +122,13 @@ public class JobController {
                     WebMvcLinkBuilder.linkTo(
                             WebMvcLinkBuilder.methodOn(JobController.class).getById(entity.getId()))
                         .withSelfRel())));
+  }
+
+  @Autowired
+  private com.archon.openmetadata.job.services.SseBroadcasterService sseBroadcasterService;
+
+  @GetMapping(value = "/{id}/stream", produces = org.springframework.http.MediaType.TEXT_EVENT_STREAM_VALUE)
+  public org.springframework.web.servlet.mvc.method.annotation.SseEmitter streamJob(@PathVariable UUID id) {
+    return sseBroadcasterService.createEmitter(id);
   }
 }

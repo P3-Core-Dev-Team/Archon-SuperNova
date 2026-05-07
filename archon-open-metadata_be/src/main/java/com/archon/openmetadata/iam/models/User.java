@@ -26,6 +26,10 @@ public class User extends AuditModel {
 
   private String username;
   private String password;
+  private String email;
+  private String role;
+  private String status;
+  private LocalDateTime lastLogin;
 
   @Column(name = "last_attempt_password")
   private LocalDateTime lastAttemptPassword;

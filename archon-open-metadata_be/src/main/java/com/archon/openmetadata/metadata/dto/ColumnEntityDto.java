@@ -11,7 +11,6 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class ColumnEntityDto extends AuditModelDto {
   private UUID id;
-  private TableEntityDto table;
   private String columnName;
   private String columnType;
   private Integer columnLength;
@@ -19,4 +18,12 @@ public class ColumnEntityDto extends AuditModelDto {
   private Integer scale;
   private Boolean primary;
   private Boolean indexColumn;
+
+  // Sensitive Data
+  private Boolean isSensitive;
+  private String sensitivityType;
+  private Double sensitivityScore;
+
+  // Flattened for UI
+  private String tableName;
 }

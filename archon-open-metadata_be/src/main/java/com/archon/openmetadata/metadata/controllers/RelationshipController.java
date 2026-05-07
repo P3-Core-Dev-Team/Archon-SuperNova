@@ -103,6 +103,9 @@ public class RelationshipController {
                     criteriaBuilder.like(
                         root.get("id").as(String.class), "%" + filterBean.getSearchText() + "%"));
               }
+              if (filterBean.getJobId() != null) {
+                predicates.add(criteriaBuilder.equal(root.get("job").get("id"), filterBean.getJobId()));
+              }
 
               if (predicates.isEmpty()) {
                 return criteriaBuilder.conjunction();

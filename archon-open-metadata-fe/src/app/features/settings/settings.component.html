@@ -49,5 +49,17 @@
       <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">{{ 'SETTINGS.LOGS_DESC' | translate }}</p>
       <button class="btn" style="background: #ef4444; box-shadow: none;">{{ 'SETTINGS.CLEAR_LOGS' | translate }}</button>
     </div>
+    <!-- System Configuration block -->
+    <div class="glass-panel" style="background: rgba(15,23,42,0.4)">
+      <h3>System Configuration</h3>
+      <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 0.9rem;">Configure global platform properties</p>
+      
+      <div class="form-group">
+        <label>Data Cleanup Period (Days)</label>
+        <input type="number" class="form-control" [(ngModel)]="dataCleanupDays">
+      </div>
+      
+      <button class="btn" (click)="saveSystemProperties()">Save System Properties</button>
+    </div>
   </div>
 </div>

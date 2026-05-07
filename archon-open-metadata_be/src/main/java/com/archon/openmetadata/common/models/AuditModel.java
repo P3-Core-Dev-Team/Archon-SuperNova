@@ -19,6 +19,9 @@ public abstract class AuditModel {
   @Column(name = "audit_user")
   private String auditUser;
 
+  @Column(name = "is_active")
+  private Boolean isActive = true;
+
   @PrePersist
   protected void onCreate() {
     createdAt = LocalDateTime.now();

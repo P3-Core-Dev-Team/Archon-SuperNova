@@ -38,7 +38,7 @@ public class ConnectionProfile extends AuditModel {
   @Column(name = "list_of_schemas", columnDefinition = "TEXT")
   private String listOfSchemas;
 
-  @Lob
+  @Column(name = "connection_hash")
   private String connectionHash;
 
   @OneToMany(mappedBy = "datasourceProfile")

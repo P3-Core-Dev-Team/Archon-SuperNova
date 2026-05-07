@@ -26,7 +26,7 @@ public class Group extends AuditModel {
   @Column(name = "group_name")
   private String groupName;
 
-  @Column(name ="description")
+  @Column(name = "description")
   private String description;
 
   @ManyToMany
@@ -35,4 +35,8 @@ public class Group extends AuditModel {
       joinColumns = @JoinColumn(name = "group_id"),
       inverseJoinColumns = @JoinColumn(name = "role_id"))
   private List<Role> roles;
+
+  @ManyToMany(mappedBy = "groups")
+  @com.fasterxml.jackson.annotation.JsonIgnoreProperties("groups")
+  private List<User> users;
 }
